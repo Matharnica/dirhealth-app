@@ -85,7 +85,7 @@ jobs:
       - name: Copy installer to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: 213.165.72.148
+          host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.VPS_SSH_KEY }}
           source: ./installer/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
@@ -95,7 +95,7 @@ jobs:
       - name: Update version and restart API
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: 213.165.72.148
+          host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
