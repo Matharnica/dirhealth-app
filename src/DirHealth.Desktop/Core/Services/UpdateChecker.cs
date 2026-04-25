@@ -9,13 +9,13 @@ public record UpdateInfo(string Version, string DownloadUrl);
 
 public class UpdateChecker
 {
-    private readonly HttpClient _http;
-    private readonly string _apiBase;
+    private const string ReleasesApi = "https://api.github.com/repos/matharnica/dirhealth/releases/latest";
 
-    public UpdateChecker(HttpClient http, string apiBase)
+    private readonly HttpClient _http;
+
+    public UpdateChecker(HttpClient http)
     {
-        _http    = http;
-        _apiBase = apiBase.TrimEnd('/');
+        _http = http;
     }
 
     public async Task<(UpdateInfo? Update, string Diagnostic)> CheckAsync()
@@ -23,20 +23,34 @@ public class UpdateChecker
         var currentVersion = GetCurrentVersion();
         try
         {
-            var res = await _http.GetAsync($"{_apiBase}/v1/version");
+            using var req = new HttpRequestMessage(HttpMethod.Get, ReleasesApi);
+            req.Headers.UserAgent.Add(new ProductInfoHeaderValue("DirHealth", currentVersion));
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+
+            var res = await _http.SendAsync(req);
 
             if (!res.IsSuccessStatusCode)
-                return (null, $"API returned {(int)res.StatusCode}");
+                return (null, $"GitHub API returned {(int)res.StatusCode}");
 
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
 
-            var latestVer = doc.RootElement.GetProperty("version").GetString() ?? "";
+            var tagName   = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+            var latestVer = tagName.TrimStart('v');
 
             if (!IsNewer(latestVer, currentVersion))
                 return (null, $"Up to date (installed={currentVersion}, latest={latestVer})");
 
-            var downloadUrl = $"{_apiBase}/download/DirHealth-Setup-{latestVer}.exe";
+            var downloadUrl = doc.RootElement
+                .GetProperty("assets")
+                .EnumerateArray()
+                .Select(a => a.GetProperty("browser_download_url").GetString())
+                .FirstOrDefault(u => u?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
+                ?? "";
+
+            if (string.IsNullOrEmpty(downloadUrl))
+                return (null, "Release found but no .exe asset attached yet");
+
             return (new UpdateInfo(latestVer, downloadUrl), $"Update found: {latestVer}");
         }
         catch (Exception ex)
