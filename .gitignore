@@ -8,3 +8,12 @@ CLAUDE.md
 docs/
 .superpowers/
 .claude/
+
+# Secrets – never commit these
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+node_modules/
+**/dist/
