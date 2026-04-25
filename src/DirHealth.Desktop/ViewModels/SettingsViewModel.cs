@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.Services;
+using DirHealth.Desktop.Core.Storage;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -27,8 +28,8 @@ public partial class SettingsViewModel : BaseViewModel
     public string CurrentVersion { get; } = UpdateChecker.GetCurrentVersion();
 
     public List<int> ScanIntervalOptions { get; } = [1, 2, 4, 8, 12, 24];
-    public Action<bool, int>? OnScheduleChanged  { get; set; }
-    public Func<Task>?        OnCheckForUpdates  { get; set; }
+    public Action<bool, int>?    OnScheduleChanged  { get; set; }
+    public Func<Task<string>>?  OnCheckForUpdates  { get; set; }
 
     partial void OnAutoScanEnabledChanged(bool value)      => OnScheduleChanged?.Invoke(value, AutoScanIntervalHours);
     partial void OnAutoScanIntervalHoursChanged(int value) => OnScheduleChanged?.Invoke(AutoScanEnabled, value);
@@ -51,8 +52,7 @@ public partial class SettingsViewModel : BaseViewModel
         UpdateStatusText     = "Checking…";
         try
         {
-            await OnCheckForUpdates();
-            UpdateStatusText = "Check complete — see banner at top if an update is available.";
+            UpdateStatusText = await OnCheckForUpdates();
         }
         catch (Exception ex) { UpdateStatusText = $"Check failed: {ex.Message}"; }
         finally { IsCheckingForUpdates = false; }
@@ -84,6 +84,7 @@ public partial class SettingsViewModel : BaseViewModel
         _connector.Domain   = string.IsNullOrWhiteSpace(Domain) ? null : Domain;
         _connector.Username = string.IsNullOrWhiteSpace(Username) ? null : Username;
         _connector.Password = string.IsNullOrWhiteSpace(Password) ? null : Password;
+        CredentialStore.Save(Domain ?? "", Username ?? "", Password ?? "");
         StatusMessage       = "Settings saved.";
     }
 }
