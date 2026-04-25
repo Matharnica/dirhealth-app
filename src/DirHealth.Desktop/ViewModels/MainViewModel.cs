@@ -191,11 +191,7 @@ public partial class MainViewModel : BaseViewModel
                 if (total > 0)
                     DownloadProgress = (int)(downloaded * 100 / total);
             }
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            var args = $"/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /RESTARTEXITCODE=0";
-            if (!string.IsNullOrEmpty(exePath))
-                args += $" /RESTARTAPP=\"{exePath}\"";
-            System.Diagnostics.Process.Start(tmp, args);
+            System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
             Application.Current.Shutdown();
         }
         catch (Exception ex)

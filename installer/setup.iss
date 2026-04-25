@@ -42,3 +42,4 @@ Type: filesandordirs; Name: "{userappdata}\DirHealth"
 
 [Run]
 Filename: "{app}\DirHealth.exe"; Description: "{cm:LaunchProgram,DirHealth}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\DirHealth.exe"; Flags: nowait; Check: WizardSilent
