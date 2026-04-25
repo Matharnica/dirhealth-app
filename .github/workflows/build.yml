@@ -64,4 +64,6 @@ jobs:
           files: installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
+          prerelease: false
+          draft: false
 
