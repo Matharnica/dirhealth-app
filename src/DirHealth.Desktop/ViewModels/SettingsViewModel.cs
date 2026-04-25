@@ -39,6 +39,7 @@ public partial class SettingsViewModel : BaseViewModel
         _connector = connector;
         Domain     = connector.Domain ?? "";
         Username   = connector.Username ?? "";
+        Password   = connector.Password ?? "";
     }
 
     [RelayCommand]

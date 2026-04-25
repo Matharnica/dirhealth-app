@@ -7,7 +7,15 @@ namespace DirHealth.Desktop.Views.Settings;
 
 public partial class SettingsView : UserControl
 {
-    public SettingsView() => InitializeComponent();
+    public SettingsView()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is SettingsViewModel vm && !string.IsNullOrEmpty(vm.Password))
+                PasswordInput.Password = vm.Password;
+        };
+    }
 
     private void PasswordInput_PasswordChanged(object sender, System.Windows.RoutedEventArgs e)
     {

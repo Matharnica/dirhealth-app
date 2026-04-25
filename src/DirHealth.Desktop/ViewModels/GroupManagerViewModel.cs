@@ -31,6 +31,7 @@ public partial class GroupManagerViewModel : BaseViewModel
             _allGroups = await _scanner.GetAllGroupsWithCountAsync();
             ApplyFilter();
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load groups: {ex.Message}"; }
         finally { IsLoading = false; }
     }
 
@@ -58,6 +59,7 @@ public partial class GroupManagerViewModel : BaseViewModel
         {
             SelectedGroup = await _scanner.GetGroupDetailAsync(group.DistinguishedName);
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load group details: {ex.Message}"; }
         finally { IsLoadingDetail = false; }
     }
 }

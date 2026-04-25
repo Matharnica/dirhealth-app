@@ -34,6 +34,7 @@ public partial class OuBrowserViewModel : BaseViewModel
             _allOUs = await _scanner.GetAllOUsAsync();
             ApplyFilter();
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load OUs: {ex.Message}"; }
         finally { IsLoading = false; }
     }
 
@@ -67,6 +68,7 @@ public partial class OuBrowserViewModel : BaseViewModel
             SelectedOuComputerCount = computers;
             SelectedOuGroupCount    = groups;
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load OU details: {ex.Message}"; }
         finally { IsLoadingCounts = false; }
     }
 }

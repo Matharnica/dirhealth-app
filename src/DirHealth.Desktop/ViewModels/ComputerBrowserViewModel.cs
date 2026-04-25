@@ -40,6 +40,7 @@ public partial class ComputerBrowserViewModel : BaseViewModel
             _allComputers = await _scanner.GetAllComputersAsync();
             ApplyFilter();
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load computers: {ex.Message}"; }
         finally { IsLoading = false; }
     }
 
