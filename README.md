@@ -50,13 +50,13 @@ Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the nu
 
 ## Getting started
 
-1. **Download** the latest `.exe` from [Releases](https://github.com/matharnica/dirhealth/releases/latest) — single file, no runtime needed
+1. **Download** the latest `.exe` from [Releases](https://github.com/matharnica/dirhealth-app/releases/latest) — single file, no runtime needed
 2. **Log in** with your domain admin credentials
 3. **Scan & fix** — review findings, drill into categories, export a full PDF report
 
 ## Download
 
-→ [**Latest Release**](https://github.com/matharnica/dirhealth/releases/latest)
+→ [**Latest Release**](https://github.com/matharnica/dirhealth-app/releases/latest)
 
 Requires Windows 10/11. Self-contained .exe — no .NET runtime installation needed.
 
