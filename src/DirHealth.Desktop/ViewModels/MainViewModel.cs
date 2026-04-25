@@ -27,6 +27,7 @@ public partial class MainViewModel : BaseViewModel
     [ObservableProperty] private bool          _isDownloadingUpdate;
 
     private string _updateDownloadUrl = "";
+    private bool   _updateHasDirectDownload;
 
     public string AppVersion { get; } = UpdateChecker.GetCurrentVersion();
 
@@ -154,6 +155,11 @@ public partial class MainViewModel : BaseViewModel
     public async Task DownloadAndInstallUpdateAsync()
     {
         if (string.IsNullOrEmpty(_updateDownloadUrl)) return;
+        if (!_updateHasDirectDownload)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_updateDownloadUrl) { UseShellExecute = true });
+            return;
+        }
         IsDownloadingUpdate = true;
         try
         {
@@ -174,8 +180,9 @@ public partial class MainViewModel : BaseViewModel
 
     public void SetUpdateAvailable(UpdateInfo info)
     {
-        _updateDownloadUrl = info.DownloadUrl;
-        UpdateVersion      = info.Version;
-        ShowUpdateBanner   = true;
+        _updateDownloadUrl      = info.DownloadUrl;
+        _updateHasDirectDownload = info.HasDirectDownload;
+        UpdateVersion           = info.Version;
+        ShowUpdateBanner        = true;
     }
 }
