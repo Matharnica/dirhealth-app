@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace DirHealth.Desktop.Core.Services;
 
-public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownload);
+public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownload, long FileSize);
 
 public class UpdateChecker
 {
@@ -52,18 +52,19 @@ public class UpdateChecker
             if (!IsNewer(latestVer, currentVersion))
                 return (null, $"Up to date (installed={currentVersion}, latest={latestVer})");
 
-            var downloadUrl = release
-                .GetProperty("assets")
-                .EnumerateArray()
-                .Select(a => a.GetProperty("browser_download_url").GetString())
-                .FirstOrDefault(u => u?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
-                ?? "";
+            var asset = release.GetProperty("assets").EnumerateArray()
+                .FirstOrDefault(a =>
+                    a.GetProperty("browser_download_url").GetString()
+                     ?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true);
 
-            if (string.IsNullOrEmpty(downloadUrl))
-                return (new UpdateInfo(latestVer, releaseUrl, false),
+            if (asset.ValueKind == JsonValueKind.Undefined)
+                return (new UpdateInfo(latestVer, releaseUrl, false, 0),
                         $"Update found: {latestVer} (no installer attached yet — opens release page)");
 
-            return (new UpdateInfo(latestVer, downloadUrl, true), $"Update found: {latestVer}");
+            var downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+            var fileSize    = asset.GetProperty("size").GetInt64();
+
+            return (new UpdateInfo(latestVer, downloadUrl, true, fileSize), $"Update found: {latestVer}");
         }
         catch (Exception ex)
         {

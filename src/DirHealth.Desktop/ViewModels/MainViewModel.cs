@@ -36,6 +36,7 @@ public partial class MainViewModel : BaseViewModel
 
     private string _updateDownloadUrl = "";
     private bool   _updateHasDirectDownload;
+    private long   _updateFileSize;
 
     public string AppVersion { get; } = UpdateChecker.GetCurrentVersion();
 
@@ -176,7 +177,8 @@ public partial class MainViewModel : BaseViewModel
             using var http = new System.Net.Http.HttpClient();
             using var response = await http.GetAsync(_updateDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
-            var total = response.Content.Headers.ContentLength ?? -1;
+            var total = _updateFileSize > 0 ? _updateFileSize
+                      : response.Content.Headers.ContentLength ?? -1;
             using var src  = await response.Content.ReadAsStreamAsync();
             using var dest = File.Create(tmp);
             var buf = new byte[81920];
@@ -206,9 +208,10 @@ public partial class MainViewModel : BaseViewModel
 
     public void SetUpdateAvailable(UpdateInfo info)
     {
-        _updateDownloadUrl      = info.DownloadUrl;
+        _updateDownloadUrl       = info.DownloadUrl;
         _updateHasDirectDownload = info.HasDirectDownload;
-        UpdateVersion           = info.Version;
-        ShowUpdateBanner        = true;
+        _updateFileSize          = info.FileSize;
+        UpdateVersion            = info.Version;
+        ShowUpdateBanner         = true;
     }
 }
