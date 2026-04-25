@@ -153,18 +153,18 @@ public partial class App : Application
             else         scheduler.Stop();
         };
 
-        appSettings.OnCheckForUpdates = () => CheckForUpdatesAsync(http, apiBase, mainVm);
+        appSettings.OnCheckForUpdates = () => CheckForUpdatesAsync(http, mainVm);
 
-        _ = CheckForUpdatesAsync(http, apiBase, mainVm);
+        _ = CheckForUpdatesAsync(http, mainVm);
     }
 
-    private static async Task CheckForUpdatesAsync(HttpClient http, string apiBase, MainViewModel mainVm)
+    private static async Task CheckForUpdatesAsync(HttpClient http, MainViewModel mainVm)
     {
         try
         {
             await Task.Delay(5000);
             Log("Update check starting");
-            var checker = new DirHealth.Desktop.Core.Services.UpdateChecker(http, apiBase);
+            var checker = new DirHealth.Desktop.Core.Services.UpdateChecker(http);
             var (update, diagnostic) = await checker.CheckAsync();
             Log($"Update check: {diagnostic}");
             if (update is not null)
