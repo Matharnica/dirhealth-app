@@ -42,6 +42,7 @@ public partial class UserBrowserViewModel : BaseViewModel
             _allUsers = await _scanner.GetAllUsersAsync();
             ApplyFilter();
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load users: {ex.Message}"; }
         finally { IsLoading = false; }
     }
 

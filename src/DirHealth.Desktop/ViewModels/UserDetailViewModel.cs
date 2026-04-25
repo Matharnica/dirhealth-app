@@ -32,6 +32,7 @@ public partial class UserDetailViewModel : BaseViewModel
             var groups = await _scanner.GetUserGroupsAsync(user.DistinguishedName);
             foreach (var g in groups) Groups.Add(g);
         }
+        catch (Exception ex) { StatusMessage = $"Failed to load user details: {ex.Message}"; }
         finally { IsLoading = false; }
     }
 
