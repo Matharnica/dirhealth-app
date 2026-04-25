@@ -9,7 +9,7 @@ public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownl
 
 public class UpdateChecker
 {
-    private const string ReleasesApi = "https://api.github.com/repos/Matharnica/dirhealth-app/releases/latest";
+    private const string ReleasesApi = "https://api.github.com/repos/Matharnica/dirhealth-app/releases";
 
     private readonly HttpClient _http;
 
@@ -38,14 +38,21 @@ public class UpdateChecker
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
 
-            var tagName    = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
-            var latestVer  = tagName.TrimStart('v').Split('-')[0]; // strip pre-release suffix
-            var releaseUrl = doc.RootElement.GetProperty("html_url").GetString() ?? "";
+            // releases endpoint returns array, newest first — pick first non-draft entry
+            var release = doc.RootElement.EnumerateArray()
+                .FirstOrDefault(r => !r.GetProperty("draft").GetBoolean());
+
+            if (release.ValueKind == JsonValueKind.Undefined)
+                return (null, $"No releases published yet (installed={currentVersion})");
+
+            var tagName    = release.GetProperty("tag_name").GetString() ?? "";
+            var latestVer  = tagName.TrimStart('v').Split('-')[0];
+            var releaseUrl = release.GetProperty("html_url").GetString() ?? "";
 
             if (!IsNewer(latestVer, currentVersion))
                 return (null, $"Up to date (installed={currentVersion}, latest={latestVer})");
 
-            var downloadUrl = doc.RootElement
+            var downloadUrl = release
                 .GetProperty("assets")
                 .EnumerateArray()
                 .Select(a => a.GetProperty("browser_download_url").GetString())
