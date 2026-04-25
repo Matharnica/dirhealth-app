@@ -1,0 +1,270 @@
+<UserControl x:Class="DirHealth.Desktop.Views.DcInventory.DcInventoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left panel -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,16,16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Domain Controllers" FontSize="20" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"
+                           TextWrapping="Wrap" />
+
+                <StackPanel Grid.Row="1">
+                    <!-- Total DCs -->
+                    <Border Background="{DynamicResource BackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                        <StackPanel>
+                            <TextBlock Text="TOTAL DCs" FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
+                            <TextBlock Text="{Binding DcCount}" FontSize="24" FontWeight="Black"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- EOL DCs -->
+                    <Border BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EolCount}" Value="0">
+                                        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="END OF LIFE" FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
+                            <TextBlock FontSize="24" FontWeight="Black">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EolCount}" Value="0">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                                <TextBlock.Text>
+                                    <Binding Path="EolCount" FallbackValue="0" />
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Global Catalogs -->
+                    <Border Background="{DynamicResource BackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="GLOBAL CATALOGS" FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
+                            <TextBlock Text="{Binding GcCount}" FontSize="24" FontWeight="Black"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Content="↻  Refresh" Command="{Binding LoadCommand}"
+                            IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBool}}"
+                            HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+
+                    <ProgressBar IsIndeterminate="True" Height="2"
+                                 Background="Transparent" Foreground="{StaticResource AccentBrush}"
+                                 BorderThickness="0"
+                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,8,0,0"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Right: DC list -->
+        <Grid Grid.Column="1" Margin="24,20,24,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Empty / not-loaded state -->
+            <TextBlock Grid.RowSpan="2" Text="Click Refresh to load domain controllers."
+                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DomainControllers}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- Column header row -->
+            <Grid Grid.Row="0" Margin="16,0,0,6">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DomainControllers}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="210" />
+                    <ColumnDefinition Width="110" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="NAME / ROLES" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
+                <TextBlock Grid.Column="1" Text="OPERATING SYSTEM" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
+                <TextBlock Grid.Column="2" Text="LAST LOGON" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
+            </Grid>
+
+            <!-- DC list -->
+            <ListBox Grid.Row="1" ItemsSource="{Binding DomainControllers}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.Style>
+                    <Style TargetType="ListBox">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DomainControllers}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.Style>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0,0,0,6" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Padding="0">
+                            <!-- Red left bar for EOL DCs -->
+                            <Grid>
+                                <Border Width="4" HorizontalAlignment="Left" Background="#991B1B"
+                                        CornerRadius="6,0,0,6"
+                                        Visibility="{Binding IsEol, Converter={StaticResource BoolToVisibility}}" />
+                                <Grid Margin="20,12,16,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="210" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Column 1: Name + badges -->
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold" FontSize="14" />
+                                            <Border CornerRadius="4" Padding="5,1" Margin="8,2,0,0"
+                                                    Background="#7F1D1D"
+                                                    Visibility="{Binding IsEol, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="EOL" FontSize="9" FontWeight="Bold"
+                                                           Foreground="#FCA5A5" />
+                                            </Border>
+                                        </StackPanel>
+                                        <!-- FSMO + GC badges -->
+                                        <WrapPanel>
+                                            <ItemsControl ItemsSource="{Binding FsmoRoles}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border CornerRadius="3" Padding="6,2" Margin="0,0,4,2"
+                                                                Background="#1E3A5F">
+                                                            <TextBlock Text="{Binding}" FontSize="10"
+                                                                       Foreground="#93C5FD" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Border CornerRadius="3" Padding="6,2" Margin="0,0,4,2"
+                                                    Background="#14532D"
+                                                    Visibility="{Binding IsGlobalCatalog, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="Global Catalog" FontSize="10"
+                                                           Foreground="#86EFAC" />
+                                            </Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+
+                                    <!-- Column 2: OS -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OperatingSystem}" FontSize="12"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEol}" Value="True">
+                                                            <Setter Property="Foreground" Value="#F87171" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding EolInfo}" FontSize="10"
+                                                   Foreground="#F87171" Margin="0,2,0,0"
+                                                   Visibility="{Binding IsEol, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+
+                                    <!-- Column 3: Last Logon -->
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding LastLogonDisplay}"
+                                               FontSize="12" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+    </Grid>
+</UserControl>
