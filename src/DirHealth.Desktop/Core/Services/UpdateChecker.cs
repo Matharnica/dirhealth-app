@@ -9,7 +9,7 @@ public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownl
 
 public class UpdateChecker
 {
-    private const string ReleasesApi = "https://api.github.com/repos/matharnica/dirhealth/releases/latest";
+    private const string ReleasesApi = "https://api.github.com/repos/Matharnica/dirhealth-app/releases/latest";
 
     private readonly HttpClient _http;
 
