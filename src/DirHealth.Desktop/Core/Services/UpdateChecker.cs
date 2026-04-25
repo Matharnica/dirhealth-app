@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace DirHealth.Desktop.Core.Services;
 
-public record UpdateInfo(string Version, string DownloadUrl);
+public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownload);
 
 public class UpdateChecker
 {
@@ -29,14 +29,18 @@ public class UpdateChecker
 
             var res = await _http.SendAsync(req);
 
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return (null, $"No releases published yet (installed={currentVersion})");
+
             if (!res.IsSuccessStatusCode)
                 return (null, $"GitHub API returned {(int)res.StatusCode}");
 
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
 
-            var tagName   = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
-            var latestVer = tagName.TrimStart('v');
+            var tagName    = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+            var latestVer  = tagName.TrimStart('v').Split('-')[0]; // strip pre-release suffix
+            var releaseUrl = doc.RootElement.GetProperty("html_url").GetString() ?? "";
 
             if (!IsNewer(latestVer, currentVersion))
                 return (null, $"Up to date (installed={currentVersion}, latest={latestVer})");
@@ -49,9 +53,10 @@ public class UpdateChecker
                 ?? "";
 
             if (string.IsNullOrEmpty(downloadUrl))
-                return (null, "Release found but no .exe asset attached yet");
+                return (new UpdateInfo(latestVer, releaseUrl, false),
+                        $"Update found: {latestVer} (no installer attached yet — opens release page)");
 
-            return (new UpdateInfo(latestVer, downloadUrl), $"Update found: {latestVer}");
+            return (new UpdateInfo(latestVer, downloadUrl, true), $"Update found: {latestVer}");
         }
         catch (Exception ex)
         {
@@ -60,7 +65,7 @@ public class UpdateChecker
     }
 
     public static string GetCurrentVersion() =>
-        Assembly.GetExecutingAssembly()
+        (Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly())
             .GetName().Version?.ToString(3) ?? "1.0.0";
 
     private static bool IsNewer(string latest, string current) =>

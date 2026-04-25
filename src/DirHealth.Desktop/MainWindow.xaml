@@ -216,7 +216,7 @@
                     <TextBlock HorizontalAlignment="Center" Foreground="#93C5FD" FontSize="12"
                                VerticalAlignment="Center">
                         <Run Text="🆕 DirHealth " />
-                        <Run Text="{Binding UpdateVersion}" FontWeight="Bold" />
+                        <Run Text="{Binding UpdateVersion, Mode=OneWay}" FontWeight="Bold" />
                         <Run Text=" is available" />
                     </TextBlock>
                     <Button Grid.Column="1" Margin="0,0,8,0"
