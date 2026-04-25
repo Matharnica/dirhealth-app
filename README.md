@@ -60,6 +60,8 @@ Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the nu
 
 Requires Windows 10/11. Self-contained .exe — no .NET runtime installation needed.
 
+**Requires an Active Directory environment.** Run on a domain-joined Windows machine or any machine with network access to your domain controller.
+
 ## Support the project
 
 DirHealth is free and open source, maintained in spare time. If it saved you an afternoon of manual AD cleanup, consider buying a coffee:
