@@ -179,18 +179,20 @@ public partial class MainViewModel : BaseViewModel
             response.EnsureSuccessStatusCode();
             var total = _updateFileSize > 0 ? _updateFileSize
                       : response.Content.Headers.ContentLength ?? -1;
-            using var src  = await response.Content.ReadAsStreamAsync();
-            using var dest = File.Create(tmp);
-            var buf = new byte[81920];
-            long downloaded = 0;
-            int read;
-            while ((read = await src.ReadAsync(buf)) > 0)
+            using (var src  = await response.Content.ReadAsStreamAsync())
+            using (var dest = File.Create(tmp))
             {
-                await dest.WriteAsync(buf.AsMemory(0, read));
-                downloaded += read;
-                if (total > 0)
-                    DownloadProgress = (int)(downloaded * 100 / total);
-            }
+                var buf = new byte[81920];
+                long downloaded = 0;
+                int read;
+                while ((read = await src.ReadAsync(buf)) > 0)
+                {
+                    await dest.WriteAsync(buf.AsMemory(0, read));
+                    downloaded += read;
+                    if (total > 0)
+                        DownloadProgress = (int)(downloaded * 100 / total);
+                }
+            } // file handle closed here before starting installer
             System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
             Application.Current.Shutdown();
         }
