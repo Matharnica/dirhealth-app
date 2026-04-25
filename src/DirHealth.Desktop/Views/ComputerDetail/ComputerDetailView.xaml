@@ -1,0 +1,181 @@
+<UserControl x:Class="DirHealth.Desktop.Views.ComputerDetail.ComputerDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <!-- Header -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="{Binding Computer.Name}" FontSize="18" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsOnline}" Value="True">
+                                <Setter Property="Text" Value="● Online" />
+                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsOnline}" Value="False">
+                                <Setter Property="Text" Value="● Offline" />
+                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- WMI Error -->
+        <TextBlock Text="{Binding WmiError}" Foreground="{StaticResource ErrorBrush}"
+                   FontSize="12" Margin="0,0,0,8"
+                   Visibility="{Binding WmiError, Converter={StaticResource StringToVisibility}}" />
+
+        <!-- Tabs -->
+        <TabControl Background="Transparent" BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource BorderBrush}">
+
+            <!-- Overview -->
+            <TabItem Header="Overview">
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="PING" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOnline}" Value="True">
+                                            <Setter Property="Text" Value="{Binding PingMs, StringFormat={}{0}ms}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsOnline}" Value="False">
+                                            <Setter Property="Text" Value="—" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="OS" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Computer.OperatingSystem}" FontSize="14"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                        <TextBlock Text="LAST LOGON" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Computer.LastLogon, StringFormat={}{0:dd.MM.yyyy}}"
+                                   FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="STATUS" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock FontSize="14">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Computer.IsEnabled}" Value="True">
+                                            <Setter Property="Text" Value="Enabled" />
+                                            <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Computer.IsEnabled}" Value="False">
+                                            <Setter Property="Text" Value="Disabled" />
+                                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Disks -->
+            <TabItem Header="Disks">
+                <ListView ItemsSource="{Binding Disks}" Margin="0,12,0,0"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="{DynamicResource TextPrimaryBrush}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Drive"  Width="70"  DisplayMemberBinding="{Binding Drive}" />
+                            <GridViewColumn Header="Total"  Width="100" DisplayMemberBinding="{Binding TotalDisplay}" />
+                            <GridViewColumn Header="Free"   Width="100" DisplayMemberBinding="{Binding FreeDisplay}" />
+                            <GridViewColumn Header="Used %" Width="80"  DisplayMemberBinding="{Binding UsedPercent}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+
+            <!-- Local Admins -->
+            <TabItem Header="Local Admins">
+                <ListView ItemsSource="{Binding LocalAdmins}" Margin="0,12,0,0"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="{DynamicResource TextPrimaryBrush}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Account" Width="300" DisplayMemberBinding="{Binding Full}" />
+                            <GridViewColumn Header="Domain"  Width="200" DisplayMemberBinding="{Binding Domain}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+
+            <!-- Logged On -->
+            <TabItem Header="Logged On">
+                <ListView ItemsSource="{Binding LoggedOn}" Margin="0,12,0,0"
+                          Background="Transparent" BorderThickness="0"
+                          Foreground="{DynamicResource TextPrimaryBrush}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="User"   Width="300" DisplayMemberBinding="{Binding Full}" />
+                            <GridViewColumn Header="Domain" Width="200" DisplayMemberBinding="{Binding Domain}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+
+            <!-- Eventlog -->
+            <TabItem Header="Eventlog">
+                <StackPanel Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <ComboBox ItemsSource="{Binding LogSources}"
+                                  SelectedItem="{Binding SelectedLog}"
+                                  Margin="0,0,8,0" Width="120"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource InputBackgroundBrush}" />
+                        <ComboBox ItemsSource="{Binding Severities}"
+                                  SelectedItem="{Binding SelectedSeverity}"
+                                  Margin="0,0,8,0" Width="120"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource InputBackgroundBrush}" />
+                        <ComboBox ItemsSource="{Binding EntryCounts}"
+                                  SelectedItem="{Binding MaxEntries}"
+                                  Margin="0,0,8,0" Width="80"
+                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                  Background="{DynamicResource InputBackgroundBrush}" />
+                        <Button Style="{StaticResource SecondaryButton}" Content="Refresh"
+                                Command="{Binding RefreshEventLogCommand}" />
+                    </StackPanel>
+                    <ListView ItemsSource="{Binding EventLog}"
+                              Background="Transparent" BorderThickness="0"
+                              Foreground="{DynamicResource TextPrimaryBrush}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Time"    Width="140" DisplayMemberBinding="{Binding TimeGenerated, StringFormat={}{0:dd.MM.yy HH:mm:ss}}" />
+                                <GridViewColumn Header="Level"   Width="90"  DisplayMemberBinding="{Binding Level}" />
+                                <GridViewColumn Header="Source"  Width="150" DisplayMemberBinding="{Binding Source}" />
+                                <GridViewColumn Header="Message" Width="400" DisplayMemberBinding="{Binding Message}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </StackPanel>
+            </TabItem>
+
+        </TabControl>
+    </StackPanel>
+</UserControl>

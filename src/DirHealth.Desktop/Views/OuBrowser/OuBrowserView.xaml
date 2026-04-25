@@ -1,0 +1,123 @@
+<UserControl x:Class="DirHealth.Desktop.Views.OuBrowser.OuBrowserView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: OU list -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,16,16">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Organizational Units" FontSize="22" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
+            <TextBox Grid.Row="1" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     Background="{DynamicResource InputBackgroundBrush}"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     BorderBrush="{DynamicResource InputBorderBrush}"
+                     Padding="8,6" Margin="0,0,0,8" />
+            <TextBlock Grid.Row="2" Text="Loading…" FontSize="12"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+            <ListBox Grid.Row="3" x:Name="OUList" ItemsSource="{Binding OUs}"
+                     Background="Transparent" BorderThickness="0"
+                     SelectionChanged="OUList_SelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="4,4">
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Description}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="11" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+        </Border>
+
+        <!-- Right: OU detail -->
+        <ScrollViewer Grid.Column="1" Margin="24,20,24,20" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedOU}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="{Binding SelectedOU.Name}" FontSize="20" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                <TextBlock Text="{Binding SelectedOU.Description}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="13" Margin="0,0,0,16" TextWrapping="Wrap" />
+                <ProgressBar IsIndeterminate="True" Height="2" Margin="0,0,0,8"
+                             Background="Transparent" Foreground="{StaticResource AccentBrush}"
+                             BorderThickness="0"
+                             Visibility="{Binding IsLoadingCounts, Converter={StaticResource BoolToVisibility}}" />
+                <UniformGrid Columns="3" Margin="0,0,0,16">
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="USERS" FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding SelectedOuUserCount}" FontSize="28"
+                                       FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                        <StackPanel>
+                            <TextBlock Text="COMPUTERS" FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding SelectedOuComputerCount}" FontSize="28"
+                                       FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="GROUPS" FontSize="10"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding SelectedOuGroupCount}" FontSize="28"
+                                       FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding SelectedOU.DistinguishedName}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="11" TextWrapping="Wrap" FontFamily="Consolas" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <TextBlock Grid.Column="1" Text="Select an OU to view details"
+                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
+                   HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedOU}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </Grid>
+</UserControl>

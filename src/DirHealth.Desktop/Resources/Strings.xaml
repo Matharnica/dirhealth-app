@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="AppName">DirHealth</sys:String>
+    <sys:String x:Key="AppTagline">Active Directory Health Monitor</sys:String>
+    <sys:String x:Key="NavDashboard">Dashboard</sys:String>
+    <sys:String x:Key="NavFindings">Findings</sys:String>
+    <sys:String x:Key="NavSettings">Settings</sys:String>
+    <sys:String x:Key="BtnScan">Run Scan</sys:String>
+    <sys:String x:Key="BtnExportCsv">Export CSV</sys:String>
+    <sys:String x:Key="BtnExportPdf">Export PDF</sys:String>
+    <sys:String x:Key="LblScore">Compliance Score</sys:String>
+    <sys:String x:Key="LblLastScan">Last Scan</sys:String>
+    <sys:String x:Key="TrialExpiredTitle">Your Trial Has Expired</sys:String>
+    <sys:String x:Key="TrialExpiredMsg">Enter your license key to continue using DirHealth.</sys:String>
+
+</ResourceDictionary>

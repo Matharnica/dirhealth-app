@@ -1,0 +1,318 @@
+<Window x:Class="DirHealth.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:vm="clr-namespace:DirHealth.Desktop.ViewModels"
+        xmlns:dashboard="clr-namespace:DirHealth.Desktop.Views.Dashboard"
+        xmlns:findings="clr-namespace:DirHealth.Desktop.Views.Findings"
+        xmlns:settings="clr-namespace:DirHealth.Desktop.Views.Settings"
+        xmlns:adsearch="clr-namespace:DirHealth.Desktop.Views.AdSearch"
+        xmlns:computerbrowser="clr-namespace:DirHealth.Desktop.Views.ComputerBrowser"
+        xmlns:userbrowser="clr-namespace:DirHealth.Desktop.Views.UserBrowser"
+        xmlns:oubrowser="clr-namespace:DirHealth.Desktop.Views.OuBrowser"
+        xmlns:groupmanager="clr-namespace:DirHealth.Desktop.Views.GroupManager"
+        xmlns:passwordreport="clr-namespace:DirHealth.Desktop.Views.PasswordReport"
+        xmlns:domainadmins="clr-namespace:DirHealth.Desktop.Views.DomainAdmins"
+        Title="DirHealth" Height="700" Width="1100" MinHeight="600" MinWidth="900"
+        Background="{DynamicResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="5"
+                            UseAeroCaptionButtons="False" GlassFrameThickness="0,0,0,1" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
+            <dashboard:DashboardView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FindingsViewModel}">
+            <findings:FindingsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <settings:SettingsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AdSearchViewModel}">
+            <adsearch:AdSearchView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ComputerBrowserViewModel}">
+            <computerbrowser:ComputerBrowserView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:UserBrowserViewModel}">
+            <userbrowser:UserBrowserView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:OuBrowserViewModel}">
+            <oubrowser:OuBrowserView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GroupManagerViewModel}">
+            <groupmanager:GroupManagerView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:PasswordReportViewModel}">
+            <passwordreport:PasswordReportView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DomainAdminsViewModel}">
+            <domainadmins:DomainAdminsView />
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Custom title bar -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Logo + App name -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                            Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Image Source="Resources/icon_128.png" Width="18" Height="18"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           VerticalAlignment="Center" Margin="0,0,7,0" />
+                    <TextBlock FontSize="13" FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Center">
+                        <Run Text="DirHealth" />
+                        <Run Text=" v" /><Run Text="{Binding AppVersion, Mode=OneWay}"
+                             Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="Normal" FontSize="11" />
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Window controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Minimize -->
+                    <Button Width="46" Height="36"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="TitleBar_Minimize"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            FontSize="12" Content="&#xE921;"
+                            FontFamily="Segoe MDL2 Assets">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavHoverBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <!-- Maximize/Restore -->
+                    <Button Width="46" Height="36"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="TitleBar_MaximizeRestore"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            x:Name="MaximizeButton">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+                                <Setter Property="FontSize" Value="11" />
+                                <Setter Property="Content" Value="&#xE922;" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavHoverBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <!-- Close -->
+                    <Button Width="46" Height="36"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="TitleBar_Close"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            FontSize="11" Content="&#xE8BB;"
+                            FontFamily="Segoe MDL2 Assets">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#C42B1C" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Row 1: All banners stacked -->
+        <StackPanel Grid.Row="1">
+            <!-- Score drop alert -->
+            <Border Background="#1C1917" Padding="12,6"
+                    Visibility="{Binding ShowScoreDropAlert, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock HorizontalAlignment="Center" Foreground="#FCA5A5" FontSize="12">
+                        <Run Text="⚠ " />
+                        <Run Text="{Binding ScoreDropMessage}" />
+                    </TextBlock>
+                    <Button Grid.Column="1" Content="✕" FontSize="11"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#FCA5A5" Cursor="Hand"
+                            Command="{Binding DismissScoreAlertCommand}" />
+                </Grid>
+            </Border>
+
+            <!-- Update available banner -->
+            <Border Background="#0F2942" Padding="12,6"
+                    Visibility="{Binding ShowUpdateBanner, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock HorizontalAlignment="Center" Foreground="#93C5FD" FontSize="12"
+                               VerticalAlignment="Center">
+                        <Run Text="🆕 DirHealth " />
+                        <Run Text="{Binding UpdateVersion}" FontWeight="Bold" />
+                        <Run Text=" is available" />
+                    </TextBlock>
+                    <Button Grid.Column="1" Margin="0,0,8,0"
+                            Style="{StaticResource PrimaryButton}" Padding="12,4" FontSize="12"
+                            Command="{Binding DownloadAndInstallUpdateCommand}"
+                            IsEnabled="{Binding IsDownloadingUpdate, Converter={StaticResource InverseBool}}">
+                        <Button.Content>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Update now" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDownloadingUpdate}" Value="True">
+                                                <Setter Property="Text" Value="Downloading…" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button.Content>
+                    </Button>
+                    <Button Grid.Column="2" Content="✕" FontSize="11"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#93C5FD" Cursor="Hand"
+                            Command="{Binding DismissUpdateBannerCommand}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Main Layout -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="210" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Sidebar -->
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+                <StackPanel Margin="12,20,12,12">
+                    <TextBlock Text="DirHealth" FontSize="18" FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}" Margin="8,0,0,4" />
+                    <TextBlock Text="AD Health Monitor" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,20" />
+
+                    <!-- Overview -->
+                    <TextBlock Text="OVERVIEW" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="8,0,0,4" Opacity="0.6" />
+                    <Button Style="{StaticResource NavButton}" Content="⊞  Dashboard"
+                            Command="{Binding ShowDashboardCommand}" />
+                    <Button Style="{StaticResource NavButton}" Content="⚠  Findings"
+                            Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16" />
+
+                    <!-- AD Tools -->
+                    <TextBlock Text="AD TOOLS" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="8,0,0,4" Opacity="0.6" />
+                    <Button Style="{StaticResource NavButton}" Content="🔍  AD Search"
+                            Command="{Binding ShowAdSearchCommand}" />
+                    <Button Style="{StaticResource NavButton}" Content="👥  Users"
+                            Command="{Binding ShowUserBrowserCommand}" Margin="0,2,0,16" />
+
+                    <!-- Computer -->
+                    <TextBlock Text="COMPUTER" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="8,0,0,4" Opacity="0.6" />
+                    <Button Style="{StaticResource NavButton}" Content="🖥  Computers"
+                            Command="{Binding ShowComputerBrowserCommand}" Margin="0,2,0,16" />
+
+                    <!-- AD Views -->
+                    <TextBlock Text="AD VIEWS" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="8,0,0,4" Opacity="0.6" />
+                    <Button Style="{StaticResource NavButton}" Content="🏢  OUs"
+                            Command="{Binding ShowOuBrowserCommand}" />
+                    <Button Style="{StaticResource NavButton}" Content="👥  Groups"
+                            Command="{Binding ShowGroupManagerCommand}" Margin="0,2,0,0" />
+                    <Button Style="{StaticResource NavButton}" Content="🔑  Pwd Expiry"
+                            Command="{Binding ShowPasswordReportCommand}" Margin="0,2,0,0" />
+                    <Button Style="{StaticResource NavButton}" Content="🛡  Domain Admins"
+                            Command="{Binding ShowDomainAdminsCommand}" Margin="0,2,0,16" />
+
+                    <!-- System -->
+                    <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="8,0,0,4" Opacity="0.6" />
+                    <Button Style="{StaticResource NavButton}" Content="⚙  Settings"
+                            Command="{Binding ShowSettingsCommand}" />
+
+                </StackPanel>
+            </Border>
+
+            <!-- Content -->
+            <ContentControl Grid.Column="1" Content="{Binding CurrentView}"
+                            Margin="24" />
+        </Grid>
+    </Grid>
+</Window>

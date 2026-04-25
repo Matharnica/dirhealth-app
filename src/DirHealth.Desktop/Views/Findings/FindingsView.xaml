@@ -1,0 +1,213 @@
+<UserControl x:Class="DirHealth.Desktop.Views.Findings.FindingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: findings list + filters -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,16,16">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Findings" FontSize="22" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           VerticalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="CSV" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ExportCsvCommand}"
+                            Padding="10,4" FontSize="11" Margin="0,0,6,0" />
+                    <Button Content="PDF" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ExportPdfCommand}"
+                            Padding="10,4" FontSize="11" />
+                </StackPanel>
+            </Grid>
+
+            <TextBox Grid.Row="1" Style="{StaticResource DarkTextBox}"
+                     Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     Tag="Filter findings…" Margin="0,0,0,8" />
+
+            <Grid Grid.Row="2" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="SEVERITY" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" Width="110"
+                          ItemsSource="{Binding SeverityOptions}"
+                          SelectedItem="{Binding SeverityFilter}" />
+            </Grid>
+
+            <CheckBox Grid.Row="3" Content="Show acknowledged"
+                      IsChecked="{Binding ShowAcknowledged}"
+                      Foreground="{DynamicResource TextSecondaryBrush}"
+                      Margin="0,0,0,12" />
+
+            <ListBox Grid.Row="4"
+                     ItemsSource="{Binding FilteredFindings}"
+                     SelectedItem="{Binding SelectedFinding}"
+                     Background="Transparent" BorderThickness="0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="8,10" BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="0,0,0,1">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,4,0,0">
+                                    <Run Text="{Binding Count, Mode=OneWay}" />
+                                    <Run Text=" affected · " />
+                                    <Run Text="{Binding Severity, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border Background="{TemplateBinding Background}">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#1E2235" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#161925" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+        </Grid>
+        </Border>
+
+        <!-- Right: finding detail -->
+        <Border Grid.Column="1" Margin="24,20,24,20" Style="{StaticResource Card}">
+            <StackPanel>
+                <TextBlock Text="Select a finding to view details"
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedFinding}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <StackPanel DataContext="{Binding SelectedFinding}">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Description}" FontSize="13"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                    <TextBlock Text="Affected Objects" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                    <ListBox ItemsSource="{Binding AffectedObjects}"
+                             Background="{DynamicResource BackgroundBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             MaxHeight="280">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Padding="4,2" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+
+                <!-- Acknowledge section -->
+                <StackPanel Margin="0,16,0,0">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedFinding}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="ACKNOWLEDGE" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                    <TextBox Style="{StaticResource DarkTextBox}"
+                             Text="{Binding AcknowledgeNote, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="Optional note (e.g. 'all service accounts, reviewed')"
+                             Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="✓ Acknowledge" Padding="12,6" FontSize="12"
+                                Command="{Binding AcknowledgeCommand}"
+                                Margin="0,0,8,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedFinding.IsAcknowledged}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="↩ Unacknowledge" Padding="12,6" FontSize="12"
+                                Command="{Binding UnacknowledgeCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedFinding.IsAcknowledged}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

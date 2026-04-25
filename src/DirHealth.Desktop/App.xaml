@@ -1,0 +1,21 @@
+<Application x:Class="DirHealth.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DirHealth.Desktop">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Themes/Dark.xaml" />
+                <ResourceDictionary Source="Resources/Styles.xaml" />
+                <ResourceDictionary Source="Resources/Strings.xaml" />
+                <ResourceDictionary Source="Resources/Icons.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <local:BoolToVisibilityConverter    x:Key="BoolToVisibility" />
+            <local:InverseBoolConverter         x:Key="InverseBool" />
+            <local:StringToVisibilityConverter  x:Key="StringToVisibility" />
+            <local:NonZeroToVisibilityConverter x:Key="NonZeroToVisibility" />
+            <local:DaysToExpiryColorConverter   x:Key="DaysToExpiryColor" />
+            <local:IsNegativeConverter          x:Key="IsNegativeConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

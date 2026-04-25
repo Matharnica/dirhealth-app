@@ -1,0 +1,88 @@
+<UserControl x:Class="DirHealth.Desktop.Views.AdSearch.AdSearchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left panel -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="16,24,16,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="AD Search" FontSize="20" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,20" />
+
+                <TextBlock Grid.Row="1" Text="SEARCH TYPE" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                <ComboBox Grid.Row="2"
+                          ItemsSource="{Binding Modes}"
+                          SelectedItem="{Binding SelectedMode}"
+                          DisplayMemberPath="Label"
+                          Margin="0,0,0,12" />
+
+                <TextBlock Grid.Row="3" Text="QUERY" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+
+                <StackPanel Grid.Row="4">
+                    <TextBox Background="{DynamicResource InputBackgroundBrush}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             BorderBrush="{DynamicResource InputBorderBrush}"
+                             BorderThickness="1" Padding="8,6"
+                             Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,0,10">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding SearchCommand}" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Content="Search" Command="{Binding SearchCommand}" />
+
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Text="Searching…" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,8,0,0"
+                               Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Right panel: results -->
+        <Grid Grid.Column="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Results" FontSize="16" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16" />
+
+            <ListView Grid.Row="1" ItemsSource="{Binding Results}"
+                      Background="Transparent" BorderThickness="0"
+                      Foreground="{DynamicResource TextPrimaryBrush}">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Type"  Width="80"  DisplayMemberBinding="{Binding TypeLabel}" />
+                        <GridViewColumn Header="Name"  Width="180" DisplayMemberBinding="{Binding Name}" />
+                        <GridViewColumn Header="SAM"   Width="150" DisplayMemberBinding="{Binding SamAccountName}" />
+                        <GridViewColumn Header="Email" Width="200" DisplayMemberBinding="{Binding Email}" />
+                        <GridViewColumn Header="OU"    Width="250" DisplayMemberBinding="{Binding OU}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
+    </Grid>
+</UserControl>

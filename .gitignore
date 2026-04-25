@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+*.user
+.vs/
+publish/
+installer/Output/
+CLAUDE.md
+docs/
+.superpowers/
+.claude/

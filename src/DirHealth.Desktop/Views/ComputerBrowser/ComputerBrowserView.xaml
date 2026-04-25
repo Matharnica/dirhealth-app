@@ -1,0 +1,58 @@
+<UserControl x:Class="DirHealth.Desktop.Views.ComputerBrowser.ComputerBrowserView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:detail="clr-namespace:DirHealth.Desktop.Views.ComputerDetail">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: Computer list -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,16,16">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Computers" FontSize="22" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
+            <TextBox Grid.Row="1" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     Background="{DynamicResource InputBackgroundBrush}"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     BorderBrush="{DynamicResource InputBorderBrush}"
+                     Padding="8,6" Margin="0,0,0,8"
+                     x:Name="FilterBox" />
+            <ListBox Grid.Row="2" x:Name="ComputerList"
+                     ItemsSource="{Binding Computers}"
+                     Background="Transparent" BorderThickness="0"
+                     SelectionMode="Single"
+                     SelectionChanged="ComputerList_SelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="4,4">
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding OperatingSystem}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="11" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+        </Border>
+
+        <!-- Right: Detail panel -->
+        <Border Grid.Column="1" Margin="24,20,24,20"
+                Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibility}}">
+            <detail:ComputerDetailView DataContext="{Binding Detail}" />
+        </Border>
+    </Grid>
+</UserControl>

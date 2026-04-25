@@ -1,0 +1,186 @@
+<UserControl x:Class="DirHealth.Desktop.Views.UserBrowser.UserBrowserView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- User list -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,16,16">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Users" FontSize="22" FontWeight="Bold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
+            <TextBox Grid.Row="1" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                     Background="{DynamicResource InputBackgroundBrush}"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     BorderBrush="{DynamicResource InputBorderBrush}"
+                     Padding="8,6" Margin="0,0,0,8" />
+            <ComboBox Grid.Row="2" ItemsSource="{Binding UserFilterOptions}"
+                      SelectedItem="{Binding UserFilter}"
+                      Margin="0,0,0,8"
+                      Background="{DynamicResource InputBackgroundBrush}"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      BorderBrush="{DynamicResource InputBorderBrush}">
+                <ComboBox.Resources>
+                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}"     Color="#1E293B" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F1F5F9" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"  Color="#6366F1" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+                </ComboBox.Resources>
+            </ComboBox>
+            <ListBox Grid.Row="3" x:Name="UserList"
+                     ItemsSource="{Binding Users}"
+                     Background="Transparent" BorderThickness="0"
+                     SelectionChanged="UserList_SelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="4,4">
+                            <TextBlock Text="{Binding DisplayName}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SamAccountName}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="11" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+        </Border>
+
+        <!-- User detail -->
+        <ScrollViewer Grid.Column="1"
+                      Margin="24,20,24,20"
+                      Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibility}}"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Grid Margin="0,0,0,16">
+                    <TextBlock Text="{Binding Detail.User.DisplayName}" FontSize="18" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               VerticalAlignment="Center" />
+                    <Button HorizontalAlignment="Right"
+                            Style="{StaticResource SecondaryButton}"
+                            Content="Export PDF" Padding="12,4" FontSize="12"
+                            Command="{Binding Detail.ExportPdfCommand}" />
+                </Grid>
+
+                <!-- Key attributes grid -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="USERNAME" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Detail.User.SamAccountName}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="EMAIL" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Detail.User.Email}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                        <TextBlock Text="LAST LOGON" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding Detail.User.LastLogon, StringFormat={}{0:dd.MM.yyyy}}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="STATUS" FontSize="10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Foreground="{DynamicResource TextPrimaryBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Detail.User.IsEnabled}" Value="True">
+                                            <Setter Property="Text" Value="Enabled" />
+                                            <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Detail.User.IsEnabled}" Value="False">
+                                            <Setter Property="Text" Value="Disabled" />
+                                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Password info -->
+                <TextBlock Text="PASSWORD" FontSize="10"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <TextBlock Text="Never expires: "
+                               Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                    <TextBlock FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Detail.User.PasswordNeverExpires}" Value="True">
+                                        <Setter Property="Text" Value="Yes" />
+                                        <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Detail.User.PasswordNeverExpires}" Value="False">
+                                        <Setter Property="Text" Value="No" />
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="  |  Last set: "
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                    <TextBlock Text="{Binding Detail.User.PasswordLastSet, StringFormat={}{0:dd.MM.yyyy}}"
+                               Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                </StackPanel>
+
+                <!-- Password expiry -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <TextBlock Text="Expires in: " Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                    <TextBlock FontSize="12" FontWeight="SemiBold"
+                               Foreground="{Binding Detail.User.DaysUntilPasswordExpiry, Converter={StaticResource DaysToExpiryColor}}"
+                               Text="{Binding Detail.User.DaysUntilPasswordExpiry, StringFormat={}{0} days, TargetNullValue='Never / N/A'}" />
+                </StackPanel>
+
+                <!-- Group memberships -->
+                <TextBlock Text="GROUP MEMBERSHIPS" FontSize="10"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                <ItemsControl ItemsSource="{Binding Detail.Groups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceBrush}"
+                                    CornerRadius="4" Padding="8,4" Margin="0,2">
+                                <TextBlock Text="{Binding}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- DN -->
+                <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,4" />
+                <TextBlock Text="{Binding Detail.User.DistinguishedName}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DirHealth Icon — A+B Kombination</title>
+<style>
+  body { background: #111; font-family: sans-serif; color: #eee; display: flex; flex-direction: column; align-items: center; padding: 40px; gap: 48px; }
+  h1 { color: #fff; margin: 0; font-size: 1.4rem; letter-spacing: .05em; }
+  .row { display: flex; gap: 40px; align-items: flex-end; flex-wrap: wrap; justify-content: center; }
+  .card { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .label { font-size: .75rem; color: #666; }
+  .bg-dark { background: #1a1a2e; padding: 14px; border-radius: 12px; }
+  .bg-light { background: #f0f0f0; padding: 14px; border-radius: 12px; }
+  .bg-win { background: #f3f3f3; padding: 14px; border-radius: 4px; }
+  .divider { width: 2px; background: #333; height: 180px; border-radius: 2px; }
+  h2 { color: #888; font-size: .85rem; font-weight: 400; margin: 0; }
+  .variant-label { font-size: .9rem; font-weight: 600; color: #aaa; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>DirHealth — Shield + Tree Kombination</h1>
+
+<!-- ICON SVG DEFINITION (reused across sizes) -->
+<!-- Variante 1: Blau + Grün (Original) -->
+<div>
+  <div class="variant-label" style="text-align:center">Variante 1 — Blau / Grün</div>
+  <div class="row">
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="256" height="256" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Shield -->
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#shield1)"/>
+          <defs>
+            <linearGradient id="shield1" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#3B82F6"/>
+              <stop offset="1" stop-color="#1D4ED8"/>
+            </linearGradient>
+          </defs>
+          <!-- Shield inner highlight -->
+          <path d="M32 6L10 15v17c0 13 9.5 22.5 22 26 12.5-3.5 22-13 22-26V15L32 6z" fill="url(#shieldInner1)" opacity=".18"/>
+          <defs>
+            <linearGradient id="shieldInner1" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#fff"/>
+              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- Root node -->
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/>
+          <circle cx="32" cy="18" r="3.5" fill="#60A5FA"/>
+          <!-- Lines to children -->
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <!-- Left child -->
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <!-- Center child -->
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <!-- Right child — green = healthy -->
+          <circle cx="44" cy="34" r="5" fill="#10B981"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- EKG line -->
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#7DFFB3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+        </svg>
+      </div>
+      <div class="label">256px</div>
+    </div>
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="128" height="128" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#s128)"/>
+          <defs><linearGradient id="s128" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#60A5FA"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="44" cy="34" r="5" fill="#10B981"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#7DFFB3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+        </svg>
+      </div>
+      <div class="label">128px</div>
+    </div>
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#s64)"/>
+          <defs><linearGradient id="s64" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#60A5FA"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="44" cy="34" r="5" fill="#10B981"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#7DFFB3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+        </svg>
+      </div>
+      <div class="label">64px</div>
+    </div>
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#s32)"/>
+          <defs><linearGradient id="s32" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5" fill="#fff" opacity=".9"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="2" opacity=".6"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="2" opacity=".6"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="2" opacity=".6"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="44" cy="34" r="5" fill="#10B981"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h15" stroke="#7DFFB3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="label">32px</div>
+    </div>
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="#2563EB"/>
+          <circle cx="32" cy="17" r="6" fill="#fff" opacity=".9"/>
+          <line x1="28" y1="22" x2="18" y2="32" stroke="#fff" stroke-width="3" opacity=".5"/>
+          <line x1="36" y1="22" x2="46" y2="32" stroke="#fff" stroke-width="3" opacity=".5"/>
+          <circle cx="18" cy="36" r="5" fill="#fff" opacity=".5"/>
+          <circle cx="46" cy="36" r="6" fill="#10B981"/>
+          <path d="M10 48h8l3-7 5 14 3-8 3 5h13" stroke="#7DFFB3" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="label">16px</div>
+    </div>
+    <div class="divider"></div>
+    <!-- Windows context -->
+    <div class="card">
+      <div class="bg-win">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#sw)"/>
+          <defs><linearGradient id="sw" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#60A5FA"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".7"/>
+          <circle cx="44" cy="34" r="5" fill="#10B981"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#7DFFB3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+        </svg>
+      </div>
+      <div class="label">auf hellem BG</div>
+    </div>
+  </div>
+</div>
+
+<!-- Variante 2: Dunkleres Blau / stärker -->
+<div>
+  <div class="variant-label" style="text-align:center; margin-top: 32px;">Variante 2 — Indigo / stärker</div>
+  <div class="row">
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="256" height="256" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#shield2)"/>
+          <defs>
+            <linearGradient id="shield2" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#6366F1"/>
+              <stop offset="1" stop-color="#3730A3"/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#A5B4FC"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="44" cy="34" r="5" fill="#34D399"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+        </svg>
+      </div>
+      <div class="label">256px</div>
+    </div>
+    <div class="card">
+      <div class="bg-dark">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#s2_64)"/>
+          <defs><linearGradient id="s2_64" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#3730A3"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#A5B4FC"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="44" cy="34" r="5" fill="#34D399"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+        </svg>
+      </div>
+      <div class="label">64px</div>
+    </div>
+    <div class="card">
+      <div class="bg-win">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <path d="M32 3L7 13v19c0 15 11 25.5 25 29 14-3.5 25-14 25-29V13L32 3z" fill="url(#s2_win)"/>
+          <defs><linearGradient id="s2_win" x1="7" y1="3" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#3730A3"/></linearGradient></defs>
+          <circle cx="32" cy="18" r="5.5" fill="#fff" opacity=".95"/><circle cx="32" cy="18" r="3.5" fill="#A5B4FC"/>
+          <line x1="29" y1="22" x2="20" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="35" y1="22" x2="44" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <line x1="32" y1="23" x2="32" y2="31" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+          <circle cx="20" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="32" cy="34" r="4" fill="#fff" opacity=".6"/>
+          <circle cx="44" cy="34" r="5" fill="#34D399"/>
+          <path d="M41.5 34l2 2 3.5-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 47h6l2.5-6 4.5 12 3.5-9 2.5 5h5h10" stroke="#6EE7B7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>
+        </svg>
+      </div>
+      <div class="label">auf hellem BG</div>
+    </div>
+  </div>
+</div>
+
+<p style="color:#555; font-size:.8rem; margin-top: 16px;">Variante 1 (Blau) oder Variante 2 (Indigo)? Oder Farbe anpassen?</p>
+</body>
+</html>
