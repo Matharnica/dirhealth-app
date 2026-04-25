@@ -130,10 +130,11 @@ public partial class App : Application
         var groupManager     = new GroupManagerViewModel(scanner);
         var passwordReport   = new PasswordReportViewModel(scanner);
         var domainAdmins     = new DomainAdminsViewModel(scanner);
+        var dcInventory      = new DcInventoryViewModel(scanner);
         var mainVm           = new MainViewModel(dashboard, findings, appSettings,
                                                  adSearch, computerBrowser, userBrowser,
                                                  ouBrowser, groupManager, passwordReport,
-                                                 domainAdmins);
+                                                 domainAdmins, dcInventory);
 
         Log("Creating MainWindow");
         var mainWindow = new MainWindow(mainVm);

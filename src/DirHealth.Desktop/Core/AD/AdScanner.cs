@@ -7,6 +7,35 @@ public class AdScanner
 {
     private readonly AdConnector _connector;
 
+    private static readonly (string Substring, DateTime EolDate)[] EolTable =
+    [
+        ("Windows XP",       new DateTime(2014,  4,  8)),
+        ("Windows Vista",    new DateTime(2017,  4, 11)),
+        ("Windows 8.1",      new DateTime(2023,  1, 10)),
+        ("Windows 8",        new DateTime(2016,  1, 12)),
+        ("Windows 7",        new DateTime(2020,  1, 14)),
+        ("Server 2003",      new DateTime(2015,  7, 14)),
+        ("Server 2008 R2",   new DateTime(2020,  1, 14)),
+        ("Server 2008",      new DateTime(2020,  1, 14)),
+        ("Server 2012 R2",   new DateTime(2023, 10, 10)),
+        ("Server 2012",      new DateTime(2023, 10, 10)),
+    ];
+
+    private static bool TryGetEolDate(string os, out DateTime eolDate)
+    {
+        eolDate = default;
+        if (string.IsNullOrEmpty(os)) return false;
+        foreach (var (sub, date) in EolTable)
+        {
+            if (os.Contains(sub, StringComparison.OrdinalIgnoreCase))
+            {
+                eolDate = date;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public AdScanner(AdConnector connector)
     {
         _connector = connector;
@@ -78,6 +107,152 @@ public class AdScanner
         });
     }
 
+    public async Task<List<AdComputer>> GetEolComputersAsync()
+    {
+        return await Task.Run(() =>
+        {
+            var computers = QueryComputers("(&(objectClass=computer)(operatingSystem=*))");
+            var eol = new List<AdComputer>();
+            foreach (var c in computers)
+            {
+                if (TryGetEolDate(c.OperatingSystem, out var eolDate))
+                {
+                    c.IsEol   = true;
+                    c.EolDate = eolDate;
+                    eol.Add(c);
+                }
+            }
+            return eol;
+        });
+    }
+
+    public async Task<List<AdDomainController>> GetAllDomainControllersAsync()
+    {
+        return await Task.Run(() =>
+        {
+            string domainDn = "", configDn = "";
+            try
+            {
+                var dsePath = string.IsNullOrEmpty(_connector.Domain)
+                    ? "LDAP://RootDSE"
+                    : $"LDAP://{_connector.Domain}/RootDSE";
+                using var dse = _connector.GetEntry(dsePath);
+                domainDn = dse.Properties["defaultNamingContext"]?[0]?.ToString() ?? "";
+                configDn = dse.Properties["configurationNamingContext"]?[0]?.ToString() ?? "";
+            }
+            catch { }
+
+            var fsmo = domainDn.Length > 0 && configDn.Length > 0
+                ? GetFsmoOwners(domainDn, configDn)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var gcs = configDn.Length > 0
+                ? GetGlobalCatalogServers(configDn)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var dcs = new List<AdDomainController>();
+            using var root     = _connector.GetRootEntry();
+            using var searcher = _connector.CreateSearcher(root,
+                "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))",
+                "cn", "operatingSystem", "operatingSystemVersion",
+                "lastLogonTimestamp", "distinguishedName");
+            using var results = searcher.FindAll();
+
+            foreach (SearchResult r in results)
+            {
+                var props = r.Properties;
+                var name  = GetString(props, "cn");
+                var os    = GetString(props, "operatingSystem");
+
+                var dc = new AdDomainController
+                {
+                    Name              = name,
+                    OperatingSystem   = os,
+                    OsVersion         = GetString(props, "operatingSystemVersion"),
+                    LastLogon         = GetDateTime(props, "lastLogonTimestamp"),
+                    DistinguishedName = GetString(props, "distinguishedName"),
+                    IsGlobalCatalog   = gcs.Contains(name),
+                    FsmoRoles         = fsmo
+                        .Where(kv => kv.Value.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        .Select(kv => kv.Key)
+                        .ToList(),
+                };
+
+                if (TryGetEolDate(os, out var eolDate))
+                {
+                    dc.IsEol   = true;
+                    dc.EolDate = eolDate;
+                }
+
+                dcs.Add(dc);
+            }
+
+            return dcs.OrderByDescending(d => d.IsEol).ThenBy(d => d.Name).ToList();
+        });
+    }
+
+    private Dictionary<string, string> GetFsmoOwners(string domainDn, string configDn)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        void Read(string dn, string roleName)
+        {
+            try
+            {
+                using var entry = GetEntryByDn(dn);
+                var owner = entry.Properties["fSMORoleOwner"]?[0]?.ToString() ?? "";
+                if (owner.Length > 0) result[roleName] = ExtractServerFromNtdsDn(owner);
+            }
+            catch { }
+        }
+
+        Read(domainDn,                                    "PDC Emulator");
+        Read($"CN=RID Manager$,CN=System,{domainDn}",     "RID Master");
+        Read($"CN=Infrastructure,{domainDn}",             "Infrastructure Master");
+        Read($"CN=Schema,{configDn}",                     "Schema Master");
+        Read($"CN=Partitions,{configDn}",                 "Domain Naming Master");
+
+        return result;
+    }
+
+    private HashSet<string> GetGlobalCatalogServers(string configDn)
+    {
+        var gcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var configEntry = GetEntryByDn(configDn);
+            using var searcher    = _connector.CreateSearcher(configEntry,
+                "(&(objectClass=nTDSDSA)(options:1.2.840.113556.1.4.803:=1))",
+                "distinguishedName");
+            using var results = searcher.FindAll();
+            foreach (SearchResult r in results)
+            {
+                var dn   = r.Properties["distinguishedName"]?[0]?.ToString() ?? "";
+                var name = ExtractServerFromNtdsDn(dn);
+                if (name.Length > 0) gcs.Add(name);
+            }
+        }
+        catch { }
+        return gcs;
+    }
+
+    private static string ExtractServerFromNtdsDn(string ntdsDn)
+    {
+        // "CN=NTDS Settings,CN=<ServerName>,CN=Servers,..."
+        var parts = ntdsDn.Split(',');
+        if (parts.Length < 2) return ntdsDn;
+        var part = parts[1].Trim();
+        return part.StartsWith("CN=", StringComparison.OrdinalIgnoreCase) ? part[3..] : part;
+    }
+
+    private DirectoryEntry GetEntryByDn(string dn)
+    {
+        var path = string.IsNullOrEmpty(_connector.Domain)
+            ? $"LDAP://{dn}"
+            : $"LDAP://{_connector.Domain}/{dn}";
+        return _connector.GetEntry(path);
+    }
+
     public async Task<List<AdComputer>> GetComputersWithoutOsAsync()
     {
         return await Task.Run(() =>
@@ -101,11 +276,12 @@ public class AdScanner
         var noOsTask           = GetComputersWithoutOsAsync();
         var securityTask       = GetKerberoastableAccountsAsync();
         var policyTask         = GetPasswordPolicyFindingsAsync();
+        var eolTask            = GetEolComputersAsync();
 
         await Task.WhenAll(totalUsersTask, totalGroupsTask, totalComputersTask,
                            inactiveUsersTask, neverExpiresTask, expiredPwdTask,
                            emptyGroupsTask, singleMemberTask, inactiveCompsTask,
-                           noOsTask, securityTask, policyTask);
+                           noOsTask, securityTask, policyTask, eolTask);
 
         int totalUsers     = totalUsersTask.Result;
         int totalGroups    = totalGroupsTask.Result;
@@ -130,6 +306,11 @@ public class AdScanner
         score -= Math.Min(12, securityTask.Result.Count * 4);
         foreach (var f in policyTask.Result)
             score -= f.Severity == FindingSeverity.High ? 8 : 4;
+
+        // EOL OS — DCs count more heavily
+        var eolDcCount  = eolTask.Result.Count(c => c.IsDomainController);
+        var eolPcCount  = eolTask.Result.Count(c => !c.IsDomainController);
+        score -= Math.Min(15, eolDcCount * 8 + eolPcCount * 3);
 
         // Floor at 10 — a non-zero score shows there's always room to improve
         return Math.Max(10, score);
@@ -323,6 +504,7 @@ public class AdScanner
         var kerberoastable       = await GetKerberoastableAccountsAsync();
         var adminSdHolder        = await GetAdminSdHolderAccountsAsync();
         var policyFindings       = await GetPasswordPolicyFindingsAsync();
+        var eolComputers         = await GetEolComputersAsync();
 
         if (inactiveUsers.Count > 0)
             findings.Add(new AdFinding
@@ -424,6 +606,28 @@ public class AdScanner
             });
 
         findings.AddRange(policyFindings);
+
+        if (eolComputers.Count > 0)
+        {
+            var dcEol  = eolComputers.Where(c => c.IsDomainController).ToList();
+            var sev    = dcEol.Count > 0 ? FindingSeverity.High : FindingSeverity.Medium;
+            var affected = eolComputers
+                .OrderByDescending(c => c.IsDomainController)
+                .Select(c => c.IsDomainController
+                    ? $"[DC] {c.Name} — {c.OperatingSystem}"
+                    : $"{c.Name} — {c.OperatingSystem}")
+                .ToList();
+            findings.Add(new AdFinding
+            {
+                Category        = "EolOperatingSystems",
+                Title           = $"{eolComputers.Count} Computer(s) Running End-of-Life OS",
+                Description     = "These computers run Windows versions that no longer receive security updates. Any new vulnerability remains permanently unpatched." +
+                                  (dcEol.Count > 0 ? $" {dcEol.Count} domain controller(s) are affected — critical risk." : ""),
+                Severity        = sev,
+                Count           = eolComputers.Count,
+                AffectedObjects = affected,
+            });
+        }
 
         return findings;
     }
@@ -657,14 +861,16 @@ public class AdScanner
         foreach (SearchResult result in results)
         {
             var props = result.Properties;
+            var uac = GetLong(props, "userAccountControl");
             computers.Add(new AdComputer
             {
-                Name              = GetString(props, "cn"),
-                OperatingSystem   = GetString(props, "operatingSystem"),
-                OsVersion         = GetString(props, "operatingSystemVersion"),
-                LastLogon         = GetDateTime(props, "lastLogonTimestamp"),
-                IsEnabled         = (GetLong(props, "userAccountControl") & 2) == 0,
-                DistinguishedName = GetString(props, "distinguishedName"),
+                Name                = GetString(props, "cn"),
+                OperatingSystem     = GetString(props, "operatingSystem"),
+                OsVersion           = GetString(props, "operatingSystemVersion"),
+                LastLogon           = GetDateTime(props, "lastLogonTimestamp"),
+                IsEnabled           = (uac & 2) == 0,
+                IsDomainController  = (uac & 8192) != 0,
+                DistinguishedName   = GetString(props, "distinguishedName"),
             });
         }
         return computers;

@@ -18,6 +18,7 @@ public partial class MainViewModel : BaseViewModel
     public GroupManagerViewModel    GroupManager    { get; }
     public PasswordReportViewModel  PasswordReport  { get; }
     public DomainAdminsViewModel    DomainAdmins    { get; }
+    public DcInventoryViewModel     DcInventory     { get; }
 
     [ObservableProperty] private BaseViewModel _currentView;
     [ObservableProperty] private bool          _showScoreDropAlert;
@@ -50,7 +51,8 @@ public partial class MainViewModel : BaseViewModel
         OuBrowserViewModel ouBrowser,
         GroupManagerViewModel groupManager,
         PasswordReportViewModel passwordReport,
-        DomainAdminsViewModel domainAdmins)
+        DomainAdminsViewModel domainAdmins,
+        DcInventoryViewModel dcInventory)
     {
         Dashboard       = dashboard;
         Findings        = findings;
@@ -62,6 +64,7 @@ public partial class MainViewModel : BaseViewModel
         GroupManager    = groupManager;
         PasswordReport  = passwordReport;
         DomainAdmins    = domainAdmins;
+        DcInventory     = dcInventory;
         _currentView    = dashboard;
 
         Dashboard.PropertyChanged += (_, e) =>
@@ -152,6 +155,13 @@ public partial class MainViewModel : BaseViewModel
     {
         CurrentView = DomainAdmins;
         await DomainAdmins.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowDcInventoryAsync()
+    {
+        CurrentView = DcInventory;
+        await DcInventory.LoadAsync();
     }
 
     [RelayCommand]
