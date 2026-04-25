@@ -25,6 +25,14 @@ public partial class MainViewModel : BaseViewModel
     [ObservableProperty] private bool          _showUpdateBanner;
     [ObservableProperty] private string        _updateVersion = "";
     [ObservableProperty] private bool          _isDownloadingUpdate;
+    [ObservableProperty] private int           _downloadProgress;
+
+    public string UpdateButtonText => IsDownloadingUpdate
+        ? (DownloadProgress > 0 ? $"Downloading {DownloadProgress}%" : "Downloading…")
+        : "Update now";
+
+    partial void OnIsDownloadingUpdateChanged(bool value) => OnPropertyChanged(nameof(UpdateButtonText));
+    partial void OnDownloadProgressChanged(int value)    => OnPropertyChanged(nameof(UpdateButtonText));
 
     private string _updateDownloadUrl = "";
     private bool   _updateHasDirectDownload;
@@ -161,19 +169,37 @@ public partial class MainViewModel : BaseViewModel
             return;
         }
         IsDownloadingUpdate = true;
+        DownloadProgress    = 0;
         try
         {
-            var tmp   = Path.Combine(Path.GetTempPath(), "DirHealth-Setup.exe");
-            using var http  = new System.Net.Http.HttpClient();
-            var bytes = await http.GetByteArrayAsync(_updateDownloadUrl);
-            File.WriteAllBytes(tmp, bytes);
-            System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
+            var tmp = Path.Combine(Path.GetTempPath(), "DirHealth-Setup.exe");
+            using var http = new System.Net.Http.HttpClient();
+            using var response = await http.GetAsync(_updateDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength ?? -1;
+            using var src  = await response.Content.ReadAsStreamAsync();
+            using var dest = File.Create(tmp);
+            var buf = new byte[81920];
+            long downloaded = 0;
+            int read;
+            while ((read = await src.ReadAsync(buf)) > 0)
+            {
+                await dest.WriteAsync(buf.AsMemory(0, read));
+                downloaded += read;
+                if (total > 0)
+                    DownloadProgress = (int)(downloaded * 100 / total);
+            }
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+            var args = $"/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /RESTARTEXITCODE=0";
+            if (!string.IsNullOrEmpty(exePath))
+                args += $" /RESTARTAPP=\"{exePath}\"";
+            System.Diagnostics.Process.Start(tmp, args);
             Application.Current.Shutdown();
         }
         catch (Exception ex)
         {
-            ScoreDropMessage   = $"Update failed: {ex.Message}";
-            ShowScoreDropAlert = true;
+            ScoreDropMessage    = $"Update failed: {ex.Message}";
+            ShowScoreDropAlert  = true;
             IsDownloadingUpdate = false;
         }
     }

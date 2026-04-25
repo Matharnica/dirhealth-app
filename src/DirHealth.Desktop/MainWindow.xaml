@@ -224,18 +224,7 @@
                             Command="{Binding DownloadAndInstallUpdateCommand}"
                             IsEnabled="{Binding IsDownloadingUpdate, Converter={StaticResource InverseBool}}">
                         <Button.Content>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="Update now" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsDownloadingUpdate}" Value="True">
-                                                <Setter Property="Text" Value="Downloading…" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <TextBlock Text="{Binding UpdateButtonText, Mode=OneWay}" />
                         </Button.Content>
                     </Button>
                     <Button Grid.Column="2" Content="✕" FontSize="11"
