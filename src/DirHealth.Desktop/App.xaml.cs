@@ -153,28 +153,45 @@ public partial class App : Application
             else         scheduler.Stop();
         };
 
-        appSettings.OnCheckForUpdates = () => CheckForUpdatesAsync(http, mainVm);
+        appSettings.OnCheckForUpdates = () => ManualUpdateCheckAsync(http, mainVm);
 
-        _ = CheckForUpdatesAsync(http, mainVm);
+        _ = StartupUpdateCheckAsync(http, mainVm);
     }
 
-    private static async Task CheckForUpdatesAsync(HttpClient http, MainViewModel mainVm)
+    private static async Task StartupUpdateCheckAsync(HttpClient http, MainViewModel mainVm)
     {
         try
         {
             await Task.Delay(5000);
-            Log("Update check starting");
+            Log("Startup update check starting");
             var checker = new DirHealth.Desktop.Core.Services.UpdateChecker(http);
             var (update, diagnostic) = await checker.CheckAsync();
-            Log($"Update check: {diagnostic}");
+            Log($"Startup update check: {diagnostic}");
             if (update is not null)
-            {
-                Log($"Update available: {update.Version}");
                 System.Windows.Application.Current.Dispatcher.Invoke(
                     () => mainVm.SetUpdateAvailable(update));
-            }
         }
-        catch (Exception ex) { Log($"Update check exception: {ex}"); }
+        catch (Exception ex) { Log($"Startup update check exception: {ex}"); }
+    }
+
+    private static async Task<string> ManualUpdateCheckAsync(HttpClient http, MainViewModel mainVm)
+    {
+        try
+        {
+            Log("Manual update check starting");
+            var checker = new DirHealth.Desktop.Core.Services.UpdateChecker(http);
+            var (update, diagnostic) = await checker.CheckAsync();
+            Log($"Manual update check: {diagnostic}");
+            if (update is not null)
+                System.Windows.Application.Current.Dispatcher.Invoke(
+                    () => mainVm.SetUpdateAvailable(update));
+            return diagnostic;
+        }
+        catch (Exception ex)
+        {
+            Log($"Manual update check exception: {ex}");
+            return $"Check failed: {ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     private static Dictionary<string, string> LoadSettings()
