@@ -8,6 +8,9 @@ CLAUDE.md
 docs/
 .superpowers/
 .claude/
+_bmad/
+_bmad-output/
+_bmad*/
 
 # Secrets – never commit these
 **/.env
