@@ -13,6 +13,7 @@
         xmlns:groupmanager="clr-namespace:DirHealth.Desktop.Views.GroupManager"
         xmlns:passwordreport="clr-namespace:DirHealth.Desktop.Views.PasswordReport"
         xmlns:domainadmins="clr-namespace:DirHealth.Desktop.Views.DomainAdmins"
+        xmlns:dcinventory="clr-namespace:DirHealth.Desktop.Views.DcInventory"
         Title="DirHealth" Height="700" Width="1100" MinHeight="600" MinWidth="900"
         Background="{DynamicResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen">
@@ -52,6 +53,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:DomainAdminsViewModel}">
             <domainadmins:DomainAdminsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DcInventoryViewModel}">
+            <dcinventory:DcInventoryView />
         </DataTemplate>
     </Window.Resources>
 
@@ -287,7 +291,9 @@
                     <Button Style="{StaticResource NavButton}" Content="🔑  Pwd Expiry"
                             Command="{Binding ShowPasswordReportCommand}" Margin="0,2,0,0" />
                     <Button Style="{StaticResource NavButton}" Content="🛡  Domain Admins"
-                            Command="{Binding ShowDomainAdminsCommand}" Margin="0,2,0,16" />
+                            Command="{Binding ShowDomainAdminsCommand}" Margin="0,2,0,0" />
+                    <Button Style="{StaticResource NavButton}" Content="🖧  DC Inventory"
+                            Command="{Binding ShowDcInventoryCommand}" Margin="0,2,0,16" />
 
                     <!-- System -->
                     <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"
