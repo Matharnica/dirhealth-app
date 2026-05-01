@@ -5,7 +5,7 @@
   No license key. No subscription. No nag screens.</p>
 
   <a href="https://github.com/matharnica/dirhealth/releases/latest">
-    <img alt="Download" src="https://img.shields.io/github/v/release/matharnica/dirhealth?label=Download&style=for-the-badge&color=6366f1" />
+    <img alt="Download" src="https://img.shields.io/github/v/release/matharnica/dirhealth-app?label=Download&style=for-the-badge&color=6366f1" />
   </a>
   &nbsp;
   <a href="https://ko-fi.com/matharnica">
