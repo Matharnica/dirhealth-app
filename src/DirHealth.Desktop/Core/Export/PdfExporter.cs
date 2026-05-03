@@ -368,62 +368,68 @@ public class PdfExporter
 
     public void ExportPasswordReport(IEnumerable<AdUser> users, string filePath)
     {
-        var list  = users.ToList();
-        var doc   = new PdfDocument();
+        var list    = users.ToList();
+        var doc     = new PdfDocument();
         doc.Info.Title = "DirHealth — Password Expiry Report";
+        var ui      = new PdfPageBuilder();
+        int pageNum = 1;
+        int expired = list.Count(u => u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 0);
 
-        var page  = doc.AddPage();
-        var gfx   = XGraphics.FromPdfPage(page);
-        var fontH = new XFont("Arial", 18, XFontStyleEx.Bold);
-        var fontB = new XFont("Arial", 10, XFontStyleEx.Bold);
-        var fontR = new XFont("Arial", 10, XFontStyleEx.Regular);
+        var page = doc.AddPage();
+        var gfx  = XGraphics.FromPdfPage(page);
+        ui.DrawHeader(gfx, page, "Password Expiry Report");
+        ui.DrawFooter(gfx, page, "—", pageNum++);
 
-        double y      = 40;
-        double margin = 40;
-        double pw     = page.Width.Point - margin * 2;
+        ui.DrawTitleStrip(gfx, page,
+            "Password Expiry Report",
+            $"{list.Count} user(s)",
+            $"{expired} expired  ·  {DateTime.Now:yyyy-MM-dd}");
 
-        gfx.DrawString("DirHealth — Password Expiry Report", fontH, XBrushes.Black, margin, y);
-        y += 24;
-        gfx.DrawString(
-            $"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}  |  {list.Count} user(s)",
-            fontR, XBrushes.Gray, margin, y);
-        y += 8;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + pw, y);
-        y += 16;
+        double y        = ui.ContentTop + 40 + 16;
+        double contentW = ui.ContentWidth(page);
 
-        double c1 = margin, c2 = margin + 180, c3 = margin + 370, c4 = margin + 460;
-        void DrawPasswordHeaders()
+        double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 180,
+                             PdfPageBuilder.Margin + 370, PdfPageBuilder.Margin + 460 };
+        string[] colHdr = { "NAME", "EMAIL", "EXPIRES", "DAYS LEFT" };
+
+        void Headers()
         {
-            gfx.DrawString("Name",      fontB, XBrushes.Black, c1, y);
-            gfx.DrawString("Email",     fontB, XBrushes.Black, c2, y);
-            gfx.DrawString("Expires",   fontB, XBrushes.Black, c3, y);
-            gfx.DrawString("Days Left", fontB, XBrushes.Black, c4, y);
-            y += 6;
-            gfx.DrawLine(XPens.LightGray, margin, y, margin + pw, y);
-            y += 12;
+            page = doc.AddPage();
+            gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Password Expiry Report");
+            ui.DrawFooter(gfx, page, "—", pageNum++);
+            y = ui.ContentTop + 16;
+            y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
         }
-        DrawPasswordHeaders();
+
+        y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
 
         foreach (var u in list)
         {
-            if (y > page.Height.Point - 60)
-            {
-                page = doc.AddPage();
-                gfx  = XGraphics.FromPdfPage(page);
-                y    = 40;
-                DrawPasswordHeaders();
-            }
-            var expired  = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 0;
-            var rowBrush = expired ? XBrushes.DarkRed : XBrushes.Black;
-            gfx.DrawString(u.DisplayName,                                     fontR, rowBrush, c1, y);
-            gfx.DrawString(u.Email,                                           fontR, rowBrush, c2, y);
-            gfx.DrawString(u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "",   fontR, rowBrush, c3, y);
-            gfx.DrawString(u.DaysUntilPasswordExpiry?.ToString() ?? "N/A",    fontR, rowBrush, c4, y);
-            y += 16;
+            if (y > ui.ContentBottom(page) - 30) Headers();
+
+            bool isExpired = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 0;
+            bool isWarning = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 14 && !isExpired;
+
+            var (bg, border) = isExpired ? (PdfPageBuilder.ColRowCrit, PdfPageBuilder.ColCritical)
+                             : isWarning ? (PdfPageBuilder.ColRowHigh, PdfPageBuilder.ColHigh)
+                             :             (PdfPageBuilder.ColRowLow,  PdfPageBuilder.ColBorder);
+            var txt = new XSolidBrush(isExpired ? PdfPageBuilder.ColCritical
+                                    : isWarning ? PdfPageBuilder.ColHigh
+                                    :             PdfPageBuilder.ColBodyText);
+            y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y, contentW, border, bg,
+                (g, baseline) =>
+                {
+                    g.DrawString(u.DisplayName,                                    PdfPageBuilder.F10,   txt, colX[0] + 10, baseline);
+                    g.DrawString(u.Email ?? "",                                    PdfPageBuilder.F9,    txt, colX[1],      baseline);
+                    g.DrawString(u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "",  PdfPageBuilder.Mono9, txt, colX[2],      baseline);
+                    g.DrawString(u.DaysUntilPasswordExpiry?.ToString() ?? "N/A",   PdfPageBuilder.F9,    txt, colX[3],      baseline);
+                });
         }
 
         if (list.Count == 0)
-            gfx.DrawString("No users with expiring passwords.", fontR, XBrushes.DarkGreen, margin, y);
+            gfx.DrawString("No users with expiring passwords.", PdfPageBuilder.F10,
+                new XSolidBrush(PdfPageBuilder.ColLow), PdfPageBuilder.Margin, y + 16);
 
         doc.Save(filePath);
     }
