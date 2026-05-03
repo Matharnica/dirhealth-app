@@ -404,7 +404,9 @@ file sealed class PdfPageBuilder
     internal PdfPageBuilder()
     {
         var sri = Application.GetResourceStream(
-            new Uri("pack://application:,,,/Resources/icon_128.png"));
+            new Uri("pack://application:,,,/Resources/icon_128.png"))
+            ?? throw new InvalidOperationException(
+                "DirHealth logo resource not found: Resources/icon_128.png");
         using var ms = new MemoryStream();
         sri.Stream.CopyTo(ms);
         var bytes = ms.ToArray();
@@ -436,7 +438,7 @@ file sealed class PdfPageBuilder
         double rtW = gfx.MeasureString(rt, F9).Width;
         gfx.DrawString(rt, F9,
             new XSolidBrush(XColor.FromArgb(71, 85, 105)),
-            w - Margin - rtW + Margin, 19);
+            w - Margin - rtW, 19);
     }
 
     internal void DrawFooter(XGraphics gfx, PdfPage page, string domain, int pageNumber)
@@ -453,7 +455,7 @@ file sealed class PdfPageBuilder
 
         string pg  = $"Page {pageNumber}";
         double pgW = gfx.MeasureString(pg, Mono9).Width;
-        gfx.DrawString(pg, Mono9, brush, w - Margin - pgW + Margin, y0 + 14);
+        gfx.DrawString(pg, Mono9, brush, w - Margin - pgW, y0 + 14);
     }
 
     internal void DrawTitleStrip(XGraphics gfx, PdfPage page,
@@ -471,7 +473,7 @@ file sealed class PdfPageBuilder
         double metaW = gfx.MeasureString(meta, F9).Width;
         gfx.DrawString(meta, F9,
             new XSolidBrush(XColor.FromArgb(148, 163, 184)),
-            w - Margin - metaW + Margin, y0 + 22);
+            w - Margin - metaW, y0 + 22);
     }
 
     internal double DrawRow(XGraphics gfx, double x, double y, double rowW,
