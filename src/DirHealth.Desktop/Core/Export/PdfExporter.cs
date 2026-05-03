@@ -10,70 +10,78 @@ public class PdfExporter
 {
     public void ExportReport(List<AdFinding> findings, int score, string filePath)
     {
-        var doc  = new PdfDocument();
+        var doc = new PdfDocument();
         doc.Info.Title = "DirHealth AD Report";
+        var ui      = new PdfPageBuilder();
+        int pageNum = 1;
 
-        var page      = doc.AddPage();
-        var gfx       = XGraphics.FromPdfPage(page);
-        var fontH     = new XFont("Arial", 18, XFontStyleEx.Bold);
-        var fontB     = new XFont("Arial", 11, XFontStyleEx.Bold);
-        var fontR     = new XFont("Arial", 10, XFontStyleEx.Regular);
-        var fontS     = new XFont("Arial", 9,  XFontStyleEx.Regular);
+        var page = doc.AddPage();
+        var gfx  = XGraphics.FromPdfPage(page);
+        ui.DrawHeader(gfx, page, "AD Health Report");
+        ui.DrawFooter(gfx, page, "—", pageNum++);
 
-        double y         = 40;
-        double margin    = 40;
-        double pageWidth = page.Width.Point - margin * 2;
+        // Title strip (page 1 only)
+        ui.DrawTitleStrip(gfx, page,
+            "AD Health Report",
+            $"Score: {score}/100  ·  {ui.ScoreLabel(score)}",
+            $"{DateTime.Now:yyyy-MM-dd HH:mm}  ·  {findings.Count} findings");
 
-        // Header
-        gfx.DrawString("DirHealth — AD Health Report", fontH, XBrushes.Black, margin, y);
-        y += 30;
-        gfx.DrawString($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}", fontR, XBrushes.Gray, margin, y);
-        y += 10;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + pageWidth, y);
-        y += 20;
+        double y        = ui.ContentTop + 40 + 16; // below title strip
+        double contentW = ui.ContentWidth(page);
 
-        // Score
-        gfx.DrawString($"Compliance Score: {score}/100", fontB, XBrushes.Black, margin, y);
-        y += 30;
-
-        // Findings
-        gfx.DrawString("Findings", fontB, XBrushes.Black, margin, y);
-        y += 20;
+        void NewPage()
+        {
+            page = doc.AddPage();
+            gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "AD Health Report");
+            ui.DrawFooter(gfx, page, "—", pageNum++);
+            y = ui.ContentTop + 16;
+        }
 
         foreach (var finding in findings)
         {
-            if (y > page.Height.Point - 80)
-            {
-                page = doc.AddPage();
-                gfx  = XGraphics.FromPdfPage(page);
-                y    = 40;
-            }
+            // Each finding takes ≈ 3 lines (title + description + affected)
+            if (y > ui.ContentBottom(page) - 60) NewPage();
 
-            var severityColor = finding.Severity switch
-            {
-                FindingSeverity.Critical => XBrushes.DarkRed,
-                FindingSeverity.High     => XBrushes.Red,
-                FindingSeverity.Medium   => XBrushes.DarkOrange,
-                _                        => XBrushes.Gray
-            };
+            var (bg, border, txt) = ui.SeverityStyle(finding.Severity);
 
-            gfx.DrawString($"[{finding.Severity}] {finding.Title}", fontB, severityColor, margin, y);
-            y += 15;
-            gfx.DrawString(finding.Description, fontS, XBrushes.DarkGray, margin + 10, y);
-            y += 15;
+            // Draw the background + left border
+            gfx.DrawRectangle(new XSolidBrush(bg),
+                PdfPageBuilder.Margin, y, contentW, PdfPageBuilder.RowH);
+            gfx.DrawRectangle(new XSolidBrush(border),
+                PdfPageBuilder.Margin, y, 3, PdfPageBuilder.RowH);
 
+            gfx.DrawString(
+                $"[{finding.Severity}]  {finding.Title}",
+                PdfPageBuilder.F10B, txt,
+                PdfPageBuilder.Margin + 10, y + PdfPageBuilder.RowH - 6);
+            y += PdfPageBuilder.RowH;
+
+            // Description
+            gfx.DrawString(finding.Description, PdfPageBuilder.F9,
+                new XSolidBrush(PdfPageBuilder.ColLabelGray),
+                PdfPageBuilder.Margin + 14, y + 12);
+            y += 16;
+
+            // Affected objects
             if (finding.AffectedObjects.Count > 0)
             {
                 var preview = string.Join(", ", finding.AffectedObjects.Take(5));
-                if (finding.AffectedObjects.Count > 5) preview += $" (+{finding.AffectedObjects.Count - 5} more)";
-                gfx.DrawString(preview, fontS, XBrushes.Gray, margin + 10, y);
-                y += 15;
+                if (finding.AffectedObjects.Count > 5)
+                    preview += $" (+{finding.AffectedObjects.Count - 5} more)";
+                gfx.DrawString(preview, PdfPageBuilder.F9,
+                    new XSolidBrush(PdfPageBuilder.ColLow),
+                    PdfPageBuilder.Margin + 14, y + 12);
+                y += 16;
             }
-            y += 8;
+            y += PdfPageBuilder.RowGap + 4;
         }
 
         if (findings.Count == 0)
-            gfx.DrawString("No findings — AD environment looks healthy!", fontR, XBrushes.DarkGreen, margin, y);
+            gfx.DrawString(
+                "No findings — AD environment looks healthy!",
+                PdfPageBuilder.F10, new XSolidBrush(PdfPageBuilder.ColLow),
+                PdfPageBuilder.Margin, y + 16);
 
         doc.Save(filePath);
     }
