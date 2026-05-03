@@ -119,19 +119,23 @@ public class PdfExporter
                 new XSolidBrush(XColor.FromArgb(148, 163, 184)),
                 PdfPageBuilder.Margin, heroY + 58);
 
-            // Score
+            // Score — offsets derived from measured width so score=100 never collides
             XColor scoreColor = ui.ScoreColor(data.Score);
-            gfx.DrawString(data.Score.ToString(), PdfPageBuilder.F56B,
+            string scoreText  = data.Score.ToString();
+            double scoreW     = gfx.MeasureString(scoreText, PdfPageBuilder.F56B).Width;
+            gfx.DrawString(scoreText, PdfPageBuilder.F56B,
                 new XSolidBrush(scoreColor),
                 PdfPageBuilder.Margin, heroY + 140);
 
-            gfx.DrawString("/100", new XFont("Arial", 16, XFontStyleEx.Regular),
+            var suffix16 = new XFont("Arial", 16, XFontStyleEx.Regular);
+            gfx.DrawString("/100", suffix16,
                 new XSolidBrush(XColor.FromArgb(148, 163, 184)),
-                PdfPageBuilder.Margin + 80, heroY + 135);
+                PdfPageBuilder.Margin + scoreW + 8, heroY + 135);
 
+            double suffixW = gfx.MeasureString("/100 ", suffix16).Width;
             gfx.DrawString(ui.ScoreLabel(data.Score), PdfPageBuilder.F9B,
                 new XSolidBrush(scoreColor),
-                PdfPageBuilder.Margin + 120, heroY + 135);
+                PdfPageBuilder.Margin + scoreW + 8 + suffixW, heroY + 135);
 
             // Severity summary strip
             const double stripY = heroY + heroH;
@@ -530,8 +534,9 @@ file sealed class PdfPageBuilder
             new Uri("pack://application:,,,/Resources/icon_128.png"))
             ?? throw new InvalidOperationException(
                 "DirHealth logo resource not found: Resources/icon_128.png");
+        using var stream = sri.Stream;
         using var ms = new MemoryStream();
-        sri.Stream.CopyTo(ms);
+        stream.CopyTo(ms);
         var bytes = ms.ToArray();
         _logo = XImage.FromStream(() => new MemoryStream(bytes));
     }
