@@ -54,10 +54,16 @@
                           SelectedItem="{Binding SeverityFilter}" />
             </Grid>
 
-            <CheckBox Grid.Row="3" Content="Show acknowledged"
-                      IsChecked="{Binding ShowAcknowledged}"
-                      Foreground="{DynamicResource TextSecondaryBrush}"
-                      Margin="0,0,0,12" />
+            <StackPanel Grid.Row="3">
+                <CheckBox Content="Show acknowledged"
+                          IsChecked="{Binding ShowAcknowledged}"
+                          Foreground="{DynamicResource TextSecondaryBrush}"
+                          Margin="0,0,0,4" />
+                <TextBlock Text="{Binding StatusMessage}" FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,8"
+                           Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />
+            </StackPanel>
 
             <ListBox Grid.Row="4"
                      ItemsSource="{Binding FilteredFindings}"

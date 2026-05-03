@@ -589,18 +589,23 @@ file sealed class PdfPageBuilder
     internal const double RowH    = 20;
     internal const double RowGap  =  3;
 
-    private readonly XImage _logo;
+    private readonly XImage? _logo;
 
     internal PdfPageBuilder()
     {
-        var sri = Application.GetResourceStream(
-            new Uri("pack://application:,,,/Resources/icon_128.png"))
-            ?? throw new InvalidOperationException(
-                "DirHealth logo resource not found: Resources/icon_128.png");
-        using var srcStream = sri.Stream;
-        using var ms = new MemoryStream();
-        srcStream.CopyTo(ms);
-        _logo = XImage.FromStream(new MemoryStream(ms.ToArray()));
+        try
+        {
+            var sri = Application.GetResourceStream(
+                new Uri("pack://application:,,,/Resources/icon_128.png"));
+            if (sri != null)
+            {
+                using var srcStream = sri.Stream;
+                using var ms = new MemoryStream();
+                srcStream.CopyTo(ms);
+                _logo = XImage.FromStream(new MemoryStream(ms.ToArray()));
+            }
+        }
+        catch { /* logo is optional — export continues without it */ }
     }
 
     internal double ContentTop                     => HeaderH;
@@ -611,7 +616,7 @@ file sealed class PdfPageBuilder
     {
         double w = page.Width.Point;
         gfx.DrawRectangle(new XSolidBrush(ColHeaderBg), 0, 0, w, HeaderH);
-        gfx.DrawImage(_logo, 10, 5, 18, 18);
+        if (_logo != null) gfx.DrawImage(_logo, 10, 5, 18, 18);
 
         double x = 32;
         gfx.DrawString("DirHealth", F11B,
