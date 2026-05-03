@@ -385,8 +385,7 @@ public class PdfExporter
             $"{list.Count} user(s)",
             $"{expired} expired  ·  {DateTime.Now:yyyy-MM-dd}");
 
-        double y        = ui.ContentTop + 40 + 16;
-        double contentW = ui.ContentWidth(page);
+        double y = ui.ContentTop + 40 + 16;
 
         double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 180,
                              PdfPageBuilder.Margin + 370, PdfPageBuilder.Margin + 460 };
@@ -417,7 +416,7 @@ public class PdfExporter
             var txt = new XSolidBrush(isExpired ? PdfPageBuilder.ColCritical
                                     : isWarning ? PdfPageBuilder.ColHigh
                                     :             PdfPageBuilder.ColBodyText);
-            y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y, contentW, border, bg,
+            y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y, ui.ContentWidth(page), border, bg,
                 (g, baseline) =>
                 {
                     g.DrawString(u.DisplayName,                                    PdfPageBuilder.F10,   txt, colX[0] + 10, baseline);
