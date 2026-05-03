@@ -80,153 +80,276 @@ public class PdfExporter
 
     public void ExportFullReport(FullReportData data, string filePath)
     {
-        var doc   = new PdfDocument();
+        var doc  = new PdfDocument();
         doc.Info.Title = "DirHealth — Full AD Health Report";
+        var ui   = new PdfPageBuilder();
+        int pageNum = 1;
 
-        var fontH     = new XFont("Arial", 22, XFontStyleEx.Bold);
-        var fontH2    = new XFont("Arial", 14, XFontStyleEx.Bold);
-        var fontSub   = new XFont("Arial", 16, XFontStyleEx.Regular);
-        var fontScore = new XFont("Arial", 18, XFontStyleEx.Bold);
-        var fontB     = new XFont("Arial", 10, XFontStyleEx.Bold);
-        var fontR     = new XFont("Arial", 10, XFontStyleEx.Regular);
-        var fontS     = new XFont("Arial",  9, XFontStyleEx.Regular);
-
-        const double margin = 40;
-
-        XGraphics NewPage()
+        // ── 1. COVER ─────────────────────────────────────────────────────────────
         {
-            var p = doc.AddPage();
-            return XGraphics.FromPdfPage(p);
-        }
+            var p   = doc.AddPage();
+            var gfx = XGraphics.FromPdfPage(p);
+            ui.DrawHeader(gfx, p, "Active Directory Health Report");
+            ui.DrawFooter(gfx, p, data.Domain, pageNum++);
 
-        double PageWidth(XGraphics g) => g.PageSize.Width - margin * 2;
+            double w = p.Width.Point;
 
-        // ── 1. COVER ──────────────────────────────────────────────────────────
-        var gfx = NewPage();
-        double y = 80;
+            // Blue gradient hero
+            const double heroY = PdfPageBuilder.HeaderH;
+            const double heroH = 170;
+            var grad = new XLinearGradientBrush(
+                new XRect(0, heroY, w, heroH),
+                PdfPageBuilder.ColGradStart, PdfPageBuilder.ColGradEnd,
+                XLinearGradientMode.ForwardDiagonal);
+            gfx.DrawRectangle(grad, 0, heroY, w, heroH);
 
-        gfx.DrawString("DirHealth", fontH, XBrushes.Black, margin, y);
-        y += 32;
-        gfx.DrawString("Active Directory Health Report", fontSub, XBrushes.DarkGray, margin, y);
-        y += 48;
-        gfx.DrawString($"Domain:    {data.Domain}",              fontR, XBrushes.Black, margin, y); y += 20;
-        gfx.DrawString($"Date:      {DateTime.Now:dd.MM.yyyy HH:mm}", fontR, XBrushes.Black, margin, y); y += 20;
-        gfx.DrawString($"Findings:  {data.Findings.Count}",      fontR, XBrushes.Black, margin, y); y += 40;
+            // Report type label
+            gfx.DrawString("ACTIVE DIRECTORY HEALTH REPORT", PdfPageBuilder.F9B,
+                new XSolidBrush(XColor.FromArgb(148, 163, 184)),
+                PdfPageBuilder.Margin, heroY + 22);
 
-        var scoreBrush = data.Score >= 80 ? XBrushes.DarkGreen
-                       : data.Score >= 60 ? XBrushes.DarkOrange
-                       : XBrushes.DarkRed;
-        gfx.DrawString($"Compliance Score: {data.Score}/100",
-            fontScore, scoreBrush, margin, y);
+            // Domain
+            gfx.DrawString(data.Domain, PdfPageBuilder.F20B,
+                XBrushes.White, PdfPageBuilder.Margin, heroY + 44);
 
-        // ── 2. FINDINGS ───────────────────────────────────────────────────────
-        gfx = NewPage();
-        y   = 40;
-        gfx.DrawString("Findings", fontH2, XBrushes.Black, margin, y); y += 24;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + PageWidth(gfx), y); y += 14;
+            // Date + findings count
+            gfx.DrawString(
+                $"{DateTime.Now:yyyy-MM-dd HH:mm}  ·  {data.Findings.Count} Findings",
+                PdfPageBuilder.F9,
+                new XSolidBrush(XColor.FromArgb(148, 163, 184)),
+                PdfPageBuilder.Margin, heroY + 58);
 
-        double f1 = margin, f2 = margin + 210, f3 = margin + 370, f4 = margin + 450;
-        void DrawFindingsHeaders()
-        {
-            gfx.DrawString("Title",    fontB, XBrushes.Black, f1, y);
-            gfx.DrawString("Category", fontB, XBrushes.Black, f2, y);
-            gfx.DrawString("Severity", fontB, XBrushes.Black, f3, y);
-            gfx.DrawString("Count",    fontB, XBrushes.Black, f4, y);
-            y += 16;
-        }
-        DrawFindingsHeaders();
+            // Score
+            XColor scoreColor = ui.ScoreColor(data.Score);
+            gfx.DrawString(data.Score.ToString(), PdfPageBuilder.F56B,
+                new XSolidBrush(scoreColor),
+                PdfPageBuilder.Margin, heroY + 140);
 
-        foreach (var finding in data.Findings)
-        {
-            if (y > gfx.PageSize.Height - 60) { gfx = NewPage(); y = 40; DrawFindingsHeaders(); }
-            var sb = finding.Severity switch
+            gfx.DrawString("/100", new XFont("Arial", 16, XFontStyleEx.Regular),
+                new XSolidBrush(XColor.FromArgb(148, 163, 184)),
+                PdfPageBuilder.Margin + 80, heroY + 135);
+
+            gfx.DrawString(ui.ScoreLabel(data.Score), PdfPageBuilder.F9B,
+                new XSolidBrush(scoreColor),
+                PdfPageBuilder.Margin + 120, heroY + 135);
+
+            // Severity summary strip
+            const double stripY = heroY + heroH;
+            const double stripH = 52;
+            gfx.DrawRectangle(new XSolidBrush(PdfPageBuilder.ColFooterBg),
+                0, stripY, w, stripH);
+            gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 0.5),
+                0, stripY + stripH, w, stripY + stripH);
+
+            int    critical = data.Findings.Count(f => f.Severity == FindingSeverity.Critical);
+            int    high     = data.Findings.Count(f => f.Severity == FindingSeverity.High);
+            int    medium   = data.Findings.Count(f => f.Severity == FindingSeverity.Medium);
+            int    low      = data.Findings.Count(f => f.Severity != FindingSeverity.Critical
+                                                      && f.Severity != FindingSeverity.High
+                                                      && f.Severity != FindingSeverity.Medium);
+            var    counts   = new[] { critical, high, medium, low };
+            var    labels   = new[] { "Critical", "High", "Medium", "Low" };
+            var    colors   = new[] {
+                PdfPageBuilder.ColCritical, PdfPageBuilder.ColHigh,
+                PdfPageBuilder.ColMedium,   PdfPageBuilder.ColLow };
+
+            double colW = w / 4;
+            for (int i = 0; i < 4; i++)
             {
-                FindingSeverity.Critical => XBrushes.DarkRed,
-                FindingSeverity.High     => XBrushes.Red,
-                FindingSeverity.Medium   => XBrushes.DarkOrange,
-                _                        => XBrushes.Gray
-            };
-            gfx.DrawString(finding.Title,              fontS, sb,            f1, y);
-            gfx.DrawString(finding.Category,           fontS, XBrushes.Black, f2, y);
-            gfx.DrawString(finding.Severity.ToString(), fontS, sb,            f3, y);
-            gfx.DrawString(finding.Count.ToString(),   fontS, XBrushes.Black, f4, y);
-            y += 14;
+                double cx    = i * colW;
+                string cntTx = counts[i].ToString();
+                double cntW  = gfx.MeasureString(cntTx, new XFont("Arial", 22, XFontStyleEx.Bold)).Width;
+                gfx.DrawString(cntTx, new XFont("Arial", 22, XFontStyleEx.Bold),
+                    new XSolidBrush(colors[i]),
+                    cx + (colW - cntW) / 2, stripY + 30);
+
+                double lblW = gfx.MeasureString(labels[i], PdfPageBuilder.F9B).Width;
+                gfx.DrawString(labels[i], PdfPageBuilder.F9B,
+                    new XSolidBrush(colors[i]),
+                    cx + (colW - lblW) / 2, stripY + 44);
+
+                if (i < 3)
+                    gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 0.5),
+                        cx + colW, stripY + 8, cx + colW, stripY + stripH - 8);
+            }
         }
-        if (data.Findings.Count == 0)
-            gfx.DrawString("No findings.", fontR, XBrushes.DarkGreen, margin, y);
 
-        // ── 3. INACTIVE USERS ─────────────────────────────────────────────────
-        gfx = NewPage();
-        y   = 40;
-        gfx.DrawString("Inactive Users", fontH2, XBrushes.Black, margin, y); y += 24;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + PageWidth(gfx), y); y += 14;
-
-        double u1 = margin, u2 = margin + 180, u3 = margin + 310;
-        void DrawInactiveHeaders()
+        // ── 2. FINDINGS ──────────────────────────────────────────────────────────
         {
-            gfx.DrawString("Name",       fontB, XBrushes.Black, u1, y);
-            gfx.DrawString("Last Logon", fontB, XBrushes.Black, u2, y);
-            gfx.DrawString("OU",         fontB, XBrushes.Black, u3, y);
-            y += 16;
-        }
-        DrawInactiveHeaders();
+            var page = doc.AddPage();
+            var gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Findings", data.Domain);
+            ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+            double y = ui.ContentTop + 10;
 
-        foreach (var u in data.InactiveUsers)
+            double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 210,
+                                 PdfPageBuilder.Margin + 360, PdfPageBuilder.Margin + 440 };
+            string[] colHdr = { "TITLE", "CATEGORY", "SEVERITY", "COUNT" };
+
+            void FindingsNewPage()
+            {
+                page = doc.AddPage();
+                gfx  = XGraphics.FromPdfPage(page);
+                ui.DrawHeader(gfx, page, "Findings", data.Domain);
+                ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+                y = ui.ContentTop + 10;
+                y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+            }
+
+            y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+
+            foreach (var f in data.Findings)
+            {
+                if (y > ui.ContentBottom(page) - 30) FindingsNewPage();
+                var (bg, border, txt) = ui.SeverityStyle(f.Severity);
+                y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y,
+                    ui.ContentWidth(page), border, bg,
+                    (g, baseline) =>
+                    {
+                        g.DrawString(f.Title,              PdfPageBuilder.F10B, txt,                            colX[0] + 10, baseline);
+                        g.DrawString(f.Category,           PdfPageBuilder.F9,   new XSolidBrush(PdfPageBuilder.ColBodyText), colX[1],      baseline);
+                        g.DrawString(f.Severity.ToString(),PdfPageBuilder.F9B,  txt,                            colX[2],      baseline);
+                        g.DrawString(f.Count.ToString(),   PdfPageBuilder.F9,   new XSolidBrush(PdfPageBuilder.ColBodyText), colX[3],      baseline);
+                    });
+            }
+            if (data.Findings.Count == 0)
+                gfx.DrawString("No findings — AD environment looks healthy!",
+                    PdfPageBuilder.F10, new XSolidBrush(PdfPageBuilder.ColLow),
+                    PdfPageBuilder.Margin, y + 16);
+        }
+
+        // ── 3. INACTIVE USERS ────────────────────────────────────────────────────
         {
-            if (y > gfx.PageSize.Height - 60) { gfx = NewPage(); y = 40; DrawInactiveHeaders(); }
-            gfx.DrawString(u.DisplayName,                              fontS, XBrushes.Black, u1, y);
-            gfx.DrawString(u.LastLogon?.ToString("yyyy-MM-dd") ?? "Never", fontS, XBrushes.Black, u2, y);
-            gfx.DrawString(DnHelper.OuFromDn(u.DistinguishedName),    fontS, XBrushes.Black, u3, y);
-            y += 14;
+            var page = doc.AddPage();
+            var gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Inactive Users", data.Domain);
+            ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+            double y = ui.ContentTop + 10;
+
+            double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 180,
+                                 PdfPageBuilder.Margin + 310 };
+            string[] colHdr = { "NAME", "LAST LOGON", "OU" };
+
+            void InactiveUsersNewPage()
+            {
+                page = doc.AddPage();
+                gfx  = XGraphics.FromPdfPage(page);
+                ui.DrawHeader(gfx, page, "Inactive Users", data.Domain);
+                ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+                y = ui.ContentTop + 10;
+                y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+            }
+
+            y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+            var bodyBrush = new XSolidBrush(PdfPageBuilder.ColBodyText);
+
+            foreach (var u in data.InactiveUsers)
+            {
+                if (y > ui.ContentBottom(page) - 30) InactiveUsersNewPage();
+                y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y,
+                    ui.ContentWidth(page), PdfPageBuilder.ColBorder, PdfPageBuilder.ColRowLow,
+                    (g, baseline) =>
+                    {
+                        g.DrawString(u.DisplayName,                                   PdfPageBuilder.F10,  bodyBrush, colX[0] + 10, baseline);
+                        g.DrawString(u.LastLogon?.ToString("yyyy-MM-dd") ?? "Never",  PdfPageBuilder.Mono9, bodyBrush, colX[1],      baseline);
+                        g.DrawString(DnHelper.OuFromDn(u.DistinguishedName),          PdfPageBuilder.F9,   bodyBrush, colX[2],      baseline);
+                    });
+            }
+            if (data.InactiveUsers.Count == 0)
+                gfx.DrawString("No inactive users.", PdfPageBuilder.F10,
+                    new XSolidBrush(PdfPageBuilder.ColLow), PdfPageBuilder.Margin, y + 16);
         }
-        if (data.InactiveUsers.Count == 0)
-            gfx.DrawString("No inactive users.", fontR, XBrushes.DarkGreen, margin, y);
 
-        // ── 4. EXPIRING PASSWORDS ─────────────────────────────────────────────
-        gfx = NewPage();
-        y   = 40;
-        gfx.DrawString("Expiring / Expired Passwords", fontH2, XBrushes.Black, margin, y); y += 24;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + PageWidth(gfx), y); y += 14;
-
-        double p1 = margin, p2 = margin + 180, p3 = margin + 360, p4 = margin + 480;
-        void DrawPasswordExpiryHeaders()
+        // ── 4. EXPIRING PASSWORDS ────────────────────────────────────────────────
         {
-            gfx.DrawString("Name",    fontB, XBrushes.Black, p1, y);
-            gfx.DrawString("Email",   fontB, XBrushes.Black, p2, y);
-            gfx.DrawString("Expires", fontB, XBrushes.Black, p3, y);
-            gfx.DrawString("Days",    fontB, XBrushes.Black, p4, y);
-            y += 16;
-        }
-        DrawPasswordExpiryHeaders();
+            var page = doc.AddPage();
+            var gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Expiring Passwords", data.Domain);
+            ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+            double y = ui.ContentTop + 10;
 
-        foreach (var u in data.ExpiringPasswords)
+            double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 180,
+                                 PdfPageBuilder.Margin + 360, PdfPageBuilder.Margin + 460 };
+            string[] colHdr = { "NAME", "EMAIL", "EXPIRES", "DAYS" };
+
+            void PasswordsNewPage()
+            {
+                page = doc.AddPage();
+                gfx  = XGraphics.FromPdfPage(page);
+                ui.DrawHeader(gfx, page, "Expiring Passwords", data.Domain);
+                ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+                y = ui.ContentTop + 10;
+                y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+            }
+
+            y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+
+            foreach (var u in data.ExpiringPasswords)
+            {
+                if (y > ui.ContentBottom(page) - 30) PasswordsNewPage();
+                bool expired = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 0;
+                bool warning = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 14 && !expired;
+                var (bg, border) = expired ? (PdfPageBuilder.ColRowCrit, PdfPageBuilder.ColCritical)
+                                 : warning ? (PdfPageBuilder.ColRowHigh, PdfPageBuilder.ColHigh)
+                                 :           (PdfPageBuilder.ColRowLow,  PdfPageBuilder.ColBorder);
+                var txt = new XSolidBrush(expired ? PdfPageBuilder.ColCritical
+                                        : warning ? PdfPageBuilder.ColHigh
+                                        :           PdfPageBuilder.ColBodyText);
+                y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y,
+                    ui.ContentWidth(page), border, bg,
+                    (g, baseline) =>
+                    {
+                        g.DrawString(u.DisplayName,                                      PdfPageBuilder.F10,   txt, colX[0] + 10, baseline);
+                        g.DrawString(u.Email ?? "",                                      PdfPageBuilder.F9,    txt, colX[1],      baseline);
+                        g.DrawString(u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "",    PdfPageBuilder.Mono9, txt, colX[2],      baseline);
+                        g.DrawString(u.DaysUntilPasswordExpiry?.ToString() ?? "N/A",     PdfPageBuilder.F9,    txt, colX[3],      baseline);
+                    });
+            }
+            if (data.ExpiringPasswords.Count == 0)
+                gfx.DrawString("No expiring passwords.", PdfPageBuilder.F10,
+                    new XSolidBrush(PdfPageBuilder.ColLow), PdfPageBuilder.Margin, y + 16);
+        }
+
+        // ── 5. DOMAIN ADMINS ─────────────────────────────────────────────────────
         {
-            if (y > gfx.PageSize.Height - 60) { gfx = NewPage(); y = 40; DrawPasswordExpiryHeaders(); }
-            var expired  = u.DaysUntilPasswordExpiry.HasValue && u.DaysUntilPasswordExpiry.Value <= 0;
-            var rb = expired ? XBrushes.DarkRed : XBrushes.Black;
-            gfx.DrawString(u.DisplayName,                                  fontS, rb, p1, y);
-            gfx.DrawString(u.Email,                                        fontS, rb, p2, y);
-            gfx.DrawString(u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "", fontS, rb, p3, y);
-            gfx.DrawString(u.DaysUntilPasswordExpiry?.ToString() ?? "N/A", fontS, rb, p4, y);
-            y += 14;
-        }
-        if (data.ExpiringPasswords.Count == 0)
-            gfx.DrawString("No expiring passwords.", fontR, XBrushes.DarkGreen, margin, y);
+            var page = doc.AddPage();
+            var gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Domain Admins", data.Domain);
+            ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+            double y = ui.ContentTop + 20;
 
-        // ── 5. DOMAIN ADMINS ──────────────────────────────────────────────────
-        gfx = NewPage();
-        y   = 40;
-        gfx.DrawString("Domain Admins", fontH2, XBrushes.Black, margin, y); y += 24;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + PageWidth(gfx), y); y += 14;
+            if (data.DomainAdmins.Count > 5)
+            {
+                string warning = $"⚠ {data.DomainAdmins.Count} Domain Admin accounts detected — review regularly";
+                gfx.DrawRectangle(new XSolidBrush(PdfPageBuilder.ColRowCrit),
+                    PdfPageBuilder.Margin, y - 14, ui.ContentWidth(page), 20);
+                gfx.DrawRectangle(new XSolidBrush(PdfPageBuilder.ColCritical),
+                    PdfPageBuilder.Margin, y - 14, 3, 20);
+                gfx.DrawString(warning, PdfPageBuilder.F9,
+                    new XSolidBrush(PdfPageBuilder.ColCritical),
+                    PdfPageBuilder.Margin + 10, y);
+                y += 26;
+            }
 
-        foreach (var admin in data.DomainAdmins)
-        {
-            if (y > gfx.PageSize.Height - 60) { gfx = NewPage(); y = 40; }
-            gfx.DrawString($"• {admin}", fontR, XBrushes.Black, margin + 8, y);
-            y += 16;
+            var bodyBrush = new XSolidBrush(PdfPageBuilder.ColBodyText);
+            foreach (var admin in data.DomainAdmins)
+            {
+                if (y > ui.ContentBottom(page) - 30)
+                {
+                    page = doc.AddPage();
+                    gfx  = XGraphics.FromPdfPage(page);
+                    ui.DrawHeader(gfx, page, "Domain Admins", data.Domain);
+                    ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+                    y = ui.ContentTop + 20;
+                }
+                gfx.DrawString($"● {admin}", PdfPageBuilder.F10, bodyBrush,
+                    PdfPageBuilder.Margin + 8, y);
+                y += 18;
+            }
+            if (data.DomainAdmins.Count == 0)
+                gfx.DrawString("No domain admins found.", PdfPageBuilder.F10,
+                    new XSolidBrush(PdfPageBuilder.ColLow), PdfPageBuilder.Margin, y);
         }
-        if (data.DomainAdmins.Count == 0)
-            gfx.DrawString("No domain admins found.", fontR, XBrushes.Gray, margin, y);
 
         doc.Save(filePath);
     }
