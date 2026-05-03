@@ -597,11 +597,10 @@ file sealed class PdfPageBuilder
             new Uri("pack://application:,,,/Resources/icon_128.png"))
             ?? throw new InvalidOperationException(
                 "DirHealth logo resource not found: Resources/icon_128.png");
-        using var stream = sri.Stream;
+        using var srcStream = sri.Stream;
         using var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        var bytes = ms.ToArray();
-        _logo = XImage.FromStream(() => new MemoryStream(bytes));
+        srcStream.CopyTo(ms);
+        _logo = XImage.FromStream(new MemoryStream(ms.ToArray()));
     }
 
     internal double ContentTop                     => HeaderH;
