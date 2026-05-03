@@ -435,63 +435,97 @@ public class PdfExporter
 
     public void ExportUserDetail(AdUser user, IEnumerable<string> groups, string filePath)
     {
-        var doc   = new PdfDocument();
+        var groupList = groups.ToList();
+        var doc       = new PdfDocument();
         doc.Info.Title = $"DirHealth — User: {user.DisplayName}";
+        var ui        = new PdfPageBuilder();
+        int pageNum   = 1;
 
-        var page  = doc.AddPage();
-        var gfx   = XGraphics.FromPdfPage(page);
-        var fontH = new XFont("Arial", 18, XFontStyleEx.Bold);
-        var fontB = new XFont("Arial", 11, XFontStyleEx.Bold);
-        var fontR = new XFont("Arial", 10, XFontStyleEx.Regular);
-        var fontS = new XFont("Arial",  9, XFontStyleEx.Regular);
+        var page = doc.AddPage();
+        var gfx  = XGraphics.FromPdfPage(page);
+        ui.DrawHeader(gfx, page, "User Profile");
+        ui.DrawFooter(gfx, page, "—", pageNum++);
 
-        double y      = 40;
-        double margin = 40;
-        double pw     = page.Width.Point - margin * 2;
+        ui.DrawTitleStrip(gfx, page,
+            "User Profile",
+            user.DisplayName,
+            user.SamAccountName);
 
-        gfx.DrawString("DirHealth — User Profile", fontH, XBrushes.Black, margin, y);
-        y += 24;
-        gfx.DrawString($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}", fontR, XBrushes.Gray, margin, y);
-        y += 8;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + pw, y);
-        y += 20;
+        double y       = ui.ContentTop + 40 + 20;
+        double labelX  = PdfPageBuilder.Margin;
+        double valueX  = PdfPageBuilder.Margin + 150;
+        const double rowStep = 18;
 
-        void Row(string label, string value)
+        var labelBrush = new XSolidBrush(PdfPageBuilder.ColLabelGray);
+        var bodyBrush  = new XSolidBrush(PdfPageBuilder.ColBodyText);
+        var warnBrush  = new XSolidBrush(PdfPageBuilder.ColCritical);
+
+        void Row(string label, string value, bool warn = false)
         {
-            gfx.DrawString(label, fontB, XBrushes.DarkGray, margin, y);
-            gfx.DrawString(value, fontR, XBrushes.Black, margin + 150, y);
-            y += 18;
+            gfx.DrawString(label, PdfPageBuilder.F9B, labelBrush, labelX, y);
+            gfx.DrawString(value, PdfPageBuilder.F10,
+                warn ? warnBrush : bodyBrush, valueX, y);
+            y += rowStep;
         }
 
-        Row("Display Name:",           user.DisplayName);
-        Row("SAM Account:",            user.SamAccountName);
-        Row("Email:",                  user.Email);
-        Row("OU:",                     DnHelper.OuFromDn(user.DistinguishedName));
-        Row("Status:",                 user.IsEnabled ? "Enabled" : "Disabled");
-        Row("Password Never Expires:", user.PasswordNeverExpires ? "Yes" : "No");
-        Row("Password Last Set:",      user.PasswordLastSet?.ToString("yyyy-MM-dd") ?? "N/A");
-        Row("Password Expires:",       user.PasswordExpires?.ToString("yyyy-MM-dd") ?? "Never");
+        void RowMono(string label, string value, bool warn = false)
+        {
+            gfx.DrawString(label, PdfPageBuilder.F9B, labelBrush, labelX, y);
+            gfx.DrawString(value, PdfPageBuilder.Mono9,
+                warn ? warnBrush : bodyBrush, valueX, y);
+            y += rowStep;
+        }
 
-        y += 10;
-        gfx.DrawLine(XPens.LightGray, margin, y, margin + pw, y);
-        y += 16;
-        gfx.DrawString("Group Memberships", fontB, XBrushes.Black, margin, y);
+        bool pwdExpired = user.DaysUntilPasswordExpiry.HasValue && user.DaysUntilPasswordExpiry.Value <= 0;
+        string pwdExpiresText = user.PasswordExpires.HasValue
+            ? $"{user.PasswordExpires.Value:yyyy-MM-dd}  ({user.DaysUntilPasswordExpiry?.ToString() ?? "?"} days)"
+            : "Never";
+
+        Row("STATUS",             user.IsEnabled ? "Enabled" : "Disabled");
+        Row("SAM ACCOUNT",        user.SamAccountName);
+        Row("EMAIL",              user.Email ?? "—");
+        Row("OU",                 DnHelper.OuFromDn(user.DistinguishedName));
+        RowMono("PASSWORD LAST SET",  user.PasswordLastSet?.ToString("yyyy-MM-dd")  ?? "N/A");
+        RowMono("PASSWORD EXPIRES",   pwdExpiresText, pwdExpired);
+        Row("NEVER EXPIRES",      user.PasswordNeverExpires ? "Yes" : "No");
+
+        y += 6;
+        gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 0.5),
+            labelX, y, labelX + ui.ContentWidth(page), y);
+        y += 14;
+
+        gfx.DrawString("GROUP MEMBERSHIPS", PdfPageBuilder.F9B, labelBrush, labelX, y);
         y += 18;
 
-        var groupList = groups.ToList();
+        double badgeX = labelX;
         foreach (var g in groupList)
         {
-            if (y > page.Height.Point - 60)
+            if (y > ui.ContentBottom(page) - 30)
             {
                 page = doc.AddPage();
                 gfx  = XGraphics.FromPdfPage(page);
-                y    = 40;
+                ui.DrawHeader(gfx, page, "User Profile");
+                ui.DrawFooter(gfx, page, "—", pageNum++);
+                y = ui.ContentTop + 20;
+                gfx.DrawString("GROUP MEMBERSHIPS (continued)", PdfPageBuilder.F9B,
+                    labelBrush, labelX, y);
+                y += 18;
+                badgeX = labelX;
             }
-            gfx.DrawString($"• {g}", fontS, XBrushes.DarkGray, margin + 8, y);
-            y += 15;
+
+            // Wrap badge to next line if it would overflow
+            double bw = gfx.MeasureString(g, PdfPageBuilder.F9).Width + 12;
+            if (badgeX + bw > labelX + ui.ContentWidth(page))
+            {
+                badgeX = labelX;
+                y += 20;
+            }
+            ui.DrawGroupBadge(gfx, ref badgeX, y, g);
         }
+
         if (groupList.Count == 0)
-            gfx.DrawString("No group memberships found.", fontS, XBrushes.DarkGray, margin + 8, y);
+            gfx.DrawString("No group memberships.", PdfPageBuilder.F9,
+                labelBrush, labelX, y);
 
         doc.Save(filePath);
     }
