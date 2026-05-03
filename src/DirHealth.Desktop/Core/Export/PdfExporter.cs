@@ -435,6 +435,7 @@ public class PdfExporter
 
     public void ExportUserDetail(AdUser user, IEnumerable<string> groups, string filePath)
     {
+        ArgumentNullException.ThrowIfNull(groups);
         var groupList = groups.ToList();
         var doc       = new PdfDocument();
         doc.Info.Title = $"DirHealth — User: {user.DisplayName}";
@@ -463,7 +464,7 @@ public class PdfExporter
         void Row(string label, string value, bool warn = false)
         {
             gfx.DrawString(label, PdfPageBuilder.F9B, labelBrush, labelX, y);
-            gfx.DrawString(value, PdfPageBuilder.F10,
+            gfx.DrawString(value, warn ? PdfPageBuilder.F10B : PdfPageBuilder.F10,
                 warn ? warnBrush : bodyBrush, valueX, y);
             y += rowStep;
         }
@@ -476,7 +477,9 @@ public class PdfExporter
             y += rowStep;
         }
 
-        bool pwdExpired = user.DaysUntilPasswordExpiry.HasValue && user.DaysUntilPasswordExpiry.Value <= 0;
+        bool pwdExpired = user.PasswordExpires.HasValue
+            && user.DaysUntilPasswordExpiry.HasValue
+            && user.DaysUntilPasswordExpiry.Value <= 0;
         string pwdExpiresText = user.PasswordExpires.HasValue
             ? $"{user.PasswordExpires.Value:yyyy-MM-dd}  ({user.DaysUntilPasswordExpiry?.ToString() ?? "?"} days)"
             : "Never";
@@ -513,12 +516,25 @@ public class PdfExporter
                 badgeX = labelX;
             }
 
-            // Wrap badge to next line if it would overflow
+            // Wrap badge to next line if it would overflow the content width
             double bw = gfx.MeasureString(g, PdfPageBuilder.F9).Width + 12;
             if (badgeX + bw > labelX + ui.ContentWidth(page))
             {
                 badgeX = labelX;
-                y += 20;
+                y += rowStep;
+                // Re-check page overflow after line wrap
+                if (y > ui.ContentBottom(page) - 30)
+                {
+                    page = doc.AddPage();
+                    gfx  = XGraphics.FromPdfPage(page);
+                    ui.DrawHeader(gfx, page, "User Profile");
+                    ui.DrawFooter(gfx, page, "—", pageNum++);
+                    y = ui.ContentTop + 20;
+                    gfx.DrawString("GROUP MEMBERSHIPS (continued)", PdfPageBuilder.F9B,
+                        labelBrush, labelX, y);
+                    y += 18;
+                    badgeX = labelX;
+                }
             }
             ui.DrawGroupBadge(gfx, ref badgeX, y, g);
         }
