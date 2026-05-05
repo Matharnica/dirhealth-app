@@ -488,6 +488,7 @@ public class PdfExporter
         Row("SAM ACCOUNT",        user.SamAccountName);
         Row("EMAIL",              user.Email ?? "—");
         Row("OU",                 DnHelper.OuFromDn(user.DistinguishedName));
+        RowMono("LAST LOGON",         user.LastLogon?.ToString("yyyy-MM-dd") ?? "Never");
         RowMono("PASSWORD LAST SET",  user.PasswordLastSet?.ToString("yyyy-MM-dd")  ?? "N/A");
         RowMono("PASSWORD EXPIRES",   pwdExpiresText, pwdExpired);
         Row("NEVER EXPIRES",      user.PasswordNeverExpires ? "Yes" : "No");
