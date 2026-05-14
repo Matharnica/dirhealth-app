@@ -32,6 +32,9 @@
                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
             <ListBox Grid.Row="3" x:Name="GroupList" ItemsSource="{Binding Groups}"
                      Background="Transparent" BorderThickness="0"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.IsDeferredScrollingEnabled="True"
                      SelectionChanged="GroupList_SelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>

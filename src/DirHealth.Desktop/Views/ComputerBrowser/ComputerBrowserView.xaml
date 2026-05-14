@@ -32,6 +32,9 @@
                      ItemsSource="{Binding Computers}"
                      Background="Transparent" BorderThickness="0"
                      SelectionMode="Single"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.IsDeferredScrollingEnabled="True"
                      SelectionChanged="ComputerList_SelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>

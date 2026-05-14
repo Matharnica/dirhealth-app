@@ -43,6 +43,9 @@
             <ListBox Grid.Row="3" x:Name="UserList"
                      ItemsSource="{Binding Users}"
                      Background="Transparent" BorderThickness="0"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.IsDeferredScrollingEnabled="True"
                      SelectionChanged="UserList_SelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
