@@ -21,6 +21,8 @@ public partial class DashboardView : UserControl
     private DashboardViewModel?          _currentVm;
     private PropertyChangedEventHandler? _handler;
     private int                          _lastHistoryCount;
+    private double                       _lastCanvasWidth;
+    private double                       _lastCanvasHeight;
 
     public DashboardView()
     {
@@ -32,6 +34,8 @@ public partial class DashboardView : UserControl
 
             _currentVm        = DataContext as DashboardViewModel;
             _lastHistoryCount = 0;
+            _lastCanvasWidth  = 0;
+            _lastCanvasHeight = 0;
             if (_currentVm != null)
             {
                 _handler = (_, e) =>
@@ -56,8 +60,10 @@ public partial class DashboardView : UserControl
         double h = TrendChart.ActualHeight;
         if (w <= 0 || h <= 0) return;
 
-        if (history.Count == _lastHistoryCount && TrendChart.Children.Count > 0) return;
+        if (history.Count == _lastHistoryCount && w == _lastCanvasWidth && h == _lastCanvasHeight && TrendChart.Children.Count > 0) return;
         _lastHistoryCount = history.Count;
+        _lastCanvasWidth  = w;
+        _lastCanvasHeight = h;
 
         TrendChart.Children.Clear();
 
