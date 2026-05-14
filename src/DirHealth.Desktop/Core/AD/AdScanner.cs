@@ -339,10 +339,8 @@ public class AdScanner
         score = Math.Max(10, score);
 
         // ── Expiring passwords (from already-loaded allUsers) ─────────────────────
-        var maxDays = GetMaxPasswordAgeDays();
         var expiringPasswords = allUsersTask.Result
-            .Where(u => !u.PasswordNeverExpires && u.PasswordLastSet is not null &&
-                        (int)(u.PasswordLastSet.Value.AddDays(maxDays) - DateTime.UtcNow).TotalDays is >= 0 and <= 30)
+            .Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= 30)
             .OrderBy(u => u.DaysUntilPasswordExpiry)
             .ToList();
 
