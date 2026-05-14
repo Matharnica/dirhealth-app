@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write  # required by SignPath
 
 jobs:
   build:
@@ -62,41 +61,15 @@ jobs:
           path: installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
           retention-days: 7
 
-      # SignPath.io Foundation — free code signing for open source.
-      # One-time setup at https://signpath.io/open-source:
-      #   1. Register and apply for Foundation plan (free, requires public repo)
-      #   2. Create project slug "dirhealth", signing policy "release-signing",
-      #      artifact configuration "dirhealth-setup"
-      #   3. Add this GitHub repo as a Trusted Build Source in SignPath
-      #   4. Add to this repo:
-      #        Secret:   SIGNPATH_CI_TOKEN   (API token from SignPath)
-      #        Variable: SIGNPATH_ORG_ID     (Organization ID from SignPath)
-      - name: Sign installer
-        if: startsWith(github.ref, 'refs/tags/')
-        timeout-minutes: 15
-        uses: signpath/github-actions-submit-signing-request@v1
-        with:
-          api-token: '${{ secrets.SIGNPATH_CI_TOKEN }}'
-          organization-id: '${{ vars.SIGNPATH_ORG_ID }}'
-          project-slug: 'dirhealth'
-          signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'dirhealth-setup'
-          github-artifact-id: '${{ steps.upload-installer.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: installer/Output/signed
-
-      - name: Verify signed artifact
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          test -f "installer/Output/signed/DirHealth-Setup-${{ steps.version.outputs.version }}.exe" || \
-            (echo "Signed artifact missing — signing may have failed" && exit 1)
+      # TODO: Add SignPath.io code signing once the Foundation account is approved.
+      # Setup steps: https://signpath.io/open-source (requires MIT/Apache license + public repo)
+      # Secrets needed: SIGNPATH_CI_TOKEN, SIGNPATH_ORG_ID
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2.3.2
         with:
-          files: installer/Output/signed/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
+          files: installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           prerelease: false
