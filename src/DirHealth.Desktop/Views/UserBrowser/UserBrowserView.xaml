@@ -66,7 +66,7 @@
                       Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibility}}"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <Grid Margin="0,0,0,16">
+                <Grid Margin="0,0,0,4">
                     <TextBlock Text="{Binding Detail.User.DisplayName}" FontSize="18" FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center" />
@@ -75,6 +75,10 @@
                             Content="Export PDF" Padding="12,4" FontSize="12"
                             Command="{Binding Detail.ExportPdfCommand}" />
                 </Grid>
+                <TextBlock Text="{Binding Detail.StatusMessage}" FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,12"
+                           Visibility="{Binding Detail.StatusMessage, Converter={StaticResource StringToVisibility}}" />
 
                 <!-- Key attributes grid -->
                 <Grid Margin="0,0,0,16">

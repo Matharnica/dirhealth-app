@@ -1,0 +1,18 @@
+# Confirmed by fh confirm
+status: confirmed
+capabilities:
+  confirmed:
+    - id: github-actions
+      source: .github/workflows/build.yml
+      confidence: confirmed
+      check: test -d .github/workflows
+      fulfill:
+        intent: Set up GitHub Actions CI/CD
+        preferred: mkdir -p .github/workflows && create basic ci.yml
+        constraints:
+          - must not overwrite existing workflow files
+        verify: test -d .github/workflows
+    - id: ci-cd
+      source: .github/workflows/build.yml
+      confidence: confirmed
+  inferred: []
