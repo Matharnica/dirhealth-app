@@ -75,94 +75,120 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="{Binding IsLoadingDetail, Converter={StaticResource BoolToVisibility}}" />
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Visible" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedGroup}" Value="{x:Null}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedGroup}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="{Binding SelectedGroup.Name}" FontSize="20"
-                                       FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock Text="{Binding SelectedGroup.Description}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                       Margin="0,4,0,0" />
-                        </StackPanel>
-                        <Border Grid.Column="1" CornerRadius="4" Padding="8,3"
-                                Background="{DynamicResource SurfaceBrush}"
-                                BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
-                                VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SelectedGroup.GroupScope}"
-                                       Foreground="{StaticResource AccentBrush}" FontSize="11" />
-                        </Border>
-                    </Grid>
-
-                    <TextBlock Text="MEMBERS" FontSize="10" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
-                    <Border Style="{StaticResource Card}" Padding="0">
-                        <ItemsControl ItemsSource="{Binding SelectedGroup.Members}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border BorderBrush="{StaticResource BorderBrush}"
-                                            BorderThickness="0,0,0,1" Padding="16,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Border CornerRadius="3" Padding="6,2" Margin="0,0,10,0"
-                                                    VerticalAlignment="Center">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#1D3461" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding ObjectType}" Value="Group">
-                                                                <Setter Property="Background" Value="#312E81" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding ObjectType}" Value="Computer">
-                                                                <Setter Property="Background" Value="#1E3A2F" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock Text="{Binding ObjectType}" FontSize="10"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                                            </Border>
-                                            <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{Binding Name}"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                                           FontWeight="SemiBold" FontSize="13" />
-                                                <TextBlock Text="{Binding SamAccountName}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           FontSize="11" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                <!-- Group header -->
+                <Grid Grid.Row="0" Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{Binding SelectedGroup.Name}" FontSize="20"
+                                   FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding SelectedGroup.Description}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                    <Border Grid.Column="1" CornerRadius="4" Padding="8,3"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SelectedGroup.GroupScope}"
+                                   Foreground="{StaticResource AccentBrush}" FontSize="11" />
                     </Border>
+                </Grid>
 
+                <!-- Members label -->
+                <TextBlock Grid.Row="1" Text="MEMBERS" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+
+                <!-- Member list — ListBox with virtualization, no selection highlight -->
+                <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+                    <ListBox ItemsSource="{Binding SelectedGroup.Members}"
+                             Background="Transparent" BorderThickness="0"
+                             VirtualizingStackPanel.IsVirtualizing="True"
+                             VirtualizingStackPanel.VirtualizationMode="Recycling"
+                             ScrollViewer.IsDeferredScrollingEnabled="True">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="0,0,0,1" Padding="16,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border CornerRadius="3" Padding="6,2" Margin="0,0,10,0"
+                                                VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#1D3461" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ObjectType}" Value="Group">
+                                                            <Setter Property="Background" Value="#312E81" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ObjectType}" Value="Computer">
+                                                            <Setter Property="Background" Value="#1E3A2F" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding ObjectType}" FontSize="10"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold" FontSize="13" />
+                                            <TextBlock Text="{Binding SamAccountName}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       FontSize="11" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <!-- DN -->
+                <StackPanel Grid.Row="3" Margin="0,16,0,0">
                     <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,4" />
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <TextBlock Text="{Binding SelectedGroup.DistinguishedName}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="11" TextWrapping="Wrap" FontFamily="Consolas" />
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
