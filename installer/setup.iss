@@ -148,48 +148,18 @@ begin
     WizardForm.WelcomeLabel2.Caption :=
       'This will upgrade DirHealth from v' + PrevVersion +
       ' to v{#AppVersion}.' + #13#10 + #13#10 +
-      'Your scan history and settings will be backed up automatically ' +
-      'before the upgrade.';
+      'Your scan history and settings in %APPDATA%\DirHealth\ are preserved.';
 end;
 
 // --- Installation steps ---
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  AppDataDir, BackupDir, PrevVersion: String;
 begin
   case CurStep of
     ssInstall:
     begin
       WizardForm.StatusLabel.Caption := 'Preparing installation...';
       WriteInstallLog('Installation started');
-
-      // Back up %APPDATA%\DirHealth\ before overwriting on upgrade
-      PrevVersion := GetPreviousVersion;
-      AppDataDir := ExpandConstant('{userappdata}\DirHealth');
-      if (PrevVersion <> '') and DirExists(AppDataDir) then
-      begin
-        BackupDir := AppDataDir + '_backup';
-        if DirExists(BackupDir) then
-        begin
-          WriteInstallLog('Removing previous backup: ' + BackupDir);
-          DelTree(BackupDir, True, True, True);
-        end;
-        WriteInstallLog('Backing up: ' + AppDataDir + ' -> ' + BackupDir);
-        if RenameFile(AppDataDir, BackupDir) then
-          WriteInstallLog('Backup created: ' + BackupDir)
-        else
-        begin
-          WriteInstallLog('WARNING: Backup of ' + AppDataDir + ' failed');
-          if MsgBox(
-            'Could not back up your DirHealth data before upgrading.' + #13#10 + #13#10 +
-            'The installation will continue, but your existing data in:' + #13#10 +
-            AppDataDir + #13#10 + #13#10 +
-            'may be overwritten. Continue anyway?',
-            mbConfirmation, MB_YESNO) = IDNO then
-            Abort;
-        end;
-      end;
     end;
 
     ssPostInstall:
