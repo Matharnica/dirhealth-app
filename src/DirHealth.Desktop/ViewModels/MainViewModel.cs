@@ -20,6 +20,8 @@ public partial class MainViewModel : BaseViewModel
     public DomainAdminsViewModel      DomainAdmins      { get; }
     public DcInventoryViewModel       DcInventory       { get; }
     public PrivilegedGroupsViewModel  PrivilegedGroups  { get; }
+    public DomainTrustViewModel       DomainTrust       { get; }
+    public TimelineViewModel          Timeline          { get; }
 
     [ObservableProperty] private BaseViewModel _currentView;
     [ObservableProperty] private bool          _showScoreDropAlert;
@@ -54,7 +56,9 @@ public partial class MainViewModel : BaseViewModel
         PasswordReportViewModel passwordReport,
         DomainAdminsViewModel domainAdmins,
         DcInventoryViewModel dcInventory,
-        PrivilegedGroupsViewModel privilegedGroups)
+        PrivilegedGroupsViewModel privilegedGroups,
+        DomainTrustViewModel domainTrust,
+        TimelineViewModel timeline)
     {
         Dashboard       = dashboard;
         Findings        = findings;
@@ -68,6 +72,8 @@ public partial class MainViewModel : BaseViewModel
         DomainAdmins     = domainAdmins;
         DcInventory      = dcInventory;
         PrivilegedGroups = privilegedGroups;
+        DomainTrust      = domainTrust;
+        Timeline         = timeline;
         _currentView    = dashboard;
 
         Dashboard.PropertyChanged += (_, e) =>
@@ -172,6 +178,20 @@ public partial class MainViewModel : BaseViewModel
     {
         CurrentView = PrivilegedGroups;
         await PrivilegedGroups.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowDomainTrustAsync()
+    {
+        CurrentView = DomainTrust;
+        await DomainTrust.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowTimelineAsync()
+    {
+        CurrentView = Timeline;
+        await Timeline.LoadAsync();
     }
 
     [RelayCommand]

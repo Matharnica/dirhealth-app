@@ -16,6 +16,7 @@
             <local:NonZeroToVisibilityConverter x:Key="NonZeroToVisibility" />
             <local:DaysToExpiryColorConverter   x:Key="DaysToExpiryColor" />
             <local:IsNegativeConverter          x:Key="IsNegativeConverter" />
+            <local:EqualityConverter            x:Key="EqualityConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
