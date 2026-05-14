@@ -25,5 +25,11 @@ confidence: high
 ## Commits & Release-Prozess
 - Kein `dotnet` lokal — Build nur via GitHub Actions.
 - Release: `git tag vX.Y.Z && git push origin vX.Y.Z`
-- Dev-Branch heißt `dev`, nicht `main`.
-- Nach Feature-Commit: merge `dev` → `main`, dann Tag setzen.
+- Dev-Branch heißt `dev`, nicht `main`. `dev` ist gleichzeitig der Main-Branch.
+- Tags direkt auf `dev` setzen — kein separater Merge-Schritt.
+
+## Performance-Muster (v2.6.0)
+- **N+1 LDAP**: immer prüfen ob eine Loop über `GetEntry(dn)` durch einen OR-Filter-Batch ersetzt werden kann. Schwellwert: ab ca. 10 Einträgen lohnt sich das Batching.
+- **`Task.WhenAll` statt sequentiellem await**: bei unabhängigen Queries strukturell bevorzugen. Aber: `DirectoryEntry` niemals teilen — jede Task braucht eigene Instanz via `_connector.GetRootEntry()`.
+- **Scan-Ergebnis als Record zurückgeben**: statt mehrere public Methoden für verbundene Daten, einen `record` mit allen Ergebnissen zurückgeben und die caller-seitigen Wrapper dünn halten.
+- **Navigation-Cache invalidieren bei Settings-Save**: nach jedem Credential-Wechsel müssen Browser-VMs neu laden. Muster: `Action? OnCredentialsSaved` im SettingsViewModel, in MainViewModel verdrahten.

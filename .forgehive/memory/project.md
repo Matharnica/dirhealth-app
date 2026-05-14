@@ -8,7 +8,7 @@ confidence: high
 
 ## Status
 
-DirHealth v2.5.0 ist released. Phasen 1–4 sind vollständig implementiert.
+DirHealth v2.6.0 ist released. Phasen 1–4 + Performance-Release sind vollständig implementiert.
 
 ## Abgeschlossene Phasen
 
@@ -31,6 +31,16 @@ DirHealth v2.5.0 ist released. Phasen 1–4 sind vollständig implementiert.
 - SID History Finding — `(sIDHistory=*)` auf enabled users; -3/Account, Cap 12; Medium ab 1, High ab 6
 - Timeline / Recent Changes — `whenChanged >= {generalizedTime}` LDAP-Filter; Created/Modified unterschieden über whenCreated/whenChanged Delta < 5 min; 7/30/90d wählbar via RadioButtons + EqualityConverter
 
+### Performance-Release ✅ (v2.6.0)
+- ListBox Recycling-Virtualisierung in User/Computer/Group Browser Sidebars
+- Group Member List: `ItemsControl` → virtualisiertes `ListBox` in Grid-Row `Height="*"`
+- Batch LDAP: `BatchResolveGroupMembers()` — N+1 → `ceil(N/50)` Queries via OR-Filter
+- `Task.WhenAll` für 9 Privileged Group Queries (je eigene `DirectoryEntry`-Instanz)
+- `RunCompleteScanAsync()` + `CompleteScanResult` — 23 parallele Subtasks ersetzen 5 Einzelscans
+- 5-Minuten Navigations-Cache in User/Computer/Group Browser VMs mit `InvalidateCache()`
+- Cache-Invalidierung bei Settings-Save via `SettingsViewModel.OnCredentialsSaved`
+- Dashboard Chart: Static Frozen Brushes + Skip-Guard auf Count + LastScore + Canvasgröße
+
 ## Nächste Phase
 
 ### Phase 5 (geplant)
@@ -46,3 +56,6 @@ DirHealth v2.5.0 ist released. Phasen 1–4 sind vollständig implementiert.
 - **AD-Queries**: LDAP_MATCHING_RULE_IN_CHAIN (OID `1.2.840.113556.1.4.1941`) für nested group membership server-side
 - **PSO-Parsing**: `GetPsoInt()` mit -1-Sentinel unterscheidet "Attribut nicht vorhanden" von "Wert ist 0"
 - **EqualityConverter**: neu in Converters.cs + App.xaml für RadioButton two-way binding auf int-Properties
+- **RunCompleteScanAsync**: alle Scan-Subtasks via `Task.WhenAll` in einer Methode; gibt `CompleteScanResult` Record zurück; `RunFullScanAsync` + `ComputeComplianceScoreAsync` sind jetzt thin wrappers
+- **Navigation-Cache Pattern**: `_lastLoaded = DateTime.MinValue` + `CacheTtl = TimeSpan.FromMinutes(5)` in Browser-VMs; `InvalidateCache()` wird von `SettingsViewModel.OnCredentialsSaved` ausgelöst
+- **DirectoryEntry Thread-Safety**: bei `Task.WhenAll` muss jeder Task seine eigene `GetRootEntry()`-Instanz öffnen — `DirectoryEntry` ist nicht thread-safe
