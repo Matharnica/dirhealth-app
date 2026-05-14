@@ -23,8 +23,6 @@ PrivilegesRequired=lowest
 SetupLogging=yes
 ; Auto-detect and offer to close running DirHealth before install
 CloseApplications=yes
-; Embed version info in the setup .exe itself
-VersionInfoVersion={#AppVersion}
 VersionInfoDescription=DirHealth Setup
 VersionInfoCompany=DirHealth
 
@@ -84,8 +82,7 @@ begin
     ForceDirectories(ExtractFilePath(InstallLogPath));
     InstallLog.SaveToFile(InstallLogPath);
   except
-    on E: Exception do
-      Log('WARNING: Could not write install log: ' + E.Message);
+    Log('WARNING: Could not write install log');
   end;
 end;
 
