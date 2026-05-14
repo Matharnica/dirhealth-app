@@ -56,6 +56,301 @@ public class AdScanner
 
     public string DomainName => _connector.Domain ?? Environment.UserDomainName;
 
+    public record CompleteScanResult(
+        List<AdFinding> Findings,
+        int             Score,
+        List<AdUser>    InactiveUsers,
+        List<AdUser>    ExpiringPasswords,
+        List<string>    DomainAdmins);
+
+    public async Task<CompleteScanResult> RunCompleteScanAsync()
+    {
+        var totalUsersTask     = Task.Run(() => CountObjects("(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
+        var totalGroupsTask    = Task.Run(() => CountObjects("(objectClass=group)"));
+        var totalComputersTask = Task.Run(() => CountObjects("(&(objectClass=computer)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
+        var inactiveUsersTask  = GetInactiveUsersAsync();
+        var neverExpiresTask   = GetNeverExpiresUsersAsync();
+        var expiredPwdTask     = GetExpiredPasswordUsersAsync();
+        var emptyGroupsTask    = GetEmptyGroupsAsync();
+        var singleMemberTask   = GetSingleMemberGroupsAsync();
+        var inactiveCompsTask  = GetInactiveComputersAsync();
+        var noOsTask           = GetComputersWithoutOsAsync();
+        var securityTask       = GetKerberoastableAccountsAsync();
+        var adminSdTask        = GetAdminSdHolderAccountsAsync();
+        var policyTask         = GetPasswordPolicyFindingsAsync();
+        var eolTask            = GetEolComputersAsync();
+        var asRepTask          = GetAsRepRoastableAccountsAsync();
+        var undelCompsTask     = GetUnconstrainedDelegationComputersAsync();
+        var undelUsersTask     = GetUnconstrainedDelegationUsersAsync();
+        var passwdNotReqdTask  = GetPasswordNotRequiredAccountsAsync();
+        var staleDAsTask       = GetStaleDomainAdminsAsync();
+        var fgppTask           = GetFineGrainedPasswordPoliciesAsync();
+        var sidHistoryTask     = GetSidHistoryAccountsAsync();
+        var allUsersTask       = GetAllUsersAsync();
+        var domainAdminsTask   = GetDomainAdminsAsync();
+
+        await Task.WhenAll(
+            totalUsersTask, totalGroupsTask, totalComputersTask,
+            inactiveUsersTask, neverExpiresTask, expiredPwdTask,
+            emptyGroupsTask, singleMemberTask, inactiveCompsTask,
+            noOsTask, securityTask, adminSdTask, policyTask, eolTask,
+            asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
+            staleDAsTask, fgppTask, sidHistoryTask,
+            allUsersTask, domainAdminsTask);
+
+        var inactiveUsers      = inactiveUsersTask.Result;
+        var neverExpires       = neverExpiresTask.Result;
+        var expiredPwd         = expiredPwdTask.Result;
+        var emptyGroups        = emptyGroupsTask.Result;
+        var singleMember       = singleMemberTask.Result;
+        var inactiveComps      = inactiveCompsTask.Result;
+        var noOs               = noOsTask.Result;
+        var kerberoastable     = securityTask.Result;
+        var adminSdHolder      = adminSdTask.Result;
+        var policyFindings     = policyTask.Result;
+        var eolComputers       = eolTask.Result;
+        var asRepRoastable     = asRepTask.Result;
+        var undelComputers     = undelCompsTask.Result;
+        var undelUsers         = undelUsersTask.Result;
+        var passwdNotRequired  = passwdNotReqdTask.Result;
+        var staleDomainAdmins  = staleDAsTask.Result;
+        var fgppFindings       = fgppTask.Result;
+        var sidHistoryAccounts = sidHistoryTask.Result;
+        int totalUsers         = totalUsersTask.Result;
+        int totalGroups        = totalGroupsTask.Result;
+        int totalComputers     = totalComputersTask.Result;
+
+        // ── Build findings ────────────────────────────────────────────────────────
+        var findings = new List<AdFinding>();
+
+        if (inactiveUsers.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "InactiveUsers",
+                Title           = $"{inactiveUsers.Count} Inactive User Account(s)",
+                Description     = "User accounts with no logon activity in the last 90 days.",
+                Severity        = inactiveUsers.Count > 20 ? FindingSeverity.High : FindingSeverity.Medium,
+                Count           = inactiveUsers.Count,
+                AffectedObjects = inactiveUsers.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (neverExpires.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "PasswordNeverExpires",
+                Title           = $"{neverExpires.Count} Account(s) with Password Never Expires",
+                Description     = "User accounts configured with passwords that never expire.",
+                Severity        = FindingSeverity.Medium,
+                Count           = neverExpires.Count,
+                AffectedObjects = neverExpires.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (expiredPwd.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "ExpiredPasswords",
+                Title           = $"{expiredPwd.Count} Account(s) with Expired/Old Password",
+                Description     = "User accounts whose passwords have not been changed in over 365 days.",
+                Severity        = expiredPwd.Count > 10 ? FindingSeverity.High : FindingSeverity.Medium,
+                Count           = expiredPwd.Count,
+                AffectedObjects = expiredPwd.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (emptyGroups.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "EmptyGroups",
+                Title           = $"{emptyGroups.Count} Empty Group(s)",
+                Description     = "Security groups with no members.",
+                Severity        = FindingSeverity.Low,
+                Count           = emptyGroups.Count,
+                AffectedObjects = emptyGroups.Select(g => g.Name).ToList()
+            });
+
+        if (singleMember.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "SingleMemberGroups",
+                Title           = $"{singleMember.Count} Group(s) with a Single Member",
+                Description     = "Security groups with only one member — may indicate unnecessary groups.",
+                Severity        = FindingSeverity.Low,
+                Count           = singleMember.Count,
+                AffectedObjects = singleMember.Select(g => g.Name).ToList()
+            });
+
+        if (inactiveComps.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "InactiveComputers",
+                Title           = $"{inactiveComps.Count} Inactive Computer Account(s)",
+                Description     = "Computer accounts with no activity in the last 90 days.",
+                Severity        = FindingSeverity.Low,
+                Count           = inactiveComps.Count,
+                AffectedObjects = inactiveComps.Select(c => c.Name).ToList()
+            });
+
+        if (noOs.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "ComputersWithoutOS",
+                Title           = $"{noOs.Count} Computer(s) Without OS Information",
+                Description     = "Computer accounts with no operating system attribute set.",
+                Severity        = FindingSeverity.Low,
+                Count           = noOs.Count,
+                AffectedObjects = noOs.Select(c => c.Name).ToList()
+            });
+
+        if (kerberoastable.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "KerberoastableAccounts",
+                Title           = $"{kerberoastable.Count} Kerberoastable Account(s)",
+                Description     = "Enabled user accounts with a Service Principal Name (SPN) set. Their password hashes can be extracted and cracked offline.",
+                Severity        = kerberoastable.Count > 3 ? FindingSeverity.High : FindingSeverity.Medium,
+                Count           = kerberoastable.Count,
+                AffectedObjects = kerberoastable.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (adminSdHolder.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "AdminSdHolderAccounts",
+                Title           = $"{adminSdHolder.Count} Account(s) Protected by AdminSDHolder",
+                Description     = "These accounts have AdminCount=1, indicating current or past elevated privileges. Review to ensure all are expected and necessary.",
+                Severity        = FindingSeverity.Medium,
+                Count           = adminSdHolder.Count,
+                AffectedObjects = adminSdHolder.Select(u => u.SamAccountName).ToList()
+            });
+
+        findings.AddRange(policyFindings);
+
+        if (eolComputers.Count > 0)
+        {
+            var dcEol    = eolComputers.Where(c => c.IsDomainController).ToList();
+            var sev      = dcEol.Count > 0 ? FindingSeverity.High : FindingSeverity.Medium;
+            var affected = eolComputers
+                .OrderByDescending(c => c.IsDomainController)
+                .Select(c => c.IsDomainController
+                    ? $"[DC] {c.Name} — {c.OperatingSystem}"
+                    : $"{c.Name} — {c.OperatingSystem}")
+                .ToList();
+            findings.Add(new AdFinding
+            {
+                Category        = "EolOperatingSystems",
+                Title           = $"{eolComputers.Count} Computer(s) Running End-of-Life OS",
+                Description     = "These computers run Windows versions that no longer receive security updates. Any new vulnerability remains permanently unpatched." +
+                                  (dcEol.Count > 0 ? $" {dcEol.Count} domain controller(s) are affected — critical risk." : ""),
+                Severity        = sev,
+                Count           = eolComputers.Count,
+                AffectedObjects = affected,
+            });
+        }
+
+        if (asRepRoastable.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "AsRepRoasting",
+                Title           = $"{asRepRoastable.Count} Account(s) Vulnerable to AS-REP Roasting",
+                Description     = "These accounts have Kerberos Pre-Authentication disabled (DONT_REQUIRE_PREAUTH). An attacker can request an encrypted AS-REP ticket without any credentials and crack it offline.",
+                Severity        = FindingSeverity.High,
+                Count           = asRepRoastable.Count,
+                AffectedObjects = asRepRoastable.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (undelComputers.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "UnconstrainedDelegationComputers",
+                Title           = $"{undelComputers.Count} Computer(s) with Unconstrained Delegation",
+                Description     = "These non-DC computers are trusted for unconstrained Kerberos delegation. An attacker who compromises one can capture TGTs of any user authenticating to it — including Domain Admins.",
+                Severity        = FindingSeverity.Critical,
+                Count           = undelComputers.Count,
+                AffectedObjects = undelComputers.Select(c => c.Name).ToList()
+            });
+
+        if (undelUsers.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "UnconstrainedDelegationUsers",
+                Title           = $"{undelUsers.Count} User Account(s) with Unconstrained Delegation",
+                Description     = "These user accounts are trusted for unconstrained Kerberos delegation. They can impersonate any user against any service in the domain.",
+                Severity        = FindingSeverity.High,
+                Count           = undelUsers.Count,
+                AffectedObjects = undelUsers.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (passwdNotRequired.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "PasswordNotRequired",
+                Title           = $"{passwdNotRequired.Count} Account(s) with PASSWD_NOTREQD Flag",
+                Description     = "These accounts have the PASSWD_NOTREQD flag set, allowing an empty password. Active Directory will not enforce a password for these accounts.",
+                Severity        = FindingSeverity.High,
+                Count           = passwdNotRequired.Count,
+                AffectedObjects = passwdNotRequired.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (staleDomainAdmins.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "StaleDomainAdmins",
+                Title           = $"{staleDomainAdmins.Count} Stale Domain Admin Account(s)",
+                Description     = "Domain Admin accounts with no logon activity in the last 30 days. Dormant admin accounts are rarely monitored and passwords are rarely rotated.",
+                Severity        = FindingSeverity.High,
+                Count           = staleDomainAdmins.Count,
+                AffectedObjects = staleDomainAdmins.Select(u => u.SamAccountName).ToList()
+            });
+
+        findings.AddRange(fgppFindings);
+
+        if (sidHistoryAccounts.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "SidHistory",
+                Title           = $"{sidHistoryAccounts.Count} Account(s) with SID History",
+                Description     = "These accounts retain SIDs from previous AD migrations. Windows honours historical SIDs silently during access checks — a migrated account may carry elevated privileges from its old domain without appearing in any privileged group.",
+                Severity        = sidHistoryAccounts.Count > 5 ? FindingSeverity.High : FindingSeverity.Medium,
+                Count           = sidHistoryAccounts.Count,
+                AffectedObjects = sidHistoryAccounts.Select(u => u.SamAccountName).ToList()
+            });
+
+        // ── Compute score ─────────────────────────────────────────────────────────
+        int score = 100;
+        score -= PctPenalty(inactiveUsers.Count,    totalUsers,     maxPenalty: 20, fullAtPct: 30);
+        score -= PctPenalty(neverExpires.Count,      totalUsers,     maxPenalty: 15, fullAtPct: 50);
+        score -= PctPenalty(expiredPwd.Count,        totalUsers,     maxPenalty: 18, fullAtPct: 30);
+        score -= PctPenalty(emptyGroups.Count,       totalGroups,    maxPenalty:  8, fullAtPct: 35);
+        score -= PctPenalty(singleMember.Count,      totalGroups,    maxPenalty:  6, fullAtPct: 35);
+        score -= PctPenalty(inactiveComps.Count,     totalComputers, maxPenalty: 10, fullAtPct: 40);
+        score -= Math.Min(5, noOs.Count);
+        score -= Math.Min(12, kerberoastable.Count * 4);
+        foreach (var f in policyFindings)
+            score -= f.Severity == FindingSeverity.High ? 8 : 4;
+        var eolDcCount = eolComputers.Count(c => c.IsDomainController);
+        var eolPcCount = eolComputers.Count(c => !c.IsDomainController);
+        score -= Math.Min(15, eolDcCount * 8 + eolPcCount * 3);
+        score -= Math.Min(15, asRepRoastable.Count * 3);
+        score -= Math.Min(20, (undelComputers.Count + undelUsers.Count) * 6);
+        score -= Math.Min(10, passwdNotRequired.Count * 2);
+        score -= Math.Min(20, staleDomainAdmins.Count * 5);
+        foreach (var f in fgppFindings)
+            score -= f.Severity == FindingSeverity.High ? 8 : 4;
+        score -= Math.Min(12, sidHistoryAccounts.Count * 3);
+        score = Math.Max(10, score);
+
+        // ── Expiring passwords (from already-loaded allUsers) ─────────────────────
+        var maxDays = GetMaxPasswordAgeDays();
+        var expiringPasswords = allUsersTask.Result
+            .Where(u => !u.PasswordNeverExpires && u.PasswordLastSet is not null &&
+                        (int)(u.PasswordLastSet.Value.AddDays(maxDays) - DateTime.UtcNow).TotalDays is >= 0 and <= 30)
+            .OrderBy(u => u.DaysUntilPasswordExpiry)
+            .ToList();
+
+        var domainAdmins = domainAdminsTask.Result?.Members?.Select(m => m.Name).ToList() ?? [];
+
+        return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins);
+    }
+
     public async Task<List<AdUser>> GetInactiveUsersAsync(int daysThreshold = 90)
     {
         return await Task.Run(() =>
@@ -277,78 +572,8 @@ public class AdScanner
 
     public async Task<int> ComputeComplianceScoreAsync()
     {
-        var totalUsersTask     = Task.Run(() => CountObjects("(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
-        var totalGroupsTask    = Task.Run(() => CountObjects("(objectClass=group)"));
-        var totalComputersTask = Task.Run(() => CountObjects("(&(objectClass=computer)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
-        var inactiveUsersTask  = GetInactiveUsersAsync();
-        var neverExpiresTask   = GetNeverExpiresUsersAsync();
-        var expiredPwdTask     = GetExpiredPasswordUsersAsync();
-        var emptyGroupsTask    = GetEmptyGroupsAsync();
-        var singleMemberTask   = GetSingleMemberGroupsAsync();
-        var inactiveCompsTask  = GetInactiveComputersAsync();
-        var noOsTask           = GetComputersWithoutOsAsync();
-        var securityTask       = GetKerberoastableAccountsAsync();
-        var policyTask         = GetPasswordPolicyFindingsAsync();
-        var eolTask            = GetEolComputersAsync();
-        var asRepTask          = GetAsRepRoastableAccountsAsync();
-        var undelCompsTask     = GetUnconstrainedDelegationComputersAsync();
-        var undelUsersTask     = GetUnconstrainedDelegationUsersAsync();
-        var passwdNotReqdTask  = GetPasswordNotRequiredAccountsAsync();
-        var staleDAsTask       = GetStaleDomainAdminsAsync();
-        var fgppTask           = GetFineGrainedPasswordPoliciesAsync();
-        var sidHistoryTask     = GetSidHistoryAccountsAsync();
-
-        await Task.WhenAll(totalUsersTask, totalGroupsTask, totalComputersTask,
-                           inactiveUsersTask, neverExpiresTask, expiredPwdTask,
-                           emptyGroupsTask, singleMemberTask, inactiveCompsTask,
-                           noOsTask, securityTask, policyTask, eolTask,
-                           asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
-                           staleDAsTask, fgppTask, sidHistoryTask);
-
-        int totalUsers     = totalUsersTask.Result;
-        int totalGroups    = totalGroupsTask.Result;
-        int totalComputers = totalComputersTask.Result;
-
-        int score = 100;
-
-        // User health — percentage-based (full penalty at given threshold %)
-        score -= PctPenalty(inactiveUsersTask.Result.Count, totalUsers,     maxPenalty: 20, fullAtPct: 30);
-        score -= PctPenalty(neverExpiresTask.Result.Count,  totalUsers,     maxPenalty: 15, fullAtPct: 50);
-        score -= PctPenalty(expiredPwdTask.Result.Count,    totalUsers,     maxPenalty: 18, fullAtPct: 30);
-
-        // Group health — percentage-based
-        score -= PctPenalty(emptyGroupsTask.Result.Count,   totalGroups,    maxPenalty:  8, fullAtPct: 35);
-        score -= PctPenalty(singleMemberTask.Result.Count,  totalGroups,    maxPenalty:  6, fullAtPct: 35);
-
-        // Computer health — percentage-based
-        score -= PctPenalty(inactiveCompsTask.Result.Count, totalComputers, maxPenalty: 10, fullAtPct: 40);
-        score -= Math.Min(5, noOsTask.Result.Count);
-
-        // Security checks — absolute (critical regardless of environment size)
-        score -= Math.Min(12, securityTask.Result.Count * 4);
-        foreach (var f in policyTask.Result)
-            score -= f.Severity == FindingSeverity.High ? 8 : 4;
-
-        // EOL OS — DCs count more heavily
-        var eolDcCount  = eolTask.Result.Count(c => c.IsDomainController);
-        var eolPcCount  = eolTask.Result.Count(c => !c.IsDomainController);
-        score -= Math.Min(15, eolDcCount * 8 + eolPcCount * 3);
-
-        // Phase 2 security findings
-        score -= Math.Min(15, asRepTask.Result.Count * 3);
-        score -= Math.Min(20, (undelCompsTask.Result.Count + undelUsersTask.Result.Count) * 6);
-        score -= Math.Min(10, passwdNotReqdTask.Result.Count * 2);
-
-        // Phase 3 security findings
-        score -= Math.Min(20, staleDAsTask.Result.Count * 5);
-        foreach (var f in fgppTask.Result)
-            score -= f.Severity == FindingSeverity.High ? 8 : 4;
-
-        // Phase 4 security findings
-        score -= Math.Min(12, sidHistoryTask.Result.Count * 3);
-
-        // Floor at 10 — a non-zero score shows there's always room to improve
-        return Math.Max(10, score);
+        var r = await RunCompleteScanAsync();
+        return r.Score;
     }
 
     // Returns penalty proportional to (count/total) up to maxPenalty at fullAtPct%
@@ -876,219 +1101,8 @@ public class AdScanner
 
     public async Task<List<AdFinding>> RunFullScanAsync()
     {
-        var findings = new List<AdFinding>();
-
-        var inactiveUsers        = await GetInactiveUsersAsync();
-        var neverExpiresUsers    = await GetNeverExpiresUsersAsync();
-        var expiredPasswords     = await GetExpiredPasswordUsersAsync();
-        var emptyGroups          = await GetEmptyGroupsAsync();
-        var singleMemberGroups   = await GetSingleMemberGroupsAsync();
-        var inactiveComputers    = await GetInactiveComputersAsync();
-        var noOsComputers        = await GetComputersWithoutOsAsync();
-        var kerberoastable       = await GetKerberoastableAccountsAsync();
-        var adminSdHolder        = await GetAdminSdHolderAccountsAsync();
-        var policyFindings       = await GetPasswordPolicyFindingsAsync();
-        var eolComputers         = await GetEolComputersAsync();
-        var asRepRoastable       = await GetAsRepRoastableAccountsAsync();
-        var undelComputers       = await GetUnconstrainedDelegationComputersAsync();
-        var undelUsers           = await GetUnconstrainedDelegationUsersAsync();
-        var passwdNotRequired    = await GetPasswordNotRequiredAccountsAsync();
-        var staleDomainAdmins    = await GetStaleDomainAdminsAsync();
-        var fgppFindings         = await GetFineGrainedPasswordPoliciesAsync();
-        var sidHistoryAccounts   = await GetSidHistoryAccountsAsync();
-
-        if (inactiveUsers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "InactiveUsers",
-                Title = $"{inactiveUsers.Count} Inactive User Account(s)",
-                Description = "User accounts with no logon activity in the last 90 days.",
-                Severity = inactiveUsers.Count > 20 ? FindingSeverity.High : FindingSeverity.Medium,
-                Count = inactiveUsers.Count,
-                AffectedObjects = inactiveUsers.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (neverExpiresUsers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "PasswordNeverExpires",
-                Title = $"{neverExpiresUsers.Count} Account(s) with Password Never Expires",
-                Description = "User accounts configured with passwords that never expire.",
-                Severity = FindingSeverity.Medium,
-                Count = neverExpiresUsers.Count,
-                AffectedObjects = neverExpiresUsers.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (expiredPasswords.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "ExpiredPasswords",
-                Title = $"{expiredPasswords.Count} Account(s) with Expired/Old Password",
-                Description = "User accounts whose passwords have not been changed in over 365 days.",
-                Severity = expiredPasswords.Count > 10 ? FindingSeverity.High : FindingSeverity.Medium,
-                Count = expiredPasswords.Count,
-                AffectedObjects = expiredPasswords.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (emptyGroups.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "EmptyGroups",
-                Title = $"{emptyGroups.Count} Empty Group(s)",
-                Description = "Security groups with no members.",
-                Severity = FindingSeverity.Low,
-                Count = emptyGroups.Count,
-                AffectedObjects = emptyGroups.Select(g => g.Name).ToList()
-            });
-
-        if (singleMemberGroups.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "SingleMemberGroups",
-                Title = $"{singleMemberGroups.Count} Group(s) with a Single Member",
-                Description = "Security groups with only one member — may indicate unnecessary groups.",
-                Severity = FindingSeverity.Low,
-                Count = singleMemberGroups.Count,
-                AffectedObjects = singleMemberGroups.Select(g => g.Name).ToList()
-            });
-
-        if (inactiveComputers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "InactiveComputers",
-                Title = $"{inactiveComputers.Count} Inactive Computer Account(s)",
-                Description = "Computer accounts with no activity in the last 90 days.",
-                Severity = FindingSeverity.Low,
-                Count = inactiveComputers.Count,
-                AffectedObjects = inactiveComputers.Select(c => c.Name).ToList()
-            });
-
-        if (noOsComputers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category = "ComputersWithoutOS",
-                Title = $"{noOsComputers.Count} Computer(s) Without OS Information",
-                Description = "Computer accounts with no operating system attribute set.",
-                Severity = FindingSeverity.Low,
-                Count = noOsComputers.Count,
-                AffectedObjects = noOsComputers.Select(c => c.Name).ToList()
-            });
-
-        if (kerberoastable.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "KerberoastableAccounts",
-                Title           = $"{kerberoastable.Count} Kerberoastable Account(s)",
-                Description     = "Enabled user accounts with a Service Principal Name (SPN) set. Their password hashes can be extracted and cracked offline.",
-                Severity        = kerberoastable.Count > 3 ? FindingSeverity.High : FindingSeverity.Medium,
-                Count           = kerberoastable.Count,
-                AffectedObjects = kerberoastable.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (adminSdHolder.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "AdminSdHolderAccounts",
-                Title           = $"{adminSdHolder.Count} Account(s) Protected by AdminSDHolder",
-                Description     = "These accounts have AdminCount=1, indicating current or past elevated privileges. Review to ensure all are expected and necessary.",
-                Severity        = FindingSeverity.Medium,
-                Count           = adminSdHolder.Count,
-                AffectedObjects = adminSdHolder.Select(u => u.SamAccountName).ToList()
-            });
-
-        findings.AddRange(policyFindings);
-
-        if (eolComputers.Count > 0)
-        {
-            var dcEol  = eolComputers.Where(c => c.IsDomainController).ToList();
-            var sev    = dcEol.Count > 0 ? FindingSeverity.High : FindingSeverity.Medium;
-            var affected = eolComputers
-                .OrderByDescending(c => c.IsDomainController)
-                .Select(c => c.IsDomainController
-                    ? $"[DC] {c.Name} — {c.OperatingSystem}"
-                    : $"{c.Name} — {c.OperatingSystem}")
-                .ToList();
-            findings.Add(new AdFinding
-            {
-                Category        = "EolOperatingSystems",
-                Title           = $"{eolComputers.Count} Computer(s) Running End-of-Life OS",
-                Description     = "These computers run Windows versions that no longer receive security updates. Any new vulnerability remains permanently unpatched." +
-                                  (dcEol.Count > 0 ? $" {dcEol.Count} domain controller(s) are affected — critical risk." : ""),
-                Severity        = sev,
-                Count           = eolComputers.Count,
-                AffectedObjects = affected,
-            });
-        }
-
-        if (asRepRoastable.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "AsRepRoasting",
-                Title           = $"{asRepRoastable.Count} Account(s) Vulnerable to AS-REP Roasting",
-                Description     = "These accounts have Kerberos Pre-Authentication disabled (DONT_REQUIRE_PREAUTH). An attacker can request an encrypted AS-REP ticket without any credentials and crack it offline.",
-                Severity        = FindingSeverity.High,
-                Count           = asRepRoastable.Count,
-                AffectedObjects = asRepRoastable.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (undelComputers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "UnconstrainedDelegationComputers",
-                Title           = $"{undelComputers.Count} Computer(s) with Unconstrained Delegation",
-                Description     = "These non-DC computers are trusted for unconstrained Kerberos delegation. An attacker who compromises one can capture TGTs of any user authenticating to it — including Domain Admins.",
-                Severity        = FindingSeverity.Critical,
-                Count           = undelComputers.Count,
-                AffectedObjects = undelComputers.Select(c => c.Name).ToList()
-            });
-
-        if (undelUsers.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "UnconstrainedDelegationUsers",
-                Title           = $"{undelUsers.Count} User Account(s) with Unconstrained Delegation",
-                Description     = "These user accounts are trusted for unconstrained Kerberos delegation. They can impersonate any user against any service in the domain.",
-                Severity        = FindingSeverity.High,
-                Count           = undelUsers.Count,
-                AffectedObjects = undelUsers.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (passwdNotRequired.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "PasswordNotRequired",
-                Title           = $"{passwdNotRequired.Count} Account(s) with PASSWD_NOTREQD Flag",
-                Description     = "These accounts have the PASSWD_NOTREQD flag set, allowing an empty password. Active Directory will not enforce a password for these accounts.",
-                Severity        = FindingSeverity.High,
-                Count           = passwdNotRequired.Count,
-                AffectedObjects = passwdNotRequired.Select(u => u.SamAccountName).ToList()
-            });
-
-        if (staleDomainAdmins.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "StaleDomainAdmins",
-                Title           = $"{staleDomainAdmins.Count} Stale Domain Admin Account(s)",
-                Description     = "Domain Admin accounts with no logon activity in the last 30 days. Dormant admin accounts are rarely monitored and passwords are rarely rotated.",
-                Severity        = FindingSeverity.High,
-                Count           = staleDomainAdmins.Count,
-                AffectedObjects = staleDomainAdmins.Select(u => u.SamAccountName).ToList()
-            });
-
-        findings.AddRange(fgppFindings);
-
-        if (sidHistoryAccounts.Count > 0)
-            findings.Add(new AdFinding
-            {
-                Category        = "SidHistory",
-                Title           = $"{sidHistoryAccounts.Count} Account(s) with SID History",
-                Description     = "These accounts retain SIDs from previous AD migrations. Windows honours historical SIDs silently during access checks — a migrated account may carry elevated privileges from its old domain without appearing in any privileged group.",
-                Severity        = sidHistoryAccounts.Count > 5 ? FindingSeverity.High : FindingSeverity.Medium,
-                Count           = sidHistoryAccounts.Count,
-                AffectedObjects = sidHistoryAccounts.Select(u => u.SamAccountName).ToList()
-            });
-
-        return findings;
+        var r = await RunCompleteScanAsync();
+        return r.Findings;
     }
 
     public async Task<List<AdOU>> GetAllOUsAsync()

@@ -76,16 +76,22 @@ public partial class DashboardViewModel : BaseViewModel
         StatusMessage = "Scanning Active Directory...";
         try
         {
-            var previousCache   = _cacheStore.Load();
+            var previousCache = _cacheStore.Load();
 
-            Findings            = await _scanner.RunFullScanAsync();
-            ComplianceScore     = await _scanner.ComputeComplianceScoreAsync();
+            var result          = await _scanner.RunCompleteScanAsync();
+            Findings            = result.Findings;
+            ComplianceScore     = result.Score;
             FindingsCount       = Findings.Count;
             InactiveUsersCount  = Findings.FirstOrDefault(f => f.Category == "InactiveUsers")?.Count ?? 0;
             PasswordIssuesCount = Findings.Where(f => f.Category is "PasswordNeverExpires" or "ExpiredPasswords").Sum(f => f.Count);
             GroupIssuesCount    = Findings.Where(f => f.Category is "EmptyGroups" or "SingleMemberGroups").Sum(f => f.Count);
             LastScanTime        = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss");
             StatusMessage       = $"Scan complete — {FindingsCount} finding(s)";
+
+            _cachedInactiveUsers     = result.InactiveUsers;
+            _cachedExpiringPasswords = result.ExpiringPasswords;
+            _cachedDomainAdmins      = result.DomainAdmins;
+            _liveScanCompleted       = true;
 
             var newCache = new ScanCache
             {
@@ -98,7 +104,6 @@ public partial class DashboardViewModel : BaseViewModel
                 LastScanTime        = LastScanTime
             };
 
-            // Calculate diff before saving (Save() moves current → previous)
             if (previousCache != null)
             {
                 LastDiff = ScanDiffCalculator.Calculate(previousCache, newCache);
@@ -106,12 +111,6 @@ public partial class DashboardViewModel : BaseViewModel
             }
 
             _cacheStore.Save(newCache);
-
-            _cachedInactiveUsers     = await _scanner.GetInactiveUsersAsync(90);
-            _cachedExpiringPasswords = await _scanner.GetExpiringPasswordUsersAsync(30);
-            var adminsGroup          = await _scanner.GetDomainAdminsAsync();
-            _cachedDomainAdmins      = adminsGroup?.Members?.Select(m => m.Name).ToList() ?? [];
-            _liveScanCompleted       = true;
 
             var previous = _historyStore.PreviousScore();
             _historyStore.Add(ComplianceScore);
