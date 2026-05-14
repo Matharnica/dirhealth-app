@@ -71,4 +71,4 @@ DirHealth is free to use and source-available, maintained in spare time. If it s
 
 ## License
 
-[Elastic License 2.0](LICENSE) — free to use and self-host. Source code is publicly available for auditing. You may not offer DirHealth as a hosted or managed service to third parties.
+[Elastic License 2.0](LICENSE) — free to use and self-host. The source code is publicly available for auditing and modification, but you may not offer DirHealth as a hosted or managed service to third parties. This differs from open source licenses in that commercial hosting is restricted; personal use, self-hosting, and private modification are fully permitted.

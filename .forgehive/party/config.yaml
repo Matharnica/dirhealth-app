@@ -1,0 +1,21 @@
+sets:
+  design:
+    agents: [suki, viktor]
+    trigger: "/design-party"
+    description: "UX + Architektur parallel"
+  build:
+    agents: [viktor, kai, sam]
+    trigger: "/party"
+    description: "Architektur + Engineering + QA"
+  review:
+    agents: [kai, sam, eli]
+    trigger: "/review-party"
+    description: "Code Review + QA + Doku"
+  full:
+    agents: [nora, eli, remy, suki, viktor, kai, sam]
+    trigger: "/full-party"
+    description: "Alle Agenten"
+  security:
+    agents: [vera, sam]
+    trigger: "/security-party"
+    description: "Security Review + QA"

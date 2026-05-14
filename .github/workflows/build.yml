@@ -73,6 +73,7 @@ jobs:
       #        Variable: SIGNPATH_ORG_ID     (Organization ID from SignPath)
       - name: Sign installer
         if: startsWith(github.ref, 'refs/tags/')
+        timeout-minutes: 15
         uses: signpath/github-actions-submit-signing-request@v1
         with:
           api-token: '${{ secrets.SIGNPATH_CI_TOKEN }}'
@@ -83,6 +84,13 @@ jobs:
           github-artifact-id: '${{ steps.upload-installer.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: installer/Output/signed
+
+      - name: Verify signed artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          test -f "installer/Output/signed/DirHealth-Setup-${{ steps.version.outputs.version }}.exe" || \
+            (echo "Signed artifact missing — signing may have failed" && exit 1)
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')

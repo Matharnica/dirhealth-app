@@ -14,16 +14,16 @@ OutputBaseFilename=DirHealth-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-; Item 4: Branded wizard images (generated from app icon + dark theme palette)
+; Branded wizard images (generated from app icon + dark theme palette)
 WizardImageFile=assets\wizard-banner.png
 WizardSmallImageFile=assets\wizard-small.png
 UninstallDisplayIcon={app}\DirHealth.exe
 PrivilegesRequired=lowest
-; Item 2: Built-in setup logging (writes to %TEMP%\Setup Log *.txt; we also write our own log below)
+; Built-in setup logging (writes to %TEMP%\Setup Log *.txt; we also write our own log below)
 SetupLogging=yes
-; Item 3: Auto-detect and offer to close running DirHealth before install
+; Auto-detect and offer to close running DirHealth before install
 CloseApplications=yes
-; Item 4: Embed version info in the setup .exe itself
+; Embed version info in the setup .exe itself
 VersionInfoVersion={#AppVersion}
 VersionInfoDescription=DirHealth Setup
 VersionInfoCompany=DirHealth
@@ -52,13 +52,13 @@ Root: HKCU; Subkey: "SOFTWARE\DirHealth"; ValueType: string; ValueName: "Version
 ; Remove legacy ADHygiene folders left over from the old app name
 Type: filesandordirs; Name: "{userappdata}\ADHygiene"
 Type: filesandordirs; Name: "{commonappdata}\ADHygiene"
-; Item 9: %APPDATA%\DirHealth\ is intentionally NOT deleted — scan history and settings are preserved
+; %APPDATA%\DirHealth\ is intentionally NOT deleted — scan history and settings are preserved
 
 [Run]
-; Item 8: Launch DirHealth after install (interactive) or silently (auto-update path)
+; Launch DirHealth after install (interactive) or silently (auto-update path)
 Filename: "{app}\DirHealth.exe"; Description: "{cm:LaunchProgram,DirHealth}"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\DirHealth.exe"; Flags: nowait; Check: WizardSilent
-; Item 2: Optional log viewer on finish page (unchecked by default)
+; Optional log viewer on finish page (unchecked by default)
 Filename: "notepad.exe"; Parameters: """{userappdata}\DirHealth\install.log"""; Description: "View installation log"; Flags: postinstall skipifsilent unchecked
 
 [Code]
@@ -68,7 +68,7 @@ var
   InstallLogPath: String;
   SetupDone: Boolean;
 
-// --- Item 2: Custom install log written to %APPDATA%\DirHealth\install.log ---
+// --- Install log: written to %APPDATA%\DirHealth\install.log ---
 
 procedure WriteInstallLog(const Msg: String);
 begin
@@ -84,10 +84,12 @@ begin
     ForceDirectories(ExtractFilePath(InstallLogPath));
     InstallLog.SaveToFile(InstallLogPath);
   except
+    on E: Exception do
+      Log('WARNING: Could not write install log: ' + E.Message);
   end;
 end;
 
-// --- Item 7: Previous version detection via registry ---
+// --- Previous version detection via registry ---
 
 function GetPreviousVersion: String;
 var
@@ -124,7 +126,7 @@ procedure InitializeWizard;
 var
   PrevVersion: String;
 begin
-  // Item 5: Permission explainer — shown right after the welcome page
+  // Permission explainer — shown right after the welcome page
   ExplainerPage := CreateOutputMsgPage(
     wpWelcome,
     'How DirHealth Works',
@@ -140,7 +142,7 @@ begin
     'No telemetry. No licensing. No external servers.'
   );
 
-  // Item 7: Show upgrade notice on the welcome page itself
+  // Show upgrade notice on the welcome page itself
   PrevVersion := GetPreviousVersion;
   if PrevVersion <> '' then
     WizardForm.WelcomeLabel2.Caption :=
@@ -150,7 +152,7 @@ begin
       'before the upgrade.';
 end;
 
-// --- Item 6: Detailed progress steps ---
+// --- Installation steps ---
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -162,18 +164,31 @@ begin
       WizardForm.StatusLabel.Caption := 'Preparing installation...';
       WriteInstallLog('Installation started');
 
-      // Item 1: Back up %APPDATA%\DirHealth\ before overwriting on upgrade
+      // Back up %APPDATA%\DirHealth\ before overwriting on upgrade
       PrevVersion := GetPreviousVersion;
       AppDataDir := ExpandConstant('{userappdata}\DirHealth');
       if (PrevVersion <> '') and DirExists(AppDataDir) then
       begin
-        BackupDir := AppDataDir + '_backup_' +
-          GetDateTimeString('yyyymmdd_hhnn', '', '');
+        BackupDir := AppDataDir + '_backup';
+        if DirExists(BackupDir) then
+        begin
+          WriteInstallLog('Removing previous backup: ' + BackupDir);
+          DelTree(BackupDir, True, True, True);
+        end;
         WriteInstallLog('Backing up: ' + AppDataDir + ' -> ' + BackupDir);
         if RenameFile(AppDataDir, BackupDir) then
           WriteInstallLog('Backup created: ' + BackupDir)
         else
-          WriteInstallLog('WARNING: Backup failed, continuing anyway');
+        begin
+          WriteInstallLog('WARNING: Backup of ' + AppDataDir + ' failed');
+          if MsgBox(
+            'Could not back up your DirHealth data before upgrading.' + #13#10 + #13#10 +
+            'The installation will continue, but your existing data in:' + #13#10 +
+            AppDataDir + #13#10 + #13#10 +
+            'may be overwritten. Continue anyway?',
+            mbConfirmation, MB_YESNO) = IDNO then
+            Abort;
+        end;
       end;
     end;
 
@@ -181,6 +196,7 @@ begin
     begin
       WizardForm.StatusLabel.Caption := 'Finalizing installation...';
       WriteInstallLog('Files installed successfully');
+      FlushInstallLog;
     end;
 
     ssDone:
@@ -198,7 +214,7 @@ begin
     WriteInstallLog('Installing: ' + ExtractFileName(FileName));
 end;
 
-// --- Item 9: Inform user that scan data is preserved on uninstall ---
+// --- Uninstall: inform user that scan data is preserved ---
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
