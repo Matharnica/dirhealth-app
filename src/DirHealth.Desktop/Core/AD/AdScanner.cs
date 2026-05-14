@@ -1202,12 +1202,54 @@ public class AdScanner
                     start += count;
                 }
 
-                foreach (var dn in memberDns)
-                    detail.Members.Add(ResolveGroupMember(dn));
+                detail.Members.AddRange(BatchResolveGroupMembers(root, memberDns));
             }
             catch { }
             return detail;
         });
+    }
+
+    private List<AdGroupMember> BatchResolveGroupMembers(DirectoryEntry root, List<string> memberDns)
+    {
+        var members = new List<AdGroupMember>(memberDns.Count);
+        const int batchSize = 50;
+        for (int i = 0; i < memberDns.Count; i += batchSize)
+        {
+            var batch  = memberDns.Skip(i).Take(batchSize).ToList();
+            var filter = "(|" + string.Join("", batch.Select(dn => $"(distinguishedName={EscapeDn(dn)})")) + ")";
+            try
+            {
+                using var searcher = _connector.CreateSearcher(root, filter,
+                    "cn", "sAMAccountName", "objectClass", "distinguishedName");
+                using var results = searcher.FindAll();
+                var found = new Dictionary<string, AdGroupMember>(StringComparer.OrdinalIgnoreCase);
+                foreach (SearchResult r in results)
+                {
+                    var dn       = GetString(r.Properties, "distinguishedName");
+                    var objClass = r.Properties["objectClass"].Cast<string>().ToList();
+                    var type     = objClass.Contains("group")    ? "Group"
+                                 : objClass.Contains("computer") ? "Computer"
+                                 :                                 "User";
+                    found[dn] = new AdGroupMember
+                    {
+                        Name              = GetString(r.Properties, "cn"),
+                        SamAccountName    = GetString(r.Properties, "sAMAccountName"),
+                        ObjectType        = type,
+                        DistinguishedName = dn,
+                    };
+                }
+                foreach (var dn in batch)
+                    members.Add(found.TryGetValue(dn, out var m)
+                        ? m
+                        : new AdGroupMember { Name = dn, DistinguishedName = dn });
+            }
+            catch
+            {
+                foreach (var dn in batch)
+                    members.Add(new AdGroupMember { Name = dn, DistinguishedName = dn });
+            }
+        }
+        return members;
     }
 
     private AdGroupMember ResolveGroupMember(string memberDn)
