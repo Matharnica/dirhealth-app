@@ -19,6 +19,8 @@ public partial class ComputerBrowserViewModel : BaseViewModel
     public ComputerDetailViewModel Detail => _detail;
 
     private List<AdComputer> _allComputers = new();
+    private DateTime _lastLoaded = DateTime.MinValue;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public ComputerBrowserViewModel() : this(null!, null!) { }
 
@@ -32,12 +34,18 @@ public partial class ComputerBrowserViewModel : BaseViewModel
     public async Task LoadAsync()
     {
         if (_scanner is null) return;
+        if (_allComputers.Count > 0 && DateTime.Now - _lastLoaded < CacheTtl)
+        {
+            ApplyFilter();
+            return;
+        }
         IsLoading = true;
         Computers.Clear();
         _allComputers.Clear();
         try
         {
             _allComputers = await _scanner.GetAllComputersAsync();
+            _lastLoaded   = DateTime.Now;
             ApplyFilter();
         }
         catch (Exception ex) { StatusMessage = $"Failed to load computers: {ex.Message}"; }

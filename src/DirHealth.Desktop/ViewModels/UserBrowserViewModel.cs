@@ -21,6 +21,8 @@ public partial class UserBrowserViewModel : BaseViewModel
     public List<string> UserFilterOptions { get; } = ["All", "Active", "Disabled", "Expiring 30d", "Never logged in"];
 
     private List<AdUser> _allUsers = new();
+    private DateTime _lastLoaded = DateTime.MinValue;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public UserBrowserViewModel() : this(null!, null!) { }
 
@@ -34,12 +36,18 @@ public partial class UserBrowserViewModel : BaseViewModel
     public async Task LoadAsync()
     {
         if (_scanner is null) return;
+        if (_allUsers.Count > 0 && DateTime.Now - _lastLoaded < CacheTtl)
+        {
+            ApplyFilter();
+            return;
+        }
         IsLoading = true;
         Users.Clear();
         _allUsers.Clear();
         try
         {
-            _allUsers = await _scanner.GetAllUsersAsync();
+            _allUsers   = await _scanner.GetAllUsersAsync();
+            _lastLoaded = DateTime.Now;
             ApplyFilter();
         }
         catch (Exception ex) { StatusMessage = $"Failed to load users: {ex.Message}"; }

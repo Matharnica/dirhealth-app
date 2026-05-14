@@ -17,18 +17,26 @@ public partial class GroupManagerViewModel : BaseViewModel
 
     public ObservableCollection<AdGroup> Groups { get; } = new();
     private List<AdGroup> _allGroups = new();
+    private DateTime _lastLoaded = DateTime.MinValue;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public GroupManagerViewModel(AdScanner scanner) { _scanner = scanner; }
 
     [RelayCommand]
     public async Task LoadAsync()
     {
+        if (_allGroups.Count > 0 && DateTime.Now - _lastLoaded < CacheTtl)
+        {
+            ApplyFilter();
+            return;
+        }
         IsLoading = true;
         Groups.Clear();
         _allGroups.Clear();
         try
         {
-            _allGroups = await _scanner.GetAllGroupsWithCountAsync();
+            _allGroups  = await _scanner.GetAllGroupsWithCountAsync();
+            _lastLoaded = DateTime.Now;
             ApplyFilter();
         }
         catch (Exception ex) { StatusMessage = $"Failed to load groups: {ex.Message}"; }
