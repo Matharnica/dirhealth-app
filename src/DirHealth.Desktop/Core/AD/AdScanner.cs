@@ -277,11 +277,16 @@ public class AdScanner
         var securityTask       = GetKerberoastableAccountsAsync();
         var policyTask         = GetPasswordPolicyFindingsAsync();
         var eolTask            = GetEolComputersAsync();
+        var asRepTask          = GetAsRepRoastableAccountsAsync();
+        var undelCompsTask     = GetUnconstrainedDelegationComputersAsync();
+        var undelUsersTask     = GetUnconstrainedDelegationUsersAsync();
+        var passwdNotReqdTask  = GetPasswordNotRequiredAccountsAsync();
 
         await Task.WhenAll(totalUsersTask, totalGroupsTask, totalComputersTask,
                            inactiveUsersTask, neverExpiresTask, expiredPwdTask,
                            emptyGroupsTask, singleMemberTask, inactiveCompsTask,
-                           noOsTask, securityTask, policyTask, eolTask);
+                           noOsTask, securityTask, policyTask, eolTask,
+                           asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask);
 
         int totalUsers     = totalUsersTask.Result;
         int totalGroups    = totalGroupsTask.Result;
@@ -311,6 +316,11 @@ public class AdScanner
         var eolDcCount  = eolTask.Result.Count(c => c.IsDomainController);
         var eolPcCount  = eolTask.Result.Count(c => !c.IsDomainController);
         score -= Math.Min(15, eolDcCount * 8 + eolPcCount * 3);
+
+        // Phase 2 security findings
+        score -= Math.Min(15, asRepTask.Result.Count * 3);
+        score -= Math.Min(20, (undelCompsTask.Result.Count + undelUsersTask.Result.Count) * 6);
+        score -= Math.Min(10, passwdNotReqdTask.Result.Count * 2);
 
         // Floor at 10 — a non-zero score shows there's always room to improve
         return Math.Max(10, score);
@@ -396,6 +406,54 @@ public class AdScanner
 
     private static string EscapeDn(string dn) =>
         dn.Replace("\\", "\\5c").Replace("(", "\\28").Replace(")", "\\29");
+
+    public async Task<List<AdUser>> GetAsRepRoastableAccountsAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // userAccountControl bit 4194304 = DONT_REQUIRE_PREAUTH
+            var filter = "(&(objectClass=user)(objectCategory=person)" +
+                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                         "(userAccountControl:1.2.840.113556.1.4.803:=4194304))";
+            return QueryUsers(filter);
+        });
+    }
+
+    public async Task<List<AdComputer>> GetUnconstrainedDelegationComputersAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // bit 524288 = TRUSTED_FOR_DELEGATION; exclude DCs (bit 8192)
+            var filter = "(&(objectClass=computer)" +
+                         "(!(userAccountControl:1.2.840.113556.1.4.803:=8192))" +
+                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
+            return QueryComputers(filter);
+        });
+    }
+
+    public async Task<List<AdUser>> GetUnconstrainedDelegationUsersAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // bit 524288 = TRUSTED_FOR_DELEGATION
+            var filter = "(&(objectClass=user)(objectCategory=person)" +
+                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
+            return QueryUsers(filter);
+        });
+    }
+
+    public async Task<List<AdUser>> GetPasswordNotRequiredAccountsAsync()
+    {
+        return await Task.Run(() =>
+        {
+            // userAccountControl bit 32 = PASSWD_NOTREQD
+            var filter = "(&(objectClass=user)(objectCategory=person)" +
+                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                         "(userAccountControl:1.2.840.113556.1.4.803:=32))";
+            return QueryUsers(filter);
+        });
+    }
 
     public async Task<List<AdUser>> GetKerberoastableAccountsAsync()
     {
@@ -505,6 +563,10 @@ public class AdScanner
         var adminSdHolder        = await GetAdminSdHolderAccountsAsync();
         var policyFindings       = await GetPasswordPolicyFindingsAsync();
         var eolComputers         = await GetEolComputersAsync();
+        var asRepRoastable       = await GetAsRepRoastableAccountsAsync();
+        var undelComputers       = await GetUnconstrainedDelegationComputersAsync();
+        var undelUsers           = await GetUnconstrainedDelegationUsersAsync();
+        var passwdNotRequired    = await GetPasswordNotRequiredAccountsAsync();
 
         if (inactiveUsers.Count > 0)
             findings.Add(new AdFinding
@@ -628,6 +690,50 @@ public class AdScanner
                 AffectedObjects = affected,
             });
         }
+
+        if (asRepRoastable.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "AsRepRoasting",
+                Title           = $"{asRepRoastable.Count} Account(s) Vulnerable to AS-REP Roasting",
+                Description     = "These accounts have Kerberos Pre-Authentication disabled (DONT_REQUIRE_PREAUTH). An attacker can request an encrypted AS-REP ticket without any credentials and crack it offline.",
+                Severity        = FindingSeverity.High,
+                Count           = asRepRoastable.Count,
+                AffectedObjects = asRepRoastable.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (undelComputers.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "UnconstrainedDelegationComputers",
+                Title           = $"{undelComputers.Count} Computer(s) with Unconstrained Delegation",
+                Description     = "These non-DC computers are trusted for unconstrained Kerberos delegation. An attacker who compromises one can capture TGTs of any user authenticating to it — including Domain Admins.",
+                Severity        = FindingSeverity.Critical,
+                Count           = undelComputers.Count,
+                AffectedObjects = undelComputers.Select(c => c.Name).ToList()
+            });
+
+        if (undelUsers.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "UnconstrainedDelegationUsers",
+                Title           = $"{undelUsers.Count} User Account(s) with Unconstrained Delegation",
+                Description     = "These user accounts are trusted for unconstrained Kerberos delegation. They can impersonate any user against any service in the domain.",
+                Severity        = FindingSeverity.High,
+                Count           = undelUsers.Count,
+                AffectedObjects = undelUsers.Select(u => u.SamAccountName).ToList()
+            });
+
+        if (passwdNotRequired.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "PasswordNotRequired",
+                Title           = $"{passwdNotRequired.Count} Account(s) with PASSWD_NOTREQD Flag",
+                Description     = "These accounts have the PASSWD_NOTREQD flag set, allowing an empty password. Active Directory will not enforce a password for these accounts.",
+                Severity        = FindingSeverity.High,
+                Count           = passwdNotRequired.Count,
+                AffectedObjects = passwdNotRequired.Select(u => u.SamAccountName).ToList()
+            });
 
         return findings;
     }
