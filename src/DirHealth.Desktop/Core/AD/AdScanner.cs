@@ -549,64 +549,60 @@ public class AdScanner
         });
     }
 
+    private PrivilegedGroupSummary QueryPrivilegedGroup(string groupName, string risk)
+    {
+        var summary = new PrivilegedGroupSummary { Name = groupName, RiskDescription = risk };
+        try
+        {
+            using var root = _connector.GetRootEntry();
+            using var gs   = _connector.CreateSearcher(root,
+                $"(&(objectClass=group)(cn={groupName}))", "distinguishedName");
+            var gr = gs.FindOne();
+            if (gr is not null)
+            {
+                var dn      = GetString(gr.Properties, "distinguishedName");
+                var escaped = EscapeDn(dn);
+                var members = new List<string>();
+                int start   = 0;
+                while (true)
+                {
+                    using var rs = _connector.CreateSearcher(root,
+                        $"(distinguishedName={escaped})", $"member;range={start}-*");
+                    var rr = rs.FindOne();
+                    if (rr is null) break;
+                    bool lastPage = false;
+                    int  count    = 0;
+                    foreach (string key in rr.Properties.PropertyNames)
+                    {
+                        if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
+                        lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
+                        foreach (var v in rr.Properties[key])
+                        {
+                            var memberDn = v?.ToString() ?? "";
+                            var cn       = memberDn.Split(',')[0];
+                            if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn[3..];
+                            members.Add(cn);
+                            count++;
+                        }
+                        break;
+                    }
+                    if (lastPage || count == 0) break;
+                    start += count;
+                }
+                summary.MemberCount = members.Count;
+                summary.Members     = members;
+            }
+        }
+        catch { }
+        return summary;
+    }
+
     public async Task<List<PrivilegedGroupSummary>> GetPrivilegedGroupSummariesAsync()
     {
-        return await Task.Run(() =>
-        {
-            var result = new List<PrivilegedGroupSummary>();
-            using var root = _connector.GetRootEntry();
-            foreach (var (groupName, risk) in PrivilegedGroupDefs)
-            {
-                var summary = new PrivilegedGroupSummary
-                {
-                    Name            = groupName,
-                    RiskDescription = risk,
-                };
-                try
-                {
-                    using var gs = _connector.CreateSearcher(root,
-                        $"(&(objectClass=group)(cn={groupName}))", "distinguishedName");
-                    var gr = gs.FindOne();
-                    if (gr is not null)
-                    {
-                        var dn      = GetString(gr.Properties, "distinguishedName");
-                        var escaped = EscapeDn(dn);
-                        var members = new List<string>();
-                        int start   = 0;
-                        while (true)
-                        {
-                            using var rs = _connector.CreateSearcher(root,
-                                $"(distinguishedName={escaped})", $"member;range={start}-*");
-                            var rr = rs.FindOne();
-                            if (rr is null) break;
-                            bool lastPage = false;
-                            int count = 0;
-                            foreach (string key in rr.Properties.PropertyNames)
-                            {
-                                if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
-                                lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
-                                foreach (var v in rr.Properties[key])
-                                {
-                                    var memberDn = v?.ToString() ?? "";
-                                    var cn       = memberDn.Split(',')[0];
-                                    if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn[3..];
-                                    members.Add(cn);
-                                    count++;
-                                }
-                                break;
-                            }
-                            if (lastPage || count == 0) break;
-                            start += count;
-                        }
-                        summary.MemberCount = members.Count;
-                        summary.Members     = members;
-                    }
-                }
-                catch { }
-                result.Add(summary);
-            }
-            return result;
-        });
+        var tasks = PrivilegedGroupDefs
+            .Select(def => Task.Run(() => QueryPrivilegedGroup(def.Name, def.Risk)))
+            .ToList();
+        return [.. await Task.WhenAll(tasks)];
     }
 
     public async Task<List<AdUser>> GetAsRepRoastableAccountsAsync()
