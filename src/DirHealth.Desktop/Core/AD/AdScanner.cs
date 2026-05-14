@@ -7,6 +7,19 @@ public class AdScanner
 {
     private readonly AdConnector _connector;
 
+    private static readonly (string Name, string Risk)[] PrivilegedGroupDefs =
+    [
+        ("Domain Admins",       "Full domain control"),
+        ("Enterprise Admins",   "Full forest control"),
+        ("Schema Admins",       "Can permanently alter AD schema"),
+        ("Backup Operators",    "Can read all files including NTDS.dit"),
+        ("Account Operators",   "Can manage accounts and groups"),
+        ("Server Operators",    "Can log on to and manage DCs"),
+        ("Print Operators",     "Can load driver code on DCs"),
+        ("DnsAdmins",           "Can execute DLL code on DCs via DNS plugin"),
+        ("Remote Desktop Users","Can RDP into all DCs"),
+    ];
+
     private static readonly (string Substring, DateTime EolDate)[] EolTable =
     [
         ("Windows XP",       new DateTime(2014,  4,  8)),
@@ -281,12 +294,15 @@ public class AdScanner
         var undelCompsTask     = GetUnconstrainedDelegationComputersAsync();
         var undelUsersTask     = GetUnconstrainedDelegationUsersAsync();
         var passwdNotReqdTask  = GetPasswordNotRequiredAccountsAsync();
+        var staleDAsTask       = GetStaleDomainAdminsAsync();
+        var fgppTask           = GetFineGrainedPasswordPoliciesAsync();
 
         await Task.WhenAll(totalUsersTask, totalGroupsTask, totalComputersTask,
                            inactiveUsersTask, neverExpiresTask, expiredPwdTask,
                            emptyGroupsTask, singleMemberTask, inactiveCompsTask,
                            noOsTask, securityTask, policyTask, eolTask,
-                           asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask);
+                           asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
+                           staleDAsTask, fgppTask);
 
         int totalUsers     = totalUsersTask.Result;
         int totalGroups    = totalGroupsTask.Result;
@@ -321,6 +337,11 @@ public class AdScanner
         score -= Math.Min(15, asRepTask.Result.Count * 3);
         score -= Math.Min(20, (undelCompsTask.Result.Count + undelUsersTask.Result.Count) * 6);
         score -= Math.Min(10, passwdNotReqdTask.Result.Count * 2);
+
+        // Phase 3 security findings
+        score -= Math.Min(20, staleDAsTask.Result.Count * 5);
+        foreach (var f in fgppTask.Result)
+            score -= f.Severity == FindingSeverity.High ? 8 : 4;
 
         // Floor at 10 — a non-zero score shows there's always room to improve
         return Math.Max(10, score);
@@ -406,6 +427,181 @@ public class AdScanner
 
     private static string EscapeDn(string dn) =>
         dn.Replace("\\", "\\5c").Replace("(", "\\28").Replace(")", "\\29");
+
+    public async Task<List<AdUser>> GetStaleDomainAdminsAsync(int daysThreshold = 30)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                using var root = _connector.GetRootEntry();
+                using var gs   = _connector.CreateSearcher(root,
+                    "(&(objectClass=group)(cn=Domain Admins))", "distinguishedName");
+                var gr = gs.FindOne();
+                if (gr is null) return [];
+                var daDn = GetString(gr.Properties, "distinguishedName");
+                if (string.IsNullOrEmpty(daDn)) return [];
+
+                var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
+                var escaped        = EscapeDn(daDn);
+                var filter         = $"(&(objectClass=user)(objectCategory=person)" +
+                                     $"(memberOf={escaped})" +
+                                     $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
+                return QueryUsers(filter);
+            }
+            catch { return []; }
+        });
+    }
+
+    public async Task<List<AdFinding>> GetFineGrainedPasswordPoliciesAsync()
+    {
+        return await Task.Run(() =>
+        {
+            var findings = new List<AdFinding>();
+            try
+            {
+                var dsePath = string.IsNullOrEmpty(_connector.Domain)
+                    ? "LDAP://RootDSE"
+                    : $"LDAP://{_connector.Domain}/RootDSE";
+                using var dse  = _connector.GetEntry(dsePath);
+                var domainDn   = dse.Properties["defaultNamingContext"]?[0]?.ToString() ?? "";
+                if (string.IsNullOrEmpty(domainDn)) return findings;
+
+                var psoPath = string.IsNullOrEmpty(_connector.Domain)
+                    ? $"LDAP://CN=Password Settings Container,CN=System,{domainDn}"
+                    : $"LDAP://{_connector.Domain}/CN=Password Settings Container,CN=System,{domainDn}";
+
+                using var psoEntry = _connector.GetEntry(psoPath);
+                using var searcher = new DirectorySearcher(psoEntry)
+                {
+                    Filter      = "(objectClass=msDS-PasswordSettings)",
+                    PageSize    = 1000,
+                    SearchScope = SearchScope.OneLevel,
+                };
+                searcher.PropertiesToLoad.AddRange(new[]
+                {
+                    "name", "msDS-MinimumPasswordLength", "msDS-LockoutThreshold",
+                    "msDS-PasswordReversibleEncryptionEnabled",
+                });
+                using var results = searcher.FindAll();
+
+                foreach (SearchResult pso in results)
+                {
+                    var props      = pso.Properties;
+                    var name       = GetString(props, "name");
+                    var minLen     = props["msDS-MinimumPasswordLength"].Count  > 0 ? (int)props["msDS-MinimumPasswordLength"][0]  : 0;
+                    var lockout    = props["msDS-LockoutThreshold"].Count       > 0 ? (int)props["msDS-LockoutThreshold"][0]       : 0;
+                    var reversible = props["msDS-PasswordReversibleEncryptionEnabled"].Count > 0
+                                     && props["msDS-PasswordReversibleEncryptionEnabled"][0] is true;
+
+                    if (reversible)
+                        findings.Add(new AdFinding
+                        {
+                            Category        = "FineGrainedPasswordPolicy",
+                            Title           = $"PSO '{name}': Reversible Encryption Enabled",
+                            Description     = "This Password Settings Object stores passwords using reversible encryption — equivalent to plaintext storage.",
+                            Severity        = FindingSeverity.High,
+                            Count           = 1,
+                            AffectedObjects = [name],
+                        });
+
+                    if (minLen < 8)
+                        findings.Add(new AdFinding
+                        {
+                            Category        = "FineGrainedPasswordPolicy",
+                            Title           = $"PSO '{name}': Weak Minimum Password Length ({minLen} chars)",
+                            Description     = "This PSO requires fewer than 8 characters — weaker than the domain default policy.",
+                            Severity        = FindingSeverity.High,
+                            Count           = 1,
+                            AffectedObjects = [name],
+                        });
+                    else if (minLen < 12)
+                        findings.Add(new AdFinding
+                        {
+                            Category        = "FineGrainedPasswordPolicy",
+                            Title           = $"PSO '{name}': Low Minimum Password Length ({minLen} chars)",
+                            Description     = "This PSO requires fewer than 12 characters.",
+                            Severity        = FindingSeverity.Medium,
+                            Count           = 1,
+                            AffectedObjects = [name],
+                        });
+
+                    if (lockout == 0)
+                        findings.Add(new AdFinding
+                        {
+                            Category        = "FineGrainedPasswordPolicy",
+                            Title           = $"PSO '{name}': No Account Lockout Configured",
+                            Description     = "This PSO does not configure account lockout, leaving accounts vulnerable to brute-force attacks.",
+                            Severity        = FindingSeverity.High,
+                            Count           = 1,
+                            AffectedObjects = [name],
+                        });
+                }
+            }
+            catch { }
+            return findings;
+        });
+    }
+
+    public async Task<List<PrivilegedGroupSummary>> GetPrivilegedGroupSummariesAsync()
+    {
+        return await Task.Run(() =>
+        {
+            var result = new List<PrivilegedGroupSummary>();
+            using var root = _connector.GetRootEntry();
+            foreach (var (groupName, risk) in PrivilegedGroupDefs)
+            {
+                var summary = new PrivilegedGroupSummary
+                {
+                    Name            = groupName,
+                    RiskDescription = risk,
+                };
+                try
+                {
+                    using var gs = _connector.CreateSearcher(root,
+                        $"(&(objectClass=group)(cn={groupName}))", "distinguishedName");
+                    var gr = gs.FindOne();
+                    if (gr is not null)
+                    {
+                        var dn      = GetString(gr.Properties, "distinguishedName");
+                        var escaped = EscapeDn(dn);
+                        var members = new List<string>();
+                        int start   = 0;
+                        while (true)
+                        {
+                            using var rs = _connector.CreateSearcher(root,
+                                $"(distinguishedName={escaped})", $"member;range={start}-*");
+                            var rr = rs.FindOne();
+                            if (rr is null) break;
+                            bool lastPage = false;
+                            int count = 0;
+                            foreach (string key in rr.Properties.PropertyNames)
+                            {
+                                if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
+                                lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
+                                foreach (var v in rr.Properties[key])
+                                {
+                                    var memberDn = v?.ToString() ?? "";
+                                    var cn       = memberDn.Split(',')[0];
+                                    if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn[3..];
+                                    members.Add(cn);
+                                    count++;
+                                }
+                                break;
+                            }
+                            if (lastPage || count == 0) break;
+                            start += count;
+                        }
+                        summary.MemberCount = members.Count;
+                        summary.Members     = members;
+                    }
+                }
+                catch { }
+                result.Add(summary);
+            }
+            return result;
+        });
+    }
 
     public async Task<List<AdUser>> GetAsRepRoastableAccountsAsync()
     {
@@ -567,6 +763,8 @@ public class AdScanner
         var undelComputers       = await GetUnconstrainedDelegationComputersAsync();
         var undelUsers           = await GetUnconstrainedDelegationUsersAsync();
         var passwdNotRequired    = await GetPasswordNotRequiredAccountsAsync();
+        var staleDomainAdmins    = await GetStaleDomainAdminsAsync();
+        var fgppFindings         = await GetFineGrainedPasswordPoliciesAsync();
 
         if (inactiveUsers.Count > 0)
             findings.Add(new AdFinding
@@ -734,6 +932,19 @@ public class AdScanner
                 Count           = passwdNotRequired.Count,
                 AffectedObjects = passwdNotRequired.Select(u => u.SamAccountName).ToList()
             });
+
+        if (staleDomainAdmins.Count > 0)
+            findings.Add(new AdFinding
+            {
+                Category        = "StaleDomainAdmins",
+                Title           = $"{staleDomainAdmins.Count} Stale Domain Admin Account(s)",
+                Description     = "Domain Admin accounts with no logon activity in the last 30 days. Dormant admin accounts are rarely monitored and passwords are rarely rotated.",
+                Severity        = FindingSeverity.High,
+                Count           = staleDomainAdmins.Count,
+                AffectedObjects = staleDomainAdmins.Select(u => u.SamAccountName).ToList()
+            });
+
+        findings.AddRange(fgppFindings);
 
         return findings;
     }

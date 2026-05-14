@@ -17,8 +17,9 @@ public partial class MainViewModel : BaseViewModel
     public OuBrowserViewModel       OuBrowser       { get; }
     public GroupManagerViewModel    GroupManager    { get; }
     public PasswordReportViewModel  PasswordReport  { get; }
-    public DomainAdminsViewModel    DomainAdmins    { get; }
-    public DcInventoryViewModel     DcInventory     { get; }
+    public DomainAdminsViewModel      DomainAdmins      { get; }
+    public DcInventoryViewModel       DcInventory       { get; }
+    public PrivilegedGroupsViewModel  PrivilegedGroups  { get; }
 
     [ObservableProperty] private BaseViewModel _currentView;
     [ObservableProperty] private bool          _showScoreDropAlert;
@@ -52,7 +53,8 @@ public partial class MainViewModel : BaseViewModel
         GroupManagerViewModel groupManager,
         PasswordReportViewModel passwordReport,
         DomainAdminsViewModel domainAdmins,
-        DcInventoryViewModel dcInventory)
+        DcInventoryViewModel dcInventory,
+        PrivilegedGroupsViewModel privilegedGroups)
     {
         Dashboard       = dashboard;
         Findings        = findings;
@@ -63,8 +65,9 @@ public partial class MainViewModel : BaseViewModel
         OuBrowser       = ouBrowser;
         GroupManager    = groupManager;
         PasswordReport  = passwordReport;
-        DomainAdmins    = domainAdmins;
-        DcInventory     = dcInventory;
+        DomainAdmins     = domainAdmins;
+        DcInventory      = dcInventory;
+        PrivilegedGroups = privilegedGroups;
         _currentView    = dashboard;
 
         Dashboard.PropertyChanged += (_, e) =>
@@ -162,6 +165,13 @@ public partial class MainViewModel : BaseViewModel
     {
         CurrentView = DcInventory;
         await DcInventory.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowPrivilegedGroupsAsync()
+    {
+        CurrentView = PrivilegedGroups;
+        await PrivilegedGroups.LoadAsync();
     }
 
     [RelayCommand]
