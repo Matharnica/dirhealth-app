@@ -9,8 +9,18 @@ namespace DirHealth.Desktop.Views.Dashboard;
 
 public partial class DashboardView : UserControl
 {
-    private DashboardViewModel?        _currentVm;
+    private static readonly SolidColorBrush FillBrush = new(Color.FromArgb(30, 99, 102, 241));
+    private static readonly SolidColorBrush LineBrush = new(Color.FromRgb(99, 102, 241));
+
+    static DashboardView()
+    {
+        FillBrush.Freeze();
+        LineBrush.Freeze();
+    }
+
+    private DashboardViewModel?          _currentVm;
     private PropertyChangedEventHandler? _handler;
+    private int                          _lastHistoryCount;
 
     public DashboardView()
     {
@@ -20,7 +30,8 @@ public partial class DashboardView : UserControl
             if (_currentVm != null && _handler != null)
                 _currentVm.PropertyChanged -= _handler;
 
-            _currentVm = DataContext as DashboardViewModel;
+            _currentVm        = DataContext as DashboardViewModel;
+            _lastHistoryCount = 0;
             if (_currentVm != null)
             {
                 _handler = (_, e) =>
@@ -37,7 +48,6 @@ public partial class DashboardView : UserControl
 
     private void DrawChart()
     {
-        TrendChart.Children.Clear();
         if (DataContext is not DashboardViewModel vm) return;
         var history = vm.ScoreHistory;
         if (history.Count < 2) return;
@@ -45,6 +55,11 @@ public partial class DashboardView : UserControl
         double w = TrendChart.ActualWidth;
         double h = TrendChart.ActualHeight;
         if (w <= 0 || h <= 0) return;
+
+        if (history.Count == _lastHistoryCount && TrendChart.Children.Count > 0) return;
+        _lastHistoryCount = history.Count;
+
+        TrendChart.Children.Clear();
 
         var points = new PointCollection();
         for (int i = 0; i < history.Count; i++)
@@ -54,27 +69,22 @@ public partial class DashboardView : UserControl
             points.Add(new Point(x, y));
         }
 
-        var poly = new Polygon
-        {
-            Fill   = new SolidColorBrush(Color.FromArgb(30, 99, 102, 241)),
-            Points = new PointCollection(points)
-        };
+        var poly = new Polygon { Fill = FillBrush, Points = new PointCollection(points) };
         poly.Points.Insert(0, new Point(0, h));
         poly.Points.Add(new Point(w, h));
         TrendChart.Children.Add(poly);
 
-        var line = new Polyline
+        TrendChart.Children.Add(new Polyline
         {
-            Stroke          = new SolidColorBrush(Color.FromRgb(99, 102, 241)),
+            Stroke          = LineBrush,
             StrokeThickness = 2,
             Points          = points,
             StrokeLineJoin  = PenLineJoin.Round,
-        };
-        TrendChart.Children.Add(line);
+        });
 
         foreach (var pt in points)
         {
-            var dot = new Ellipse { Width = 4, Height = 4, Fill = new SolidColorBrush(Color.FromRgb(99, 102, 241)) };
+            var dot = new Ellipse { Width = 4, Height = 4, Fill = LineBrush };
             Canvas.SetLeft(dot, pt.X - 2);
             Canvas.SetTop(dot, pt.Y - 2);
             TrendChart.Children.Add(dot);
