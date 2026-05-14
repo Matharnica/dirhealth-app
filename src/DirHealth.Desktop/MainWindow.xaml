@@ -15,6 +15,8 @@
         xmlns:domainadmins="clr-namespace:DirHealth.Desktop.Views.DomainAdmins"
         xmlns:dcinventory="clr-namespace:DirHealth.Desktop.Views.DcInventory"
         xmlns:privilegedgroups="clr-namespace:DirHealth.Desktop.Views.PrivilegedGroups"
+        xmlns:domaintrust="clr-namespace:DirHealth.Desktop.Views.DomainTrust"
+        xmlns:timeline="clr-namespace:DirHealth.Desktop.Views.Timeline"
         Title="DirHealth" Height="700" Width="1100" MinHeight="600" MinWidth="900"
         Background="{DynamicResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen">
@@ -60,6 +62,12 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PrivilegedGroupsViewModel}">
             <privilegedgroups:PrivilegedGroupsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DomainTrustViewModel}">
+            <domaintrust:DomainTrustView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TimelineViewModel}">
+            <timeline:TimelineView />
         </DataTemplate>
     </Window.Resources>
 
@@ -299,7 +307,11 @@
                     <Button Style="{StaticResource NavButton}" Content="🖧  DC Inventory"
                             Command="{Binding ShowDcInventoryCommand}" Margin="0,2,0,0" />
                     <Button Style="{StaticResource NavButton}" Content="🛡  Priv. Groups"
-                            Command="{Binding ShowPrivilegedGroupsCommand}" Margin="0,2,0,16" />
+                            Command="{Binding ShowPrivilegedGroupsCommand}" Margin="0,2,0,0" />
+                    <Button Style="{StaticResource NavButton}" Content="🔗  Domain Trusts"
+                            Command="{Binding ShowDomainTrustCommand}" Margin="0,2,0,0" />
+                    <Button Style="{StaticResource NavButton}" Content="🕐  Timeline"
+                            Command="{Binding ShowTimelineCommand}" Margin="0,2,0,16" />
 
                     <!-- System -->
                     <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"
