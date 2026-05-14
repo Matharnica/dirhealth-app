@@ -132,13 +132,11 @@ begin
     'How DirHealth Works',
     'Permissions and data access',
     'DirHealth connects to Active Directory in READ-ONLY mode.' + #13#10 +
-    'It never modifies users, groups, computers, or any AD objects.' + #13#10 +
-    #13#10 +
+    'It never modifies users, groups, computers, or any AD objects.' + #13#10#13#10 +
     'Stored locally in %APPDATA%\DirHealth\:' + #13#10 +
-    '  • Encrypted credentials (AES-256)' + #13#10 +
-    '  • Scan cache and hygiene score history' + #13#10 +
-    '  • Acknowledged findings' + #13#10 +
-    #13#10 +
+    '  - Encrypted credentials (AES-256)' + #13#10 +
+    '  - Scan cache and hygiene score history' + #13#10 +
+    '  - Acknowledged findings' + #13#10#13#10 +
     'No telemetry. No licensing. No external servers.'
   );
 
