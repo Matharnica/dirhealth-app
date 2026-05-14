@@ -444,8 +444,10 @@ public class AdScanner
 
                 var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
                 var escaped        = EscapeDn(daDn);
+                // 1.2.840.113556.1.4.1941 = LDAP_MATCHING_RULE_IN_CHAIN — AD resolves nested membership server-side
                 var filter         = $"(&(objectClass=user)(objectCategory=person)" +
-                                     $"(memberOf={escaped})" +
+                                     $"(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                                     $"(memberOf:1.2.840.113556.1.4.1941:={escaped})" +
                                      $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
                 return QueryUsers(filter);
             }
@@ -489,8 +491,8 @@ public class AdScanner
                 {
                     var props      = pso.Properties;
                     var name       = GetString(props, "name");
-                    var minLen     = props["msDS-MinimumPasswordLength"].Count  > 0 ? (int)props["msDS-MinimumPasswordLength"][0]  : 0;
-                    var lockout    = props["msDS-LockoutThreshold"].Count       > 0 ? (int)props["msDS-LockoutThreshold"][0]       : 0;
+                    var minLen     = GetPsoInt(props, "msDS-MinimumPasswordLength");
+                    var lockout    = GetPsoInt(props, "msDS-LockoutThreshold");
                     var reversible = props["msDS-PasswordReversibleEncryptionEnabled"].Count > 0
                                      && props["msDS-PasswordReversibleEncryptionEnabled"][0] is true;
 
@@ -505,7 +507,7 @@ public class AdScanner
                             AffectedObjects = [name],
                         });
 
-                    if (minLen < 8)
+                    if (minLen >= 0 && minLen < 8)
                         findings.Add(new AdFinding
                         {
                             Category        = "FineGrainedPasswordPolicy",
@@ -515,7 +517,7 @@ public class AdScanner
                             Count           = 1,
                             AffectedObjects = [name],
                         });
-                    else if (minLen < 12)
+                    else if (minLen >= 8 && minLen < 12)
                         findings.Add(new AdFinding
                         {
                             Category        = "FineGrainedPasswordPolicy",
@@ -742,6 +744,13 @@ public class AdScanner
             return val is int i ? i : 0;
         }
         catch { return 0; }
+    }
+
+    private static int GetPsoInt(ResultPropertyCollection props, string name)
+    {
+        if (props[name].Count == 0) return -1;
+        var val = props[name][0];
+        return val is int i ? i : val is long l ? (int)l : 0;
     }
 
     public async Task<List<AdFinding>> RunFullScanAsync()
