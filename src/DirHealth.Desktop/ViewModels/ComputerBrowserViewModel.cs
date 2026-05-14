@@ -74,4 +74,10 @@ public partial class ComputerBrowserViewModel : BaseViewModel
         ShowDetail = true;
         await _detail.LoadAsync(computer);
     }
+
+    internal void InvalidateCache()
+    {
+        _lastLoaded = DateTime.MinValue;
+        _allComputers.Clear();
+    }
 }

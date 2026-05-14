@@ -111,6 +111,13 @@ public partial class MainViewModel : BaseViewModel
             ScoreDropMessage   = $"Score dropped from {previous} to {current} since last scan.";
             ShowScoreDropAlert = true;
         };
+
+        Settings.OnCredentialsSaved = () =>
+        {
+            UserBrowser.InvalidateCache();
+            ComputerBrowser.InvalidateCache();
+            GroupManager.InvalidateCache();
+        };
     }
 
     [RelayCommand] public void ShowDashboard()  => CurrentView = Dashboard;

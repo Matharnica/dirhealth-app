@@ -70,4 +70,10 @@ public partial class GroupManagerViewModel : BaseViewModel
         catch (Exception ex) { StatusMessage = $"Failed to load group details: {ex.Message}"; }
         finally { IsLoadingDetail = false; }
     }
+
+    internal void InvalidateCache()
+    {
+        _lastLoaded = DateTime.MinValue;
+        _allGroups.Clear();
+    }
 }

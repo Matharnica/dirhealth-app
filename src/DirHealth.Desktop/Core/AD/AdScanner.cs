@@ -1260,29 +1260,6 @@ public class AdScanner
         return members;
     }
 
-    private AdGroupMember ResolveGroupMember(string memberDn)
-    {
-        try
-        {
-            using var entry = _connector.GetEntry($"LDAP://{EscapeDn(memberDn)}");
-            var objClass = entry.Properties["objectClass"].Cast<string>().ToList();
-            var type = objClass.Contains("group")    ? "Group"
-                     : objClass.Contains("computer") ? "Computer"
-                     :                                 "User";
-            return new AdGroupMember
-            {
-                Name              = entry.Properties["cn"]?[0]?.ToString() ?? memberDn,
-                SamAccountName    = entry.Properties["sAMAccountName"]?[0]?.ToString() ?? "",
-                ObjectType        = type,
-                DistinguishedName = memberDn,
-            };
-        }
-        catch
-        {
-            return new AdGroupMember { Name = memberDn, DistinguishedName = memberDn };
-        }
-    }
-
     public async Task<AdGroupDetail> GetDomainAdminsAsync()
     {
         var dn = await Task.Run(() =>

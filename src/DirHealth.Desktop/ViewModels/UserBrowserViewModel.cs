@@ -89,4 +89,10 @@ public partial class UserBrowserViewModel : BaseViewModel
         ShowDetail = true;
         await _detail.LoadAsync(user);
     }
+
+    internal void InvalidateCache()
+    {
+        _lastLoaded = DateTime.MinValue;
+        _allUsers.Clear();
+    }
 }
