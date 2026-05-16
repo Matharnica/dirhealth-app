@@ -220,7 +220,16 @@ public partial class MainViewModel : BaseViewModel
         DownloadProgress    = 0;
         try
         {
-            var tmp = Path.Combine(Path.GetTempPath(), "DirHealth-Setup.exe");
+            if (!Uri.TryCreate(_updateDownloadUrl, UriKind.Absolute, out var uri) ||
+                (uri.Host != "github.com" && uri.Host != "objects.githubusercontent.com") ||
+                uri.Scheme != Uri.UriSchemeHttps)
+            {
+                ScoreDropMessage    = "Update failed: unexpected download host.";
+                ShowScoreDropAlert  = true;
+                IsDownloadingUpdate = false;
+                return;
+            }
+            var tmp = Path.Combine(Path.GetTempPath(), $"DirHealth-Setup-{Guid.NewGuid():N}.exe");
             using var http = new System.Net.Http.HttpClient();
             using var response = await http.GetAsync(_updateDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();

@@ -18,6 +18,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -30,12 +31,34 @@
                           ItemsSource="{Binding Modes}"
                           SelectedItem="{Binding SelectedMode}"
                           DisplayMemberPath="Label"
-                          Margin="0,0,0,12" />
+                          Margin="0,0,0,8" />
 
-                <TextBlock Grid.Row="3" Text="QUERY" FontSize="10" FontWeight="SemiBold"
+                <!-- LDAP Filter warning — shown only when raw LDAP mode is active -->
+                <Border Grid.Row="3"
+                        Background="#3D2A00" BorderBrush="#92400E" BorderThickness="1"
+                        CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLdapMode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <TextBlock Text="⚠ Unrestricted Access" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#FCD34D" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#FDE68A"
+                                   Text="This filter runs with full Domain Admin read access. Any AD attribute — including credential history — is in scope." />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Grid.Row="4" Text="QUERY" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
 
-                <StackPanel Grid.Row="4">
+                <StackPanel Grid.Row="5">
                     <TextBox Background="{DynamicResource InputBackgroundBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              BorderBrush="{DynamicResource InputBorderBrush}"

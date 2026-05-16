@@ -82,7 +82,7 @@ public class AdConnector
 
             // Check membership (LDAP_MATCHING_RULE_IN_CHAIN handles nested groups)
             using var memberSearcher = CreateSearcher(root,
-                $"(&(objectClass=user)(sAMAccountName={samName})" +
+                $"(&(objectClass=user)(sAMAccountName={EscapeFilterValue(samName)})" +
                 $"(memberOf:1.2.840.113556.1.4.1941:={EscapeDn(groupDn)}))",
                 "sAMAccountName");
             return memberSearcher.FindOne() != null;
@@ -92,4 +92,9 @@ public class AdConnector
 
     private static string EscapeDn(string dn) =>
         dn.Replace("\\", "\\5c").Replace("(", "\\28").Replace(")", "\\29");
+
+    internal static string EscapeFilterValue(string value) =>
+        value.Replace("\\", "\\5c").Replace("*",  "\\2a")
+             .Replace("(",  "\\28").Replace(")",  "\\29")
+             .Replace("\0", "\\00");
 }

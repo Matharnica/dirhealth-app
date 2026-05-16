@@ -17,6 +17,10 @@ public partial class AdSearchViewModel : BaseViewModel
     [ObservableProperty] private bool           _isLoading;
     [ObservableProperty] private string         _statusMessage = "";
 
+    public bool IsLdapMode => SelectedMode.Mode == SearchMode.Ldap;
+
+    partial void OnSelectedModeChanged(SearchModeItem value) => OnPropertyChanged(nameof(IsLdapMode));
+
     public ObservableCollection<AdSearchResult> Results { get; } = new();
 
     public List<SearchModeItem> Modes { get; } = new()

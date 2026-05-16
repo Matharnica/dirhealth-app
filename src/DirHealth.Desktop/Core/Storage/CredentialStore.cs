@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DirHealth.Desktop.Core.Crypto;
 using DirHealth.Desktop.Core.HWID;
@@ -13,15 +15,35 @@ public static class CredentialStore
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "DirHealth", "credentials.dat");
 
-    private static string Passphrase => HwidManager.ComputeHWID()[..16];
-
     public static SavedCredentials? Load()
     {
         try
         {
             if (!File.Exists(_path)) return null;
-            var decrypted = CryptoHelper.Decrypt(File.ReadAllText(_path), Passphrase);
-            return JsonSerializer.Deserialize<SavedCredentials>(decrypted);
+            var raw = File.ReadAllBytes(_path);
+
+            // Try DPAPI (current format)
+            try
+            {
+                var json = Encoding.UTF8.GetString(
+                    ProtectedData.Unprotect(raw, null, DataProtectionScope.CurrentUser));
+                return JsonSerializer.Deserialize<SavedCredentials>(json);
+            }
+            catch (CryptographicException) { }
+
+            // Migration path: try legacy HWID-based encryption, then re-save with DPAPI
+            try
+            {
+                var legacyPassphrase = HwidManager.ComputeHWID()[..16];
+                var json = CryptoHelper.Decrypt(Encoding.UTF8.GetString(raw), legacyPassphrase);
+                var creds = JsonSerializer.Deserialize<SavedCredentials>(json);
+                if (creds is not null)
+                    Save(creds.Domain, creds.Username, creds.Password);
+                return creds;
+            }
+            catch { }
+
+            return null;
         }
         catch { return null; }
     }
@@ -31,9 +53,10 @@ public static class CredentialStore
         try
         {
             var json      = JsonSerializer.Serialize(new SavedCredentials(domain, username, password));
-            var encrypted = CryptoHelper.Encrypt(json, Passphrase);
+            var plaintext = Encoding.UTF8.GetBytes(json);
+            var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            File.WriteAllText(_path, encrypted);
+            File.WriteAllBytes(_path, encrypted);
         }
         catch { }
     }

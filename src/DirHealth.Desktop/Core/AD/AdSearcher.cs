@@ -36,6 +36,8 @@ public class AdSearcher
 
     private List<AdSearchResult> SearchBySid(string query)
     {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(query, @"^S-\d+-\d+(-\d+)*$"))
+            return [];
         return RunSearch($"(objectSid={query})");
     }
 

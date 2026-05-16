@@ -116,6 +116,9 @@ public class AdWmiClient
     public async Task<List<WmiEventLogEntry>> GetEventLogAsync(
         string hostname, string logName, string? severityFilter, int maxEntries)
     {
+        if (logName is not ("System" or "Security" or "Application"))
+            return [];
+
         return await Task.Run(() =>
         {
             var entries = new List<WmiEventLogEntry>();
