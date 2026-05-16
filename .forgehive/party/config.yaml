@@ -3,19 +3,49 @@ sets:
     agents: [suki, viktor]
     trigger: "/design-party"
     description: "UX + Architektur parallel"
+    models:
+      suki: claude-sonnet-4-6
+      viktor: claude-opus-4-7
   build:
     agents: [viktor, kai, sam]
     trigger: "/party"
     description: "Architektur + Engineering + QA"
+    models:
+      viktor: claude-opus-4-7
+      kai: claude-sonnet-4-6
+      sam: claude-haiku-4-5
   review:
     agents: [kai, sam, eli]
     trigger: "/review-party"
     description: "Code Review + QA + Doku"
+    models:
+      kai: claude-opus-4-7
+      sam: claude-sonnet-4-6
+      eli: claude-sonnet-4-6
   full:
     agents: [nora, eli, remy, suki, viktor, kai, sam]
     trigger: "/full-party"
     description: "Alle Agenten"
+    models:
+      viktor: claude-opus-4-7
+      kai: claude-opus-4-7
+      nora: claude-sonnet-4-6
+      eli: claude-sonnet-4-6
+      sam: claude-sonnet-4-6
+      suki: claude-sonnet-4-6
+      remy: claude-haiku-4-5
   security:
     agents: [vera, sam]
     trigger: "/security-party"
     description: "Security Review + QA"
+    models:
+      vera: claude-opus-4-7
+      sam: claude-sonnet-4-6
+  refactor:
+    agents: [viktor, sam, eli]
+    trigger: "/fh-refactor"
+    description: "Refactor — Implementierung + Tests + Doku parallel"
+    models:
+      viktor: claude-opus-4-7
+      sam: claude-sonnet-4-6
+      eli: claude-sonnet-4-6

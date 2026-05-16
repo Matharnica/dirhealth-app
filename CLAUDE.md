@@ -100,6 +100,9 @@ src/DirHealth.Desktop/
 - **PSO attributes:** Direct `(int)` cast crashes when AD returns `long`. Use `GetPsoInt(props, name)` which returns `-1` when the attribute is absent (sentinel to avoid false positives) and handles `int`/`long` via pattern matching.
 - **`whenChanged`/`whenCreated`:** DirectorySearcher returns these as `DateTime` objects, not strings. Use `val is DateTime dt`. LDAP filter format: `yyyyMMddHHmmss.0Z`.
 - **Domain trusts:** Query `(objectClass=trustedDomain)` under `CN=System,<domainDn>`. `trustDirection` 1=Inbound, 2=Outbound, 3=Bidirectional. Bit 8 of `trustAttributes` = Forest Trust.
+- **WMI connectivity:** Requires port 135 (DCE/RPC) + dynamic RPC ports + Windows firewall rule "WMI-In" enabled on target machines. Out of scope: write operations, patch management, RDP control.
+- **Terminal Server HWID fallback:** On RDS/Terminal Server environments, append UserName to prevent all sessions sharing the same HWID: SHA256(CPU+MB+Disk+UserName). `AdWmiClient` covers: disks, local admins, active sessions, event log.
+- **`AdSearcher` search modes:** 5 modes — Users, Computers, Groups, OUs, Any. Free-text across `sAMAccountName`, `displayName`, `cn`, `description`.
 
 ### WPF quirks
 
@@ -130,6 +133,14 @@ src/DirHealth.Desktop/
 
 - Wrap all exporter calls in try/catch with `StatusMessage = $"Export failed: {ex.Message}"` — file locks and network-share failures must not reach the global crash handler.
 - PdfSharp: reprint column headers after every `NewPage()` call.
+- **Export CanExecute guard:** All export command buttons must have `CanExecute = false` when their data list is empty. Wire via `[RelayCommand(CanExecute = nameof(HasData))]` or equivalent.
+- **`FullReportData` record:** `(string Domain, int Score, List<AdFinding> Findings, List<AdUser> InactiveUsers, List<AdUser> ExpiringPasswords, List<string> DomainAdmins)` — passed to `PdfExporter.ExportFullReport()`.
+- **`PdfPageBuilder`:** Private helper class inside `PdfExporter` that encapsulates shared page anatomy: dark header bar (`#0f172a`, 28pt), white content area (40pt margins all sides), light footer strip (`#f8fafc`, 20pt). Reused across all 4 export methods.
+- **PDF score colors:** >=80 → green `#7DFFB3`, >=60 → yellow `#FCD34D`, <60 → red `#FCA5A5`.
+- **PDF table row spacing:** 6pt top/bottom padding, 10pt right, 13pt left (accounts for 3pt left accent border). Dates and SAM account names rendered in monospace. 3pt gap between rows.
+- **PDF logo:** Loaded via `pack://application:,,,/Resources/icon_128.png`.
+- **`DaysToExpiryColorConverter`:** red = <14 days, orange = <30 days, yellow = <60 days, green = >=60 days. Used in Password Report user list.
+- **`ThemeManager`:** Persists selected theme (Dark/Light) to `HKCU` registry key so the preference survives restarts. Swaps theme via merged `ResourceDictionary`.
 
 ## Plans & Roadmap
 
@@ -158,6 +169,7 @@ This project uses **forgehive** for structured AI-assisted development.
    - If `status: confirmed` → load silently and apply throughout the session
 2. Read `.forgehive/memory/MEMORY.md` — follow the index links to load project context
 3. Run `fh scan --check` to verify the stack snapshot is current
+4. Run `fh status` for the daily overview (sprint, code health, watch events)
 
 ### During the Session
 
