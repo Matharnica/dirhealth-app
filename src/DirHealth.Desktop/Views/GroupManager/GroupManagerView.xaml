@@ -43,7 +43,7 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        FontWeight="SemiBold" />
                             <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11">
-                                <Run Text="{Binding MemberCount}" />
+                                <Run Text="{Binding MemberCount, Mode=OneWay}" />
                                 <Run Text=" members" />
                             </TextBlock>
                         </StackPanel>

@@ -71,7 +71,7 @@
 
         <!-- Right: members list -->
         <Grid Grid.Column="1" Margin="24,20,24,20">
-            <!-- Empty / not-loaded state -->
+            <!-- Empty / not-loaded state — only when not loading AND no data -->
             <TextBlock Text="Click Refresh to load Domain Admins."
                        Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
                        HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -79,9 +79,13 @@
                     <Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Group}" Value="{x:Null}">
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Group}" Value="{x:Null}" />
+                                    <Condition Binding="{Binding IsLoading}" Value="False" />
+                                </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
+                            </MultiDataTrigger>
                         </Style.Triggers>
                     </Style>
                 </TextBlock.Style>
@@ -159,7 +163,8 @@
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        FontSize="10" FontFamily="Consolas"
                                                        VerticalAlignment="Center" MaxWidth="320"
-                                                       TextTrimming="CharacterEllipsis" />
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding DistinguishedName}" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

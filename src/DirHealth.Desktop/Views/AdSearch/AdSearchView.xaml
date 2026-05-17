@@ -93,6 +93,27 @@
             <TextBlock Grid.Row="0" Text="Results" FontSize="16" FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16" />
 
+            <!-- Empty state after a search returns nothing -->
+            <TextBlock Grid.Row="1" Text="No results found."
+                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding HasSearched}" Value="True" />
+                                    <Condition Binding="{Binding Results.Count}" Value="0" />
+                                    <Condition Binding="{Binding IsLoading}" Value="False" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
             <ListView Grid.Row="1" ItemsSource="{Binding Results}"
                       Background="Transparent" BorderThickness="0"
                       Foreground="{DynamicResource TextPrimaryBrush}">

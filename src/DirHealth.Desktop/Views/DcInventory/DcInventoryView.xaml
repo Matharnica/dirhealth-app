@@ -108,7 +108,7 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Empty / not-loaded state -->
+            <!-- Empty / not-loaded state — only when not loading AND no data -->
             <TextBlock Grid.RowSpan="2" Text="Click Refresh to load domain controllers."
                        Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
                        HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -116,9 +116,13 @@
                     <Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding DomainControllers}" Value="{x:Null}">
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DomainControllers}" Value="{x:Null}" />
+                                    <Condition Binding="{Binding IsLoading}" Value="False" />
+                                </MultiDataTrigger.Conditions>
                                 <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
+                            </MultiDataTrigger>
                         </Style.Triggers>
                     </Style>
                 </TextBlock.Style>

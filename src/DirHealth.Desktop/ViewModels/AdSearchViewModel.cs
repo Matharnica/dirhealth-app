@@ -16,6 +16,7 @@ public partial class AdSearchViewModel : BaseViewModel
     [ObservableProperty] private SearchModeItem _selectedMode;
     [ObservableProperty] private bool           _isLoading;
     [ObservableProperty] private string         _statusMessage = "";
+    [ObservableProperty] private bool           _hasSearched;
 
     public bool IsLdapMode => SelectedMode.Mode == SearchMode.Ldap;
 
@@ -53,6 +54,7 @@ public partial class AdSearchViewModel : BaseViewModel
         {
             var results = await _searcher.SearchAsync(Query, SelectedMode.Mode);
             foreach (var r in results) Results.Add(r);
+            HasSearched   = true;
             StatusMessage = results.Count == 0
                 ? "No results found."
                 : $"{results.Count} result(s) found.";
