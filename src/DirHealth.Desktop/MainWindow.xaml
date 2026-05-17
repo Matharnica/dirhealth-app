@@ -26,6 +26,10 @@
                             UseAeroCaptionButtons="False" GlassFrameThickness="0,0,0,1" />
     </shell:WindowChrome.WindowChrome>
 
+    <Window.InputBindings>
+        <KeyBinding Key="F5" Command="{Binding Dashboard.RunScanCommand}" />
+    </Window.InputBindings>
+
     <Window.Resources>
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
             <dashboard:DashboardView />
@@ -76,6 +80,7 @@
             <RowDefinition Height="36" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="24" />
         </Grid.RowDefinitions>
 
         <!-- Row 0: Custom title bar -->
@@ -331,5 +336,21 @@
             <ContentControl Grid.Column="1" Content="{Binding CurrentView}"
                             Margin="24" />
         </Grid>
+
+        <!-- Row 3: Status bar -->
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid Margin="12,0">
+                <TextBlock Text="{Binding Dashboard.StatusMessage}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="11" VerticalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Last scan: " FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Dashboard.LastScanTime, Converter={StaticResource RelativeScanTime}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

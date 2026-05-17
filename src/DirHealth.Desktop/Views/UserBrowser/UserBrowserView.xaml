@@ -115,8 +115,9 @@
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
                         <TextBlock Text="USERNAME" FontSize="10"
                                    Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                        <TextBlock Text="{Binding Detail.User.SamAccountName}"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBox Text="{Binding Detail.User.SamAccountName, Mode=OneWay}"
+                                 Style="{StaticResource CopyableText}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="EMAIL" FontSize="10"
@@ -207,9 +208,10 @@
                 <!-- DN -->
                 <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,16,0,4" />
-                <TextBlock Text="{Binding Detail.User.DistinguishedName}"
-                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
-                           TextWrapping="Wrap" />
+                <TextBox Text="{Binding Detail.User.DistinguishedName, Mode=OneWay}"
+                         Style="{StaticResource CopyableText}"
+                         Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"
+                         FontFamily="Consolas" />
             </StackPanel>
         </ScrollViewer>
     </Grid>

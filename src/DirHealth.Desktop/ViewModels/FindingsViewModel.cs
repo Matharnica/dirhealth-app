@@ -80,6 +80,9 @@ public partial class FindingsViewModel : BaseViewModel
     }
 
     [RelayCommand]
+    public void ClearSelection() => SelectedFinding = null;
+
+    [RelayCommand]
     public void SelectFinding(AdFinding? finding)
     {
         SelectedFinding = finding;

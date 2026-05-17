@@ -116,6 +116,25 @@
         </Setter>
     </Style>
 
+    <!-- Read-only TextBox styled as TextBlock — enables Ctrl+C and text selection -->
+    <Style x:Key="CopyableText" TargetType="TextBox">
+        <Setter Property="IsReadOnly"       Value="True" />
+        <Setter Property="Background"       Value="Transparent" />
+        <Setter Property="BorderThickness"  Value="0" />
+        <Setter Property="Padding"          Value="0" />
+        <Setter Property="IsTabStop"        Value="False" />
+        <Setter Property="TextWrapping"     Value="Wrap" />
+        <Setter Property="Cursor"           Value="IBeam" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost" Margin="0" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- PasswordBox Style -->
     <Style x:Key="DarkPasswordBox" TargetType="PasswordBox">
         <Setter Property="Background"      Value="{DynamicResource SurfaceBrush}" />

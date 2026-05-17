@@ -29,7 +29,8 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,4" />
                     <TextBlock Text="{Binding ComplianceScore}" FontSize="52" FontWeight="Black"
-                               Foreground="{StaticResource SuccessBrush}" LineHeight="52" />
+                               Foreground="{StaticResource SuccessBrush}" LineHeight="52"
+                               ToolTip="Compliance score 0–100. ≥80 = healthy, ≥60 = review recommended, &lt;60 = critical issues found." />
                     <TextBlock Text="/ 100" FontSize="12"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
 

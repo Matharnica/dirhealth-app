@@ -184,9 +184,10 @@
                 <StackPanel Grid.Row="3" Margin="0,16,0,0">
                     <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                    <TextBlock Text="{Binding SelectedGroup.DistinguishedName}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="11" TextWrapping="Wrap" FontFamily="Consolas" />
+                    <TextBox Text="{Binding SelectedGroup.DistinguishedName, Mode=OneWay}"
+                             Style="{StaticResource CopyableText}"
+                             Foreground="{DynamicResource TextSecondaryBrush}"
+                             FontSize="11" FontFamily="Consolas" />
                 </StackPanel>
             </Grid>
         </Grid>
