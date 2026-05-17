@@ -43,9 +43,12 @@ DirHealth v2.6.0 ist released. Phasen 1–4 + Performance-Release sind vollstän
 
 ## Nächste Phase
 
-### Phase 5 (geplant)
+### Phase 5 (on hold — kein aktives Startdatum)
 - GPO Browser — `(objectClass=groupPolicyContainer)` + gPLink-Auswertung auf OUs; Orphaned GPOs
 - AD Data Quality Report — Vollständigkeit von mail, telephoneNumber, department, title, manager, physicalDeliveryOfficeName
+
+**Why:** Bewusste Entscheidung nach v2.7.0-Release — Phase 5 wird zurückgestellt, kein Zeitplan.
+**How to apply:** Phase 5 nicht proaktiv vorschlagen. Erst wieder aufgreifen wenn der User es initiiert.
 
 ## Abgeschlossene Zusatz-Features (außerhalb Phasen 1–4)
 
