@@ -345,6 +345,16 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            FontSize="11" VerticalAlignment="Center" />
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Dashboard.LastScanTime}" Value="Never">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <TextBlock Text="Last scan: " FontSize="11"
                                Foreground="{DynamicResource TextSecondaryBrush}" />
                     <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
