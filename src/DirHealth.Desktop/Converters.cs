@@ -60,12 +60,23 @@ public class EqualityConverter : IValueConverter
 
 public class ScoreColorConverter : IValueConverter
 {
+    private static readonly System.Windows.Media.SolidColorBrush Green;
+    private static readonly System.Windows.Media.SolidColorBrush Amber;
+    private static readonly System.Windows.Media.SolidColorBrush Red;
+
+    static ScoreColorConverter()
+    {
+        Green = new(System.Windows.Media.Color.FromRgb(0x22, 0xC5, 0x5E)); Green.Freeze();
+        Amber = new(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B)); Amber.Freeze();
+        Red   = new(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44)); Red.Freeze();
+    }
+
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not int score) return System.Windows.Media.Brushes.White;
-        if (score >= 80) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0xC5, 0x5E));
-        if (score >= 60) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B));
-        return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44));
+        if (score >= 80) return Green;
+        if (score >= 60) return Amber;
+        return Red;
     }
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
@@ -91,14 +102,26 @@ public class RelativeScanTimeConverter : IValueConverter
 
 public class DaysToExpiryColorConverter : IValueConverter
 {
+    private static readonly System.Windows.Media.SolidColorBrush Red;
+    private static readonly System.Windows.Media.SolidColorBrush Orange;
+    private static readonly System.Windows.Media.SolidColorBrush Yellow;
+    private static readonly System.Windows.Media.SolidColorBrush Green;
+
+    static DaysToExpiryColorConverter()
+    {
+        Red    = new(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44)); Red.Freeze();
+        Orange = new(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B)); Orange.Freeze();
+        Yellow = new(System.Windows.Media.Color.FromRgb(0xFB, 0xBF, 0x24)); Yellow.Freeze();
+        Green  = new(System.Windows.Media.Color.FromRgb(0x22, 0xC5, 0x5E)); Green.Freeze();
+    }
+
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not int days) return System.Windows.Media.Brushes.Transparent;
-        if (days < 0)  return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44));
-        if (days < 14) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44));
-        if (days < 30) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B));
-        if (days < 60) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFB, 0xBF, 0x24));
-        return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0xC5, 0x5E));
+        if (days < 14) return Red;
+        if (days < 30) return Orange;
+        if (days < 60) return Yellow;
+        return Green;
     }
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();

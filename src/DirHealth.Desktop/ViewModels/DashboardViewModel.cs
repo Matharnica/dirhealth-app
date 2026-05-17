@@ -47,6 +47,17 @@ public partial class DashboardViewModel : BaseViewModel
             if (e.PropertyName == nameof(IsBusy))
                 ExportFullReportCommand.NotifyCanExecuteChanged();
         };
+
+        var refreshTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(60)
+        };
+        refreshTimer.Tick += (_, _) =>
+        {
+            if (LastScanTime != "Never")
+                OnPropertyChanged(nameof(LastScanTime));
+        };
+        refreshTimer.Start();
     }
 
     private void LoadCachedResults()
