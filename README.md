@@ -40,11 +40,18 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | Category | What DirHealth finds |
 |---|---|
 | 👤 Stale User Accounts | Accounts with no login for 90+ days |
-| 🔑 Password Policy Issues | Never-expire, expired, unchanged for 1yr+ |
+| 🔑 Password Policy Issues | Never-expire, expired, unchanged for 1yr+, fine-grained PSO weakening |
 | 🛡️ Kerberoastable Accounts | SPNs vulnerable to offline password cracking |
+| 🎫 AS-REP Roasting | Accounts without Kerberos pre-auth — hash crackable without login |
+| 🔓 Delegation Risks | Unconstrained delegation on computers and users |
+| 🚫 Password Not Required | Accounts with `PASSWD_NOTREQD` — empty password allowed |
 | 👥 Group Hygiene | Empty groups and single-member groups |
-| 💻 Inactive Computers | Unseen for 90+ days, missing OS info |
-| 📋 GPO & AdminSDHolder | Missing password policies, AdminSDHolder anomalies |
+| 💻 Inactive Computers | Unseen for 90+ days, missing OS info, EOL operating systems |
+| 🏛️ Privileged Groups | Domain Admins, Enterprise Admins, Schema Admins, DnsAdmins, and 5 more |
+| 👑 Stale Domain Admins | Privileged accounts inactive for 30+ days |
+| 🔗 Domain Trusts | All inter-domain/forest trust relationships with direction and type |
+| 🕵️ SID History | Accounts carrying historical SIDs — silent privilege escalation risk |
+| 📅 Timeline | All AD objects created or modified in the last 7 / 30 / 90 days |
 
 Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the number climb.
 
@@ -68,6 +75,10 @@ DirHealth is free to use and source-available, maintained in spare time. If it s
 
 → [**☕ Support on Ko-fi**](https://ko-fi.com/matharnica)  
 → [**💳 Donate via Stripe**](https://donate.stripe.com/8x2aEP30W7So5YR3Gaawo01)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full version history.
 
 ## License
 
