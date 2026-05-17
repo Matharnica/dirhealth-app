@@ -1,6 +1,6 @@
 ---
 type: project
-last_updated: 2026-05-16
+last_updated: 2026-05-17
 confidence: high
 ---
 
@@ -8,7 +8,12 @@ confidence: high
 
 ## Status
 
-DirHealth v2.6.0 ist released. Phasen 1–4 + Performance-Release sind vollständig implementiert.
+DirHealth v2.7.0 ist released. Phasen 1–4 + Security-Release sind vollständig implementiert.
+
+## Aktueller Fokus
+
+**Stabilität, Performance und Code-Qualität — keine neuen Features.**
+Keine Phase 5, keine neuen Views oder Findings vorschlagen. Scope beschränkt auf: Bugfixes, Performance-Verbesserungen, Test-Coverage, Refactoring, Sicherheitshärtung.
 
 ## Abgeschlossene Phasen
 
