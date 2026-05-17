@@ -74,21 +74,39 @@
                      Background="Transparent" BorderThickness="0">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Padding="8,10" BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="0,0,0,1"
-                                ToolTip="{Binding Description}">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
-                                           Margin="0,4,0,0">
-                                    <Run Text="{Binding Count, Mode=OneWay}" />
-                                    <Run Text=" affected · " />
-                                    <Run Text="{Binding Severity, Mode=OneWay}" />
-                                </TextBlock>
-                            </StackPanel>
-                        </Border>
+                        <Grid ToolTip="{Binding Description}">
+                            <!-- Severity stripe -->
+                            <Border Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#64748B" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Severity}" Value="High">
+                                                <Setter Property="Background" Value="#EF4444" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                                                <Setter Property="Background" Value="#F59E0B" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                            <!-- Content -->
+                            <Border Padding="11,10,8,10" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,0,0,1">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="0,4,0,0">
+                                        <Run Text="{Binding Count, Mode=OneWay}" />
+                                        <Run Text=" affected · " />
+                                        <Run Text="{Binding Severity, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
                 <ListBox.ItemContainerStyle>

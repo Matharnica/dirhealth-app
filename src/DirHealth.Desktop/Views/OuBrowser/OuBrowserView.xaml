@@ -30,22 +30,42 @@
             <TextBlock Grid.Row="2" Text="Loading…" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
-            <ListBox Grid.Row="3" x:Name="OUList" ItemsSource="{Binding OUs}"
-                     Background="Transparent" BorderThickness="0"
-                     SelectionChanged="OUList_SelectionChanged">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="4,4">
-                            <TextBlock Text="{Binding Name}"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Description}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       FontSize="11" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <Grid Grid.Row="3">
+                <ListBox x:Name="OUList" ItemsSource="{Binding OUs}"
+                         Background="Transparent" BorderThickness="0"
+                         SelectionChanged="OUList_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="4,4">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Description}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsLoading}" Value="False" />
+                                        <Condition Binding="{Binding OUs.Count}" Value="0" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Text" Value="No organizational units found." />
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
         </Grid>
         </Border>
 
@@ -99,9 +119,10 @@
                 </UniformGrid>
                 <TextBlock Text="DISTINGUISHED NAME" FontSize="10"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding SelectedOU.DistinguishedName}"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="11" TextWrapping="Wrap" FontFamily="Consolas" />
+                <TextBox Text="{Binding SelectedOU.DistinguishedName, Mode=OneWay}"
+                         Style="{StaticResource CopyableText}"
+                         Foreground="{DynamicResource TextSecondaryBrush}"
+                         FontSize="11" FontFamily="Consolas" />
             </StackPanel>
         </ScrollViewer>
 

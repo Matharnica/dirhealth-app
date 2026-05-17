@@ -100,9 +100,26 @@
                     <GridView>
                         <GridViewColumn Header="Type"  Width="80"  DisplayMemberBinding="{Binding TypeLabel}" />
                         <GridViewColumn Header="Name"  Width="180" DisplayMemberBinding="{Binding Name}" />
-                        <GridViewColumn Header="SAM"   Width="150" DisplayMemberBinding="{Binding SamAccountName}" />
+                        <GridViewColumn Header="SAM"   Width="150">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding SamAccountName, Mode=OneWay}"
+                                             Style="{StaticResource CopyableText}"
+                                             Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                         <GridViewColumn Header="Email" Width="200" DisplayMemberBinding="{Binding Email}" />
-                        <GridViewColumn Header="OU"    Width="250" DisplayMemberBinding="{Binding OU}" />
+                        <GridViewColumn Header="OU"    Width="250">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding OU, Mode=OneWay}"
+                                             Style="{StaticResource CopyableText}"
+                                             Foreground="{DynamicResource TextSecondaryBrush}"
+                                             FontSize="11" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                     </GridView>
                 </ListView.View>
             </ListView>
