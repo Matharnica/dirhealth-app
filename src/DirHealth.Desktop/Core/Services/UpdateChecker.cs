@@ -38,9 +38,10 @@ public class UpdateChecker
             var json = await res.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
 
-            // releases endpoint returns array, newest first — pick first non-draft entry
+            // releases endpoint returns array, newest first — skip drafts and pre-releases
             var release = doc.RootElement.EnumerateArray()
-                .FirstOrDefault(r => !r.GetProperty("draft").GetBoolean());
+                .FirstOrDefault(r => !r.GetProperty("draft").GetBoolean()
+                                  && !r.GetProperty("prerelease").GetBoolean());
 
             if (release.ValueKind == JsonValueKind.Undefined)
                 return (null, $"No releases published yet (installed={currentVersion})");

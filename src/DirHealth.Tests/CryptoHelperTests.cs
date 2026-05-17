@@ -74,4 +74,13 @@ public class CryptoHelperTests
         bytes[0] ^= 0xFF; // flip bits in the HMAC region (first 32 bytes)
         Assert.ThrowsAny<Exception>(() => CryptoHelper.Decrypt(Convert.ToBase64String(bytes), Passphrase));
     }
+
+    [Fact]
+    public void TryDecrypt_ValidCiphertextWrongPassphrase_ReturnsFalse()
+    {
+        var ciphertext = CryptoHelper.Encrypt("secret", Passphrase);
+        var result = CryptoHelper.TryDecrypt(ciphertext, "completely-wrong-passphrase", out var plain);
+        Assert.False(result);
+        Assert.Equal(string.Empty, plain);
+    }
 }

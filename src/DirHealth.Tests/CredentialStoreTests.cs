@@ -1,4 +1,9 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using DirHealth.Desktop.Core.Crypto;
+using DirHealth.Desktop.Core.HWID;
 using DirHealth.Desktop.Core.Storage;
 using Xunit;
 
@@ -27,7 +32,6 @@ public class CredentialStoreTests
         }
         else
         {
-            // No backup means there was no original file — clear what the test wrote
             CredentialStore.Clear();
         }
     }
@@ -71,6 +75,36 @@ public class CredentialStoreTests
             CredentialStore.Clear();
             var loaded = CredentialStore.Load();
             Assert.Null(loaded);
+        }
+        finally { Restore(); }
+    }
+
+    [Fact]
+    public void Load_LegacyHwidFormat_MigratesCredentialsAndResavesAsDpapi()
+    {
+        Backup();
+        try
+        {
+            // Write credentials in the legacy format (CryptoHelper + HWID passphrase stored as UTF-8 text)
+            var creds          = new SavedCredentials("legacy.corp", "CORP\\migrated", "OldPass!");
+            var json           = JsonSerializer.Serialize(creds);
+            var passphrase     = HwidManager.ComputeHWID()[..16];
+            var legacyBlob     = Encoding.UTF8.GetBytes(CryptoHelper.Encrypt(json, passphrase));
+            Directory.CreateDirectory(Path.GetDirectoryName(CredPath)!);
+            File.WriteAllBytes(CredPath, legacyBlob);
+
+            // Load should decrypt via legacy path and return correct credentials
+            var loaded = CredentialStore.Load();
+            Assert.NotNull(loaded);
+            Assert.Equal("legacy.corp", loaded.Domain);
+            Assert.Equal("CORP\\migrated", loaded.Username);
+            Assert.Equal("OldPass!", loaded.Password);
+
+            // File should now be re-saved in DPAPI format (verifiable by ProtectedData.Unprotect)
+            var raw      = File.ReadAllBytes(CredPath);
+            var dpapi    = Encoding.UTF8.GetString(ProtectedData.Unprotect(raw, null, DataProtectionScope.CurrentUser));
+            var migrated = JsonSerializer.Deserialize<SavedCredentials>(dpapi);
+            Assert.Equal("legacy.corp", migrated!.Domain);
         }
         finally { Restore(); }
     }

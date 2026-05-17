@@ -73,6 +73,42 @@ public class UpdateCheckerTests
     }
 
     [Fact]
+    public async Task CheckAsync_WhenAllPrereleases_ReturnsNull()
+    {
+        var json = """[{"tag_name":"v99.0.0","draft":false,"prerelease":true,"html_url":"https://github.com/x","assets":[]}]""";
+        var http    = MakeClient(("", json));
+        var checker = new UpdateChecker(http);
+        var (update, _) = await checker.CheckAsync();
+        Assert.Null(update);
+    }
+
+    [Fact]
+    public async Task CheckAsync_PrereleaseSkipped_StableReleaseUsed()
+    {
+        // prerelease v99.0.0 should be skipped; stable v98.0.0 should be picked up
+        var json = """
+            [{"tag_name":"v99.0.0","draft":false,"prerelease":true,"html_url":"https://github.com/pre","assets":[]},
+             {"tag_name":"v98.0.0","draft":false,"prerelease":false,"html_url":"https://github.com/stable","assets":[]}]
+            """;
+        var http    = MakeClient(("", json));
+        var checker = new UpdateChecker(http);
+        var (update, _) = await checker.CheckAsync();
+        Assert.NotNull(update);
+        Assert.Equal("https://github.com/stable", update.DownloadUrl);
+        Assert.Equal("98.0.0", update.Version);
+    }
+
+    [Fact]
+    public async Task CheckAsync_WhenApiReturns500_ReturnsNull()
+    {
+        var http    = new HttpClient(new FixedStatusHandler(HttpStatusCode.InternalServerError));
+        var checker = new UpdateChecker(http);
+        var (update, diagnostic) = await checker.CheckAsync();
+        Assert.Null(update);
+        Assert.Contains("500", diagnostic);
+    }
+
+    [Fact]
     public async Task CheckAsync_FetchesSha256FromChecksumAsset()
     {
         const string expectedHash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
@@ -91,6 +127,14 @@ public class UpdateCheckerTests
         Assert.NotNull(update);
         Assert.Equal(expectedHash, update.ExpectedSha256);
     }
+}
+
+internal class FixedStatusHandler : HttpMessageHandler
+{
+    private readonly HttpStatusCode _status;
+    public FixedStatusHandler(HttpStatusCode status) => _status = status;
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage _, CancellationToken __)
+        => Task.FromResult(new HttpResponseMessage(_status) { Content = new StringContent("") });
 }
 
 internal class SequencedMockHandler : HttpMessageHandler
