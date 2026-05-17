@@ -18,6 +18,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" Text="Computers" FontSize="22" FontWeight="Bold"
@@ -28,27 +29,49 @@
                      BorderBrush="{DynamicResource InputBorderBrush}"
                      Padding="8,6" Margin="0,0,0,8"
                      x:Name="FilterBox" />
-            <ListBox Grid.Row="2" x:Name="ComputerList"
-                     ItemsSource="{Binding Computers}"
-                     Background="Transparent" BorderThickness="0"
-                     SelectionMode="Single"
-                     VirtualizingStackPanel.IsVirtualizing="True"
-                     VirtualizingStackPanel.VirtualizationMode="Recycling"
-                     ScrollViewer.IsDeferredScrollingEnabled="True"
-                     SelectionChanged="ComputerList_SelectionChanged">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="4,4">
-                            <TextBlock Text="{Binding Name}"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding OperatingSystem}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       FontSize="11" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <ProgressBar Grid.Row="2" Height="2" IsIndeterminate="True" Margin="0,0,0,4"
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+            <Grid Grid.Row="3">
+                <ListBox x:Name="ComputerList"
+                         ItemsSource="{Binding Computers}"
+                         Background="Transparent" BorderThickness="0"
+                         SelectionMode="Single"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.IsDeferredScrollingEnabled="True"
+                         SelectionChanged="ComputerList_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="4,4">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding OperatingSystem}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsLoading}" Value="False" />
+                                        <Condition Binding="{Binding Computers.Count}" Value="0" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Text" Value="No computers found." />
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
         </Grid>
         </Border>
 

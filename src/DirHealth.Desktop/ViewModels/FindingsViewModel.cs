@@ -90,10 +90,16 @@ public partial class FindingsViewModel : BaseViewModel
     public void Acknowledge()
     {
         if (SelectedFinding is null) return;
-        _store.Acknowledge(SelectedFinding.Category, AcknowledgeNote);
-        SelectedFinding.IsAcknowledged  = true;
-        SelectedFinding.AcknowledgeNote = AcknowledgeNote;
-        OnPropertyChanged(nameof(FilteredFindings));
+        try
+        {
+            _store.Acknowledge(SelectedFinding.Category, AcknowledgeNote);
+            SelectedFinding.IsAcknowledged  = true;
+            SelectedFinding.AcknowledgeNote = AcknowledgeNote;
+            OnPropertyChanged(nameof(FilteredFindings));
+            StatusMessage   = "Finding acknowledged.";
+            AcknowledgeNote = "";
+        }
+        catch (Exception ex) { StatusMessage = $"Failed to acknowledge: {ex.Message}"; }
         SelectedFinding = null;
     }
 
@@ -101,10 +107,16 @@ public partial class FindingsViewModel : BaseViewModel
     public void Unacknowledge()
     {
         if (SelectedFinding is null) return;
-        _store.Unacknowledge(SelectedFinding.Category);
-        SelectedFinding.IsAcknowledged  = false;
-        SelectedFinding.AcknowledgeNote = "";
-        OnPropertyChanged(nameof(FilteredFindings));
+        try
+        {
+            _store.Unacknowledge(SelectedFinding.Category);
+            SelectedFinding.IsAcknowledged  = false;
+            SelectedFinding.AcknowledgeNote = "";
+            OnPropertyChanged(nameof(FilteredFindings));
+            StatusMessage   = "Acknowledgement removed.";
+            AcknowledgeNote = "";
+        }
+        catch (Exception ex) { StatusMessage = $"Failed to unacknowledge: {ex.Message}"; }
         SelectedFinding = null;
     }
 
