@@ -29,7 +29,8 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,4" />
                     <TextBlock Text="{Binding ComplianceScore}" FontSize="52" FontWeight="Black"
-                               Foreground="{StaticResource SuccessBrush}" LineHeight="52"
+                               Foreground="{Binding ComplianceScore, Converter={StaticResource ScoreColor}}"
+                               LineHeight="52"
                                ToolTip="Compliance score 0–100. ≥80 = healthy, ≥60 = review recommended, &lt;60 = critical issues found." />
                     <TextBlock Text="/ 100" FontSize="12"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -40,7 +41,8 @@
                     <Button Style="{StaticResource SecondaryButton}" Margin="0,0,0,6"
                             HorizontalContentAlignment="Stretch" Padding="10,8"
                             Command="{Binding OpenCategoryCommand}"
-                            CommandParameter="InactiveUsers">
+                            CommandParameter="InactiveUsers"
+                            ToolTip="Users with no logon activity in the last 90 days. Click to view in Findings.">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -57,7 +59,8 @@
                     <Button Style="{StaticResource SecondaryButton}" Margin="0,0,0,6"
                             HorizontalContentAlignment="Stretch" Padding="10,8"
                             Command="{Binding OpenCategoryCommand}"
-                            CommandParameter="PasswordNeverExpires">
+                            CommandParameter="PasswordNeverExpires"
+                            ToolTip="Accounts with password set to never expire or with expired passwords. Click to view in Findings.">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -74,7 +77,8 @@
                     <Button Style="{StaticResource SecondaryButton}" Margin="0,0,0,0"
                             HorizontalContentAlignment="Stretch" Padding="10,8"
                             Command="{Binding OpenCategoryCommand}"
-                            CommandParameter="EmptyGroups">
+                            CommandParameter="EmptyGroups"
+                            ToolTip="Empty groups or groups with only a single member. Click to view in Findings.">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

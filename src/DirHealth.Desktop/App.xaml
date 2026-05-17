@@ -18,6 +18,7 @@
             <local:IsNegativeConverter          x:Key="IsNegativeConverter" />
             <local:EqualityConverter            x:Key="EqualityConverter" />
             <local:RelativeScanTimeConverter    x:Key="RelativeScanTime" />
+            <local:ScoreColorConverter          x:Key="ScoreColor" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

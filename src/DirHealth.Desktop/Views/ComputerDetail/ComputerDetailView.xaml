@@ -4,8 +4,9 @@
     <StackPanel>
         <!-- Header -->
         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-            <TextBlock Text="{Binding Computer.Name}" FontSize="18" FontWeight="Bold"
-                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBox Text="{Binding Computer.Name, Mode=OneWay}" FontSize="18" FontWeight="Bold"
+                     Style="{StaticResource CopyableText}"
+                     Foreground="{DynamicResource TextPrimaryBrush}" />
             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
