@@ -97,46 +97,94 @@
 
             <!-- Disks -->
             <TabItem Header="Disks">
-                <ListView ItemsSource="{Binding Disks}" Margin="0,12,0,0"
-                          Background="Transparent" BorderThickness="0"
-                          Foreground="{DynamicResource TextPrimaryBrush}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Drive"  Width="70"  DisplayMemberBinding="{Binding Drive}" />
-                            <GridViewColumn Header="Total"  Width="100" DisplayMemberBinding="{Binding TotalDisplay}" />
-                            <GridViewColumn Header="Free"   Width="100" DisplayMemberBinding="{Binding FreeDisplay}" />
-                            <GridViewColumn Header="Used %" Width="80"  DisplayMemberBinding="{Binding UsedPercent}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
+                <Grid Margin="0,12,0,0">
+                    <ListView ItemsSource="{Binding Disks}"
+                              Background="Transparent" BorderThickness="0"
+                              Foreground="{DynamicResource TextPrimaryBrush}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Drive"  Width="70"  DisplayMemberBinding="{Binding Drive}" />
+                                <GridViewColumn Header="Total"  Width="100" DisplayMemberBinding="{Binding TotalDisplay}" />
+                                <GridViewColumn Header="Free"   Width="100" DisplayMemberBinding="{Binding FreeDisplay}" />
+                                <GridViewColumn Header="Used %" Width="80"  DisplayMemberBinding="{Binding UsedPercent}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,32,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Disks.Count}" Value="0">
+                                        <Setter Property="Text" Value="No disk information available." />
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </TabItem>
 
             <!-- Local Admins -->
             <TabItem Header="Local Admins">
-                <ListView ItemsSource="{Binding LocalAdmins}" Margin="0,12,0,0"
-                          Background="Transparent" BorderThickness="0"
-                          Foreground="{DynamicResource TextPrimaryBrush}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Account" Width="300" DisplayMemberBinding="{Binding Full}" />
-                            <GridViewColumn Header="Domain"  Width="200" DisplayMemberBinding="{Binding Domain}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
+                <Grid Margin="0,12,0,0">
+                    <ListView ItemsSource="{Binding LocalAdmins}"
+                              Background="Transparent" BorderThickness="0"
+                              Foreground="{DynamicResource TextPrimaryBrush}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Account" Width="300" DisplayMemberBinding="{Binding Full}" />
+                                <GridViewColumn Header="Domain"  Width="200" DisplayMemberBinding="{Binding Domain}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,32,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LocalAdmins.Count}" Value="0">
+                                        <Setter Property="Text" Value="No local administrators found." />
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </TabItem>
 
             <!-- Logged On -->
             <TabItem Header="Logged On">
-                <ListView ItemsSource="{Binding LoggedOn}" Margin="0,12,0,0"
-                          Background="Transparent" BorderThickness="0"
-                          Foreground="{DynamicResource TextPrimaryBrush}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="User"   Width="300" DisplayMemberBinding="{Binding Full}" />
-                            <GridViewColumn Header="Domain" Width="200" DisplayMemberBinding="{Binding Domain}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
+                <Grid Margin="0,12,0,0">
+                    <ListView ItemsSource="{Binding LoggedOn}"
+                              Background="Transparent" BorderThickness="0"
+                              Foreground="{DynamicResource TextPrimaryBrush}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="User"   Width="300" DisplayMemberBinding="{Binding Full}" />
+                                <GridViewColumn Header="Domain" Width="200" DisplayMemberBinding="{Binding Domain}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,32,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LoggedOn.Count}" Value="0">
+                                        <Setter Property="Text" Value="No users currently logged on." />
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </TabItem>
 
             <!-- Eventlog -->

@@ -20,11 +20,12 @@ public partial class DashboardViewModel : BaseViewModel
     private List<string> _cachedDomainAdmins      = [];
     private bool         _liveScanCompleted;
 
-    [ObservableProperty] private int _complianceScore;
-    [ObservableProperty] private int _findingsCount;
-    [ObservableProperty] private int _inactiveUsersCount;
-    [ObservableProperty] private int _passwordIssuesCount;
-    [ObservableProperty] private int _groupIssuesCount;
+    [ObservableProperty] private int    _complianceScore;
+    [ObservableProperty] private int    _findingsCount;
+    [ObservableProperty] private int    _inactiveUsersCount;
+    [ObservableProperty] private int    _passwordIssuesCount;
+    [ObservableProperty] private int    _groupIssuesCount;
+    [ObservableProperty] private string _connectedDomain = "";
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ExportFullReportCommand))]
     private string _lastScanTime = "Never";
@@ -50,6 +51,7 @@ public partial class DashboardViewModel : BaseViewModel
 
     private void LoadCachedResults()
     {
+        ConnectedDomain = _scanner.DomainName;
         var cache = _cacheStore.Load();
         if (cache is null) return;
 
@@ -86,6 +88,7 @@ public partial class DashboardViewModel : BaseViewModel
             PasswordIssuesCount = Findings.Where(f => f.Category is "PasswordNeverExpires" or "ExpiredPasswords").Sum(f => f.Count);
             GroupIssuesCount    = Findings.Where(f => f.Category is "EmptyGroups" or "SingleMemberGroups").Sum(f => f.Count);
             LastScanTime        = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss");
+            ConnectedDomain     = _scanner.DomainName;
             StatusMessage       = $"Scan complete — {FindingsCount} finding(s)";
 
             _cachedInactiveUsers     = result.InactiveUsers;

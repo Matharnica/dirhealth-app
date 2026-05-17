@@ -101,6 +101,10 @@
                         <Run Text=" v" /><Run Text="{Binding AppVersion, Mode=OneWay}"
                              Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="Normal" FontSize="11" />
                     </TextBlock>
+                    <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Dashboard.ConnectedDomain, Mode=OneWay, StringFormat='— {0}'}"
+                               Visibility="{Binding Dashboard.ConnectedDomain, Converter={StaticResource StringToVisibility}}" />
                 </StackPanel>
 
                 <!-- Window controls -->

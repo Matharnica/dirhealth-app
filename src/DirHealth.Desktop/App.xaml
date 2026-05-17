@@ -17,6 +17,7 @@
             <local:DaysToExpiryColorConverter   x:Key="DaysToExpiryColor" />
             <local:IsNegativeConverter          x:Key="IsNegativeConverter" />
             <local:EqualityConverter            x:Key="EqualityConverter" />
+            <local:RelativeScanTimeConverter    x:Key="RelativeScanTime" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

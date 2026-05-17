@@ -91,7 +91,8 @@
 
                     <TextBlock Text="LAST SCAN" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                    <TextBlock Text="{Binding LastScanTime}"
+                    <TextBlock Text="{Binding LastScanTime, Converter={StaticResource RelativeScanTime}}"
+                               ToolTip="{Binding LastScanTime}"
                                Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
                     <TextBlock Text="{Binding StatusMessage}" FontSize="11"
                                Foreground="{DynamicResource TextSecondaryBrush}"

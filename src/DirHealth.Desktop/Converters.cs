@@ -58,6 +58,24 @@ public class EqualityConverter : IValueConverter
         => value is true ? System.Convert.ChangeType(parameter, typeof(int)) : System.Windows.DependencyProperty.UnsetValue;
 }
 
+public class RelativeScanTimeConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not string s || s == "Never") return s ?? "Never";
+        if (!DateTime.TryParseExact(s, "dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var dt)) return s;
+        var diff = DateTime.Now - dt;
+        if (diff.TotalMinutes < 1)  return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours} h ago";
+        if (diff.TotalDays    <  2) return "yesterday";
+        return $"{(int)diff.TotalDays} days ago";
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
 public class DaysToExpiryColorConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
