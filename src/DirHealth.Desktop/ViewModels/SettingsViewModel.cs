@@ -89,5 +89,10 @@ public partial class SettingsViewModel : BaseViewModel
         CredentialStore.Save(Domain ?? "", Username ?? "", Password ?? "");
         StatusMessage       = "Settings saved.";
         OnCredentialsSaved?.Invoke();
+
+        var timer = new System.Windows.Threading.DispatcherTimer
+            { Interval = TimeSpan.FromSeconds(3) };
+        timer.Tick += (_, _) => { StatusMessage = ""; timer.Stop(); };
+        timer.Start();
     }
 }

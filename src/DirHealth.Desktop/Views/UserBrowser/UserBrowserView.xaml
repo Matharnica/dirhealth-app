@@ -122,9 +122,9 @@
                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="EMAIL" FontSize="10"
                                    Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                        <TextBlock Text="{Binding Detail.User.Email}"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                   TextWrapping="Wrap" />
+                        <TextBox Text="{Binding Detail.User.Email, Mode=OneWay}"
+                                 Style="{StaticResource CopyableText}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,12,0">
                         <TextBlock Text="LAST LOGON" FontSize="10"

@@ -169,9 +169,10 @@
                                             <TextBlock Text="{Binding Name}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                                        FontWeight="SemiBold" FontSize="13" />
-                                            <TextBlock Text="{Binding SamAccountName}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       FontSize="11" />
+                                            <TextBox Text="{Binding SamAccountName, Mode=OneWay}"
+                                                     Style="{StaticResource CopyableText}"
+                                                     Foreground="{DynamicResource TextSecondaryBrush}"
+                                                     FontSize="11" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>

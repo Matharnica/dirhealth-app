@@ -141,15 +141,31 @@
                                 <Border Background="{DynamicResource BackgroundBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                         CornerRadius="0,0,4,4" Padding="16,8,16,8">
-                                    <ItemsControl ItemsSource="{Binding Members}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" FontSize="12"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                                           Margin="0,3,0,3" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <StackPanel>
+                                        <TextBlock Text="No members." FontSize="12" FontStyle="Italic"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,3,0,3">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding MemberCount}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <ItemsControl ItemsSource="{Binding Members}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontSize="12"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               Margin="0,3,0,3" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </Border>
                             </Expander>
                         </DataTemplate>
