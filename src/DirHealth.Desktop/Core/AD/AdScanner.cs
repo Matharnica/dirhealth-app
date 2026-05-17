@@ -655,6 +655,10 @@ public class AdScanner
     private static string EscapeDn(string dn) =>
         dn.Replace("\\", "\\5c").Replace("(", "\\28").Replace(")", "\\29");
 
+    private static string EscapeFilterValue(string value) =>
+        value.Replace("\\", "\\5c").Replace("*", "\\2a")
+             .Replace("(", "\\28").Replace(")", "\\29").Replace("\0", "\\00");
+
     public async Task<List<AdUser>> GetStaleDomainAdminsAsync(int daysThreshold = 30)
     {
         return await Task.Run(() =>
@@ -779,7 +783,7 @@ public class AdScanner
         {
             using var root = _connector.GetRootEntry();
             using var gs   = _connector.CreateSearcher(root,
-                $"(&(objectClass=group)(cn={groupName}))", "distinguishedName");
+                $"(&(objectClass=group)(cn={EscapeFilterValue(groupName)}))", "distinguishedName");
             var gr = gs.FindOne();
             if (gr is not null)
             {

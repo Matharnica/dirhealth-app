@@ -1,6 +1,5 @@
 using System.IO;
 using System.Net.Http;
-using System.Text.Json;
 using System.Windows;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.Storage;
@@ -35,8 +34,18 @@ public partial class App : Application
 
         AppDomain.CurrentDomain.UnhandledException += (_, ex) =>
         {
-            File.WriteAllText(_logPath, "APPDOMAIN:\n" + ex.ExceptionObject);
-            MessageBox.Show(ex.ExceptionObject.ToString(), "DirHealth Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
+                File.WriteAllText(_logPath, "APPDOMAIN:\n" + ex.ExceptionObject);
+            } catch { }
+            var e   = ex.ExceptionObject as Exception;
+            var msg = e is not null
+                ? $"{e.GetType().Name}: {e.Message}"
+                : ex.ExceptionObject?.GetType().Name ?? "Unknown error";
+            MessageBox.Show(
+                $"Fatal error: {msg}\n\nDetails written to:\n{_logPath}",
+                "DirHealth Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
         };
     }
 
@@ -53,9 +62,7 @@ public partial class App : Application
         ThemeManager.LoadSavedTheme();
         Log("Theme loaded");
 
-        var settings = LoadSettings();
-        var http     = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        var apiBase  = settings.GetValueOrDefault("LicenseApi", "https://license.dirhealth.app");
+        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
         var splash = new SplashWindow();
         splash.Show();
@@ -65,7 +72,7 @@ public partial class App : Application
         try
         {
             Log("Launching main window");
-            LaunchMainWindow(http, apiBase);
+            LaunchMainWindow(http);
             Log("Main window launched");
         }
         catch (Exception ex)
@@ -105,7 +112,7 @@ public partial class App : Application
         return success;
     }
 
-    private void LaunchMainWindow(HttpClient http, string apiBase)
+    private void LaunchMainWindow(HttpClient http)
     {
         var connector        = new AdConnector();
 
@@ -197,17 +204,5 @@ public partial class App : Application
             Log($"Manual update check exception: {ex}");
             return $"Check failed: {ex.GetType().Name}: {ex.Message}";
         }
-    }
-
-    private static Dictionary<string, string> LoadSettings()
-    {
-        try
-        {
-            var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-            if (!File.Exists(path)) return new();
-            var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
-        }
-        catch { return new(); }
     }
 }

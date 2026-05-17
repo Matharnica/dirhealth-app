@@ -17,7 +17,7 @@ public class CsvExporter
         {
             csv.WriteRecord(new FindingRow(
                 f.Category, f.Title, f.Severity.ToString(),
-                f.Count, string.Join("; ", f.AffectedObjects)));
+                f.Count, string.Join("; ", f.AffectedObjects.Select(SafeField))));
             csv.NextRecord();
         }
     }
@@ -31,9 +31,9 @@ public class CsvExporter
         foreach (var u in users)
         {
             csv.WriteRecord(new PasswordReportRow(
-                u.DisplayName,
-                u.SamAccountName,
-                u.Email,
+                SafeField(u.DisplayName),
+                SafeField(u.SamAccountName),
+                SafeField(u.Email),
                 u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "",
                 u.DaysUntilPasswordExpiry?.ToString() ?? "",
                 DnHelper.OuFromDn(u.DistinguishedName)));
@@ -50,13 +50,20 @@ public class CsvExporter
         foreach (var u in users)
         {
             csv.WriteRecord(new InactiveUserRow(
-                u.DisplayName,
-                u.SamAccountName,
-                u.Email,
+                SafeField(u.DisplayName),
+                SafeField(u.SamAccountName),
+                SafeField(u.Email),
                 u.LastLogon?.ToString("yyyy-MM-dd") ?? "Never",
                 DnHelper.OuFromDn(u.DistinguishedName)));
             csv.NextRecord();
         }
+    }
+
+    // Prefix formula-starting characters to prevent CSV injection when the file is opened in spreadsheet software
+    private static string SafeField(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value[0] is '=' or '+' or '-' or '@' or '\t' or '\r' ? "'" + value : value;
     }
 
     private record FindingRow(string Category, string Title, string Severity, int Count, string AffectedObjects);

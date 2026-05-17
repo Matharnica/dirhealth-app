@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.IO;
+using System.Security.Cryptography;
 using System.Windows;
 using DirHealth.Desktop.Core.Services;
 
@@ -38,9 +39,10 @@ public partial class MainViewModel : BaseViewModel
     partial void OnIsDownloadingUpdateChanged(bool value) => OnPropertyChanged(nameof(UpdateButtonText));
     partial void OnDownloadProgressChanged(int value)    => OnPropertyChanged(nameof(UpdateButtonText));
 
-    private string _updateDownloadUrl = "";
-    private bool   _updateHasDirectDownload;
-    private long   _updateFileSize;
+    private string  _updateDownloadUrl = "";
+    private bool    _updateHasDirectDownload;
+    private long    _updateFileSize;
+    private string? _updateExpectedSha256;
 
     public string AppVersion { get; } = UpdateChecker.GetCurrentVersion();
 
@@ -248,7 +250,20 @@ public partial class MainViewModel : BaseViewModel
                     if (total > 0)
                         DownloadProgress = (int)(downloaded * 100 / total);
                 }
-            } // file handle closed here before starting installer
+            } // file handle closed here before verifying and starting installer
+            if (!string.IsNullOrEmpty(_updateExpectedSha256))
+            {
+                using var fs = File.OpenRead(tmp);
+                var actualHash = Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant();
+                if (actualHash != _updateExpectedSha256)
+                {
+                    try { File.Delete(tmp); } catch { }
+                    ScoreDropMessage    = "Update aborted: integrity check failed. Download manually from GitHub Releases.";
+                    ShowScoreDropAlert  = true;
+                    IsDownloadingUpdate = false;
+                    return;
+                }
+            }
             System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
             Application.Current.Shutdown();
         }
@@ -265,6 +280,7 @@ public partial class MainViewModel : BaseViewModel
         _updateDownloadUrl       = info.DownloadUrl;
         _updateHasDirectDownload = info.HasDirectDownload;
         _updateFileSize          = info.FileSize;
+        _updateExpectedSha256    = info.ExpectedSha256;
         UpdateVersion            = info.Version;
         ShowUpdateBanner         = true;
     }

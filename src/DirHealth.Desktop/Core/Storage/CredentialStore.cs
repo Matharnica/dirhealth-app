@@ -58,7 +58,16 @@ public static class CredentialStore
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             File.WriteAllBytes(_path, encrypted);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            try
+            {
+                var logPath = Path.Combine(Path.GetDirectoryName(_path)!, "dirhealth.log");
+                File.AppendAllText(logPath,
+                    $"{DateTime.Now:HH:mm:ss} CredentialStore.Save failed: {ex.GetType().Name}: {ex.Message}\n");
+            }
+            catch { }
+        }
     }
 
     public static void Clear()

@@ -88,4 +88,46 @@ public class CsvExporterTests
         }
         finally { File.Delete(path); }
     }
+
+    [Theory]
+    [InlineData("=CMD+CALC")]
+    [InlineData("+1234")]
+    [InlineData("-9")]
+    [InlineData("@SUM(A1)")]
+    public void ExportPasswordReport_FormulaDisplayName_IsPrefixEscaped(string formulaName)
+    {
+        var users = new List<AdUser>
+        {
+            new() { DisplayName = formulaName, SamAccountName = "user",
+                    DistinguishedName = "CN=user,DC=corp,DC=com" }
+        };
+        var path = Path.GetTempFileName();
+        try
+        {
+            _exporter.ExportPasswordReport(users, path);
+            var content = File.ReadAllText(path);
+            Assert.Contains("'" + formulaName, content);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Theory]
+    [InlineData("=HYPERLINK(http://evil.com)")]
+    [InlineData("+cmd|calc!A0")]
+    public void ExportInactiveUsers_FormulaDisplayName_IsPrefixEscaped(string formulaName)
+    {
+        var users = new List<AdUser>
+        {
+            new() { DisplayName = formulaName, SamAccountName = "user",
+                    DistinguishedName = "CN=user,DC=corp,DC=com" }
+        };
+        var path = Path.GetTempFileName();
+        try
+        {
+            _exporter.ExportInactiveUsers(users, path);
+            var content = File.ReadAllText(path);
+            Assert.Contains("'" + formulaName, content);
+        }
+        finally { File.Delete(path); }
+    }
 }

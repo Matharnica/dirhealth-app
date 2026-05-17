@@ -70,9 +70,10 @@ public class AdWmiClient
             {
                 var scope = new ManagementScope($@"\\{hostname}\root\cimv2");
                 scope.Connect();
+                var safeHost = hostname.Replace("'", "''");
                 var query = new ObjectQuery(
                     "SELECT PartComponent FROM Win32_GroupUser WHERE GroupComponent=\"Win32_Group.Domain='" +
-                    hostname + "',Name='Administrators'\"");
+                    safeHost + "',Name='Administrators'\"");
                 using var s = new ManagementObjectSearcher(scope, query);
                 foreach (ManagementObject obj in s.Get())
                 {

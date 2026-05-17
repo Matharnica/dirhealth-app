@@ -49,6 +49,9 @@ public class AdSearcher
 
     private List<AdSearchResult> SearchByOu(string query)
     {
+        // Reject anything that doesn't look like a Distinguished Name to prevent LDAP path injection
+        if (!System.Text.RegularExpressions.Regex.IsMatch(query, @"^(CN|OU|DC)=", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return [];
         var results = new List<AdSearchResult>();
         try
         {
@@ -71,6 +74,7 @@ public class AdSearcher
 
     private List<AdSearchResult> SearchByLdap(string query)
     {
+        // Intentional raw passthrough — power-user feature; caller supplies a complete LDAP filter.
         return RunSearch(query);
     }
 

@@ -18,6 +18,14 @@ Before making changes:
 
 - **github-actions** (via .github/workflows/build.yml)
 - **ci-cd** (via .github/workflows/build.yml)
+- **dotnet** (via DirHealth.sln)
+- **csharp** (via DirHealth.sln)
+- **wpf** (via CommunityToolkit.Mvvm)
+- **mvvm** (via CommunityToolkit.Mvvm)
+- **csvhelper** (via CsvHelper)
+- **dotnet-test** (via Microsoft.NET.Test.Sdk)
+- **xunit** (via xunit)
+- **unit-testing** (via xunit)
 
 ## Memory
 

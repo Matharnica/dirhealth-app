@@ -15,4 +15,34 @@ capabilities:
     - id: ci-cd
       source: .github/workflows/build.yml
       confidence: confirmed
+    - id: dotnet
+      source: DirHealth.sln
+      confidence: confirmed
+    - id: csharp
+      source: DirHealth.sln
+      confidence: confirmed
+    - id: wpf
+      source: CommunityToolkit.Mvvm
+      confidence: confirmed
+    - id: mvvm
+      source: CommunityToolkit.Mvvm
+      confidence: confirmed
+    - id: csvhelper
+      source: CsvHelper
+      confidence: confirmed
+    - id: dotnet-test
+      source: Microsoft.NET.Test.Sdk
+      confidence: confirmed
+    - id: xunit
+      source: xunit
+      confidence: confirmed
+    - id: unit-testing
+      source: xunit
+      confidence: confirmed
+    - id: moq
+      source: Moq
+      confidence: confirmed
+    - id: mocking
+      source: Moq
+      confidence: confirmed
   inferred: []

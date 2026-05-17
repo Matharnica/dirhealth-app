@@ -65,11 +65,21 @@ jobs:
       # Setup steps: https://signpath.io/open-source (requires MIT/Apache license + public repo)
       # Secrets needed: SIGNPATH_CI_TOKEN, SIGNPATH_ORG_ID
 
+      - name: Compute installer checksum
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $file = "installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+          $hash | Out-File -FilePath "installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.sha256" -Encoding ASCII -NoNewline
+
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2.3.2
         with:
-          files: installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
+          files: |
+            installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
+            installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.sha256
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           prerelease: false

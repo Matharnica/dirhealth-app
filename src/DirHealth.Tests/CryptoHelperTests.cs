@@ -49,4 +49,29 @@ public class CryptoHelperTests
         var ciphertext = CryptoHelper.Encrypt("secret", Passphrase);
         Assert.ThrowsAny<Exception>(() => CryptoHelper.Decrypt(ciphertext, "wrong-passphrase"));
     }
+
+    [Fact]
+    public void Decrypt_ThrowsOnTruncatedBlob()
+    {
+        // Blob shorter than HmacSize(32) + SaltSize(16) + IvSize(16) = 64 bytes
+        var tooShort = Convert.ToBase64String(new byte[10]);
+        Assert.ThrowsAny<Exception>(() => CryptoHelper.Decrypt(tooShort, Passphrase));
+    }
+
+    [Fact]
+    public void EncryptDecrypt_EmptyPlaintext_RoundTrip()
+    {
+        var ciphertext = CryptoHelper.Encrypt("", Passphrase);
+        var decrypted  = CryptoHelper.Decrypt(ciphertext, Passphrase);
+        Assert.Equal("", decrypted);
+    }
+
+    [Fact]
+    public void Decrypt_ThrowsOnHmacRegionTampering()
+    {
+        var ciphertext = CryptoHelper.Encrypt("secret", Passphrase);
+        var bytes = Convert.FromBase64String(ciphertext);
+        bytes[0] ^= 0xFF; // flip bits in the HMAC region (first 32 bytes)
+        Assert.ThrowsAny<Exception>(() => CryptoHelper.Decrypt(Convert.ToBase64String(bytes), Passphrase));
+    }
 }

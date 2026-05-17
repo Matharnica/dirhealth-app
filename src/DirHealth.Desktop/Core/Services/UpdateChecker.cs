@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace DirHealth.Desktop.Core.Services;
 
-public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownload, long FileSize);
+public record UpdateInfo(string Version, string DownloadUrl, bool HasDirectDownload, long FileSize, string? ExpectedSha256 = null);
 
 public class UpdateChecker
 {
@@ -64,7 +64,30 @@ public class UpdateChecker
             var downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
             var fileSize    = asset.GetProperty("size").GetInt64();
 
-            return (new UpdateInfo(latestVer, downloadUrl, true, fileSize), $"Update found: {latestVer}");
+            string? expectedSha256 = null;
+            var checksumAsset = release.GetProperty("assets").EnumerateArray()
+                .FirstOrDefault(a =>
+                    a.GetProperty("browser_download_url").GetString()
+                     ?.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true);
+            if (checksumAsset.ValueKind != JsonValueKind.Undefined)
+            {
+                var checksumUrl = checksumAsset.GetProperty("browser_download_url").GetString() ?? "";
+                try
+                {
+                    if (!Uri.TryCreate(checksumUrl, UriKind.Absolute, out var cUri) ||
+                        (cUri.Host != "github.com" && cUri.Host != "objects.githubusercontent.com") ||
+                        cUri.Scheme != Uri.UriSchemeHttps)
+                        throw new InvalidOperationException("Unexpected checksum host.");
+                    using var cReq = new HttpRequestMessage(HttpMethod.Get, checksumUrl);
+                    cReq.Headers.UserAgent.Add(new ProductInfoHeaderValue("DirHealth", currentVersion));
+                    var cRes = await _http.SendAsync(cReq);
+                    if (cRes.IsSuccessStatusCode)
+                        expectedSha256 = (await cRes.Content.ReadAsStringAsync()).Trim().ToLowerInvariant();
+                }
+                catch { }
+            }
+
+            return (new UpdateInfo(latestVer, downloadUrl, true, fileSize, expectedSha256), $"Update found: {latestVer}");
         }
         catch (Exception ex)
         {
