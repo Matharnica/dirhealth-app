@@ -36,7 +36,7 @@ public class CsvExporter
                 SafeField(u.Email),
                 u.PasswordExpires?.ToString("yyyy-MM-dd") ?? "",
                 u.DaysUntilPasswordExpiry?.ToString() ?? "",
-                DnHelper.OuFromDn(u.DistinguishedName)));
+                SafeField(DnHelper.OuFromDn(u.DistinguishedName))));
             csv.NextRecord();
         }
     }
@@ -54,7 +54,7 @@ public class CsvExporter
                 SafeField(u.SamAccountName),
                 SafeField(u.Email),
                 u.LastLogon?.ToString("yyyy-MM-dd") ?? "Never",
-                DnHelper.OuFromDn(u.DistinguishedName)));
+                SafeField(DnHelper.OuFromDn(u.DistinguishedName))));
             csv.NextRecord();
         }
     }

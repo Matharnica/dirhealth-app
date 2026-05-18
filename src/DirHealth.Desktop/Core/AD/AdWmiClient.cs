@@ -5,8 +5,13 @@ namespace DirHealth.Desktop.Core.AD;
 
 public class AdWmiClient
 {
+    private static bool IsValidHostname(string hostname) =>
+        !string.IsNullOrWhiteSpace(hostname) &&
+        System.Text.RegularExpressions.Regex.IsMatch(hostname, @"^[a-zA-Z0-9][a-zA-Z0-9\-\.]{0,253}$");
+
     public async Task<bool> PingAsync(string hostname)
     {
+        if (!IsValidHostname(hostname)) return false;
         return await Task.Run(() =>
         {
             try
@@ -21,6 +26,7 @@ public class AdWmiClient
 
     public async Task<long> PingTimeMs(string hostname)
     {
+        if (!IsValidHostname(hostname)) return -1L;
         return await Task.Run(() =>
         {
             try
@@ -36,6 +42,7 @@ public class AdWmiClient
 
     public async Task<List<WmiDisk>> GetDisksAsync(string hostname)
     {
+        if (!IsValidHostname(hostname)) return [];
         return await Task.Run(() =>
         {
             var disks = new List<WmiDisk>();
@@ -63,6 +70,7 @@ public class AdWmiClient
 
     public async Task<List<WmiLocalAdmin>> GetLocalAdminsAsync(string hostname)
     {
+        if (!IsValidHostname(hostname)) return [];
         return await Task.Run(() =>
         {
             var admins = new List<WmiLocalAdmin>();
@@ -70,7 +78,7 @@ public class AdWmiClient
             {
                 var scope = new ManagementScope($@"\\{hostname}\root\cimv2");
                 scope.Connect();
-                var safeHost = hostname.Replace("'", "''");
+                var safeHost = hostname.Replace("\\", "\\\\").Replace("'", "\\'");
                 var query = new ObjectQuery(
                     "SELECT PartComponent FROM Win32_GroupUser WHERE GroupComponent=\"Win32_Group.Domain='" +
                     safeHost + "',Name='Administrators'\"");
@@ -90,6 +98,7 @@ public class AdWmiClient
 
     public async Task<List<WmiLoggedOnUser>> GetLoggedOnUsersAsync(string hostname)
     {
+        if (!IsValidHostname(hostname)) return [];
         return await Task.Run(() =>
         {
             var users = new List<WmiLoggedOnUser>();

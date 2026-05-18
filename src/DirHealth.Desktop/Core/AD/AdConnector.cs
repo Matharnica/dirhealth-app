@@ -93,7 +93,7 @@ public class AdConnector
     private static string EscapeDn(string dn) =>
         dn.Replace("\\", "\\5c").Replace("(", "\\28").Replace(")", "\\29");
 
-    internal static string EscapeFilterValue(string value) =>
+    public static string EscapeFilterValue(string value) =>
         value.Replace("\\", "\\5c").Replace("*",  "\\2a")
              .Replace("(",  "\\28").Replace(")",  "\\29")
              .Replace("\0", "\\00");

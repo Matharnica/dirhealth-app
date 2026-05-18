@@ -251,18 +251,23 @@ public partial class MainViewModel : BaseViewModel
                         DownloadProgress = (int)(downloaded * 100 / total);
                 }
             } // file handle closed here before verifying and starting installer
-            if (!string.IsNullOrEmpty(_updateExpectedSha256))
+            if (string.IsNullOrEmpty(_updateExpectedSha256))
             {
-                using var fs = File.OpenRead(tmp);
-                var actualHash = Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant();
-                if (actualHash != _updateExpectedSha256)
-                {
-                    try { File.Delete(tmp); } catch { }
-                    ScoreDropMessage    = "Update aborted: integrity check failed. Download manually from GitHub Releases.";
-                    ShowScoreDropAlert  = true;
-                    IsDownloadingUpdate = false;
-                    return;
-                }
+                try { File.Delete(tmp); } catch { }
+                ScoreDropMessage    = "Update aborted: no integrity checksum in release. Download manually from GitHub Releases.";
+                ShowScoreDropAlert  = true;
+                IsDownloadingUpdate = false;
+                return;
+            }
+            using var fs = File.OpenRead(tmp);
+            var actualHash = Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant();
+            if (actualHash != _updateExpectedSha256)
+            {
+                try { File.Delete(tmp); } catch { }
+                ScoreDropMessage    = "Update aborted: integrity check failed. Download manually from GitHub Releases.";
+                ShowScoreDropAlert  = true;
+                IsDownloadingUpdate = false;
+                return;
             }
             System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
             Application.Current.Shutdown();

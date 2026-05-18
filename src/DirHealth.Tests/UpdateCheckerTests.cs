@@ -109,6 +109,40 @@ public class UpdateCheckerTests
     }
 
     [Fact]
+    public async Task CheckAsync_RogueHostChecksumUrl_IgnoresChecksum()
+    {
+        var releasesJson = """
+            [{"tag_name":"v99.0.0","draft":false,"prerelease":false,"html_url":"https://github.com/r",
+              "assets":[
+                {"browser_download_url":"https://objects.githubusercontent.com/DirHealth-Setup-99.0.0.exe","size":1000},
+                {"browser_download_url":"https://evil.com/DirHealth-Setup-99.0.0.sha256","size":64}
+              ]}]
+            """;
+        var http    = MakeClient(("", releasesJson), ("sha256", "deadbeef"));
+        var checker = new UpdateChecker(http);
+        var (update, _) = await checker.CheckAsync();
+        Assert.NotNull(update);
+        Assert.Null(update.ExpectedSha256);
+    }
+
+    [Fact]
+    public async Task CheckAsync_HttpChecksumUrl_IgnoresChecksum()
+    {
+        var releasesJson = """
+            [{"tag_name":"v99.0.0","draft":false,"prerelease":false,"html_url":"https://github.com/r",
+              "assets":[
+                {"browser_download_url":"https://objects.githubusercontent.com/DirHealth-Setup-99.0.0.exe","size":1000},
+                {"browser_download_url":"http://objects.githubusercontent.com/DirHealth-Setup-99.0.0.sha256","size":64}
+              ]}]
+            """;
+        var http    = MakeClient(("", releasesJson));
+        var checker = new UpdateChecker(http);
+        var (update, _) = await checker.CheckAsync();
+        Assert.NotNull(update);
+        Assert.Null(update.ExpectedSha256);
+    }
+
+    [Fact]
     public async Task CheckAsync_FetchesSha256FromChecksumAsset()
     {
         const string expectedHash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
