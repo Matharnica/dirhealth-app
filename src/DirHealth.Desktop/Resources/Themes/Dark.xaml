@@ -8,6 +8,7 @@
     <Color x:Key="InputBackgroundColor">#1A1D27</Color>
     <Color x:Key="InputBorderColor">#2D3148</Color>
     <Color x:Key="NavHoverColor">#1E2235</Color>
+    <Color x:Key="SidebarBottomColor">#131620</Color>
 
     <SolidColorBrush x:Key="BackgroundBrush"      Color="{StaticResource BackgroundColor}" />
     <SolidColorBrush x:Key="SurfaceBrush"         Color="{StaticResource SurfaceColor}" />
@@ -17,4 +18,8 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="{StaticResource InputBackgroundColor}" />
     <SolidColorBrush x:Key="InputBorderBrush"     Color="{StaticResource InputBorderColor}" />
     <SolidColorBrush x:Key="NavHoverBrush"        Color="{StaticResource NavHoverColor}" />
+    <LinearGradientBrush x:Key="SidebarBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource SurfaceColor}"    Offset="0" />
+        <GradientStop Color="{StaticResource SidebarBottomColor}" Offset="1" />
+    </LinearGradientBrush>
 </ResourceDictionary>

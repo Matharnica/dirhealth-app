@@ -28,6 +28,7 @@ public partial class DashboardViewModel : BaseViewModel
     [ObservableProperty] private string _connectedDomain = "";
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ExportFullReportCommand))]
+    [NotifyPropertyChangedFor(nameof(IsFirstRun))]
     private string _lastScanTime = "Never";
     [ObservableProperty] private List<AdFinding> _findings = [];
     [ObservableProperty] private ScanDiff? _lastDiff;
@@ -37,6 +38,21 @@ public partial class DashboardViewModel : BaseViewModel
     public Action<AdFinding>? NavigateToFinding  { get; set; }
     public IReadOnlyList<ScoreEntry> ScoreHistory => _historyStore.Entries;
     public Action<int, int>? OnScoreDrop { get; set; }
+
+    public bool IsFirstRun => LastScanTime == "Never";
+
+    public string ScoreTrendText
+    {
+        get
+        {
+            if (ScoreHistory.Count < 2) return "";
+            var delta = ScoreHistory[^1].Score - ScoreHistory[^2].Score;
+            return delta > 0 ? $"▲ +{delta}" : delta < 0 ? $"▼ {delta}" : "= no change";
+        }
+    }
+
+    public bool ScoreTrendIsPositive => ScoreHistory.Count >= 2 && ScoreHistory[^1].Score > ScoreHistory[^2].Score;
+    public bool ScoreTrendIsNegative => ScoreHistory.Count >= 2 && ScoreHistory[^1].Score < ScoreHistory[^2].Score;
 
     public DashboardViewModel(AdScanner scanner)
     {
@@ -129,6 +145,9 @@ public partial class DashboardViewModel : BaseViewModel
             var previous = _historyStore.PreviousScore();
             _historyStore.Add(ComplianceScore);
             OnPropertyChanged(nameof(ScoreHistory));
+            OnPropertyChanged(nameof(ScoreTrendText));
+            OnPropertyChanged(nameof(ScoreTrendIsPositive));
+            OnPropertyChanged(nameof(ScoreTrendIsNegative));
             if (previous.HasValue && ComplianceScore < previous.Value)
                 OnScoreDrop?.Invoke(previous.Value, ComplianceScore);
         }

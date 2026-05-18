@@ -80,6 +80,14 @@ public partial class FindingsViewModel : BaseViewModel
     }
 
     [RelayCommand]
+    public void OpenUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { }
+    }
+
+    [RelayCommand]
     public void ClearSelection() => SelectedFinding = null;
 
     [RelayCommand]

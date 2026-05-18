@@ -17,4 +17,8 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="{StaticResource InputBackgroundColor}" />
     <SolidColorBrush x:Key="InputBorderBrush"     Color="{StaticResource InputBorderColor}" />
     <SolidColorBrush x:Key="NavHoverBrush"        Color="{StaticResource NavHoverColor}" />
+    <LinearGradientBrush x:Key="SidebarBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource SurfaceColor}" Offset="0" />
+        <GradientStop Color="{StaticResource NavHoverColor}" Offset="1" />
+    </LinearGradientBrush>
 </ResourceDictionary>

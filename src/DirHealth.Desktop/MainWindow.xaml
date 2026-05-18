@@ -268,7 +268,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar -->
-            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}"
+            <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
                 <StackPanel Margin="12,20,12,12">
                     <TextBlock Text="DirHealth" FontSize="18" FontWeight="Bold"
@@ -282,8 +282,22 @@
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="⊞  Dashboard"
                             Command="{Binding ShowDashboardCommand}" />
-                    <Button Style="{StaticResource NavButton}" Content="⚠  Findings"
-                            Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16" />
+                    <Button Style="{StaticResource NavButton}"
+                            Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="⚠  Findings" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Background="#EF4444" CornerRadius="8"
+                                    Padding="5,1" Margin="4,0,0,0"
+                                    Visibility="{Binding FindingsCount, Converter={StaticResource NonZeroToVisibility}}">
+                                <TextBlock Text="{Binding FindingsCount}" FontSize="10"
+                                           FontWeight="Bold" Foreground="White" />
+                            </Border>
+                        </Grid>
+                    </Button>
 
                     <!-- AD Tools -->
                     <TextBlock Text="AD TOOLS" FontSize="10" FontWeight="SemiBold"

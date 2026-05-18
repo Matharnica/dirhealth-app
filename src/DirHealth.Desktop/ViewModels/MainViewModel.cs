@@ -44,7 +44,8 @@ public partial class MainViewModel : BaseViewModel
     private long    _updateFileSize;
     private string? _updateExpectedSha256;
 
-    public string AppVersion { get; } = UpdateChecker.GetCurrentVersion();
+    public string AppVersion   { get; } = UpdateChecker.GetCurrentVersion();
+    public int    FindingsCount => Dashboard.FindingsCount;
 
     public MainViewModel(
         DashboardViewModel dashboard,
@@ -84,6 +85,8 @@ public partial class MainViewModel : BaseViewModel
                 Findings.LoadFindings(Dashboard.Findings, Dashboard.ComplianceScore);
             if (e.PropertyName == nameof(DashboardViewModel.ComplianceScore))
                 Findings.Score = Dashboard.ComplianceScore;
+            if (e.PropertyName == nameof(DashboardViewModel.FindingsCount))
+                OnPropertyChanged(nameof(FindingsCount));
         };
 
         if (Dashboard.Findings.Count > 0)

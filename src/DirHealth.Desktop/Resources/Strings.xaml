@@ -10,7 +10,7 @@
     <sys:String x:Key="BtnScan">Run Scan</sys:String>
     <sys:String x:Key="BtnExportCsv">Export CSV</sys:String>
     <sys:String x:Key="BtnExportPdf">Export PDF</sys:String>
-    <sys:String x:Key="LblScore">Compliance Score</sys:String>
+    <sys:String x:Key="LblScore">Health Score</sys:String>
     <sys:String x:Key="LblLastScan">Last Scan</sys:String>
     <sys:String x:Key="TrialExpiredTitle">Your Trial Has Expired</sys:String>
     <sys:String x:Key="TrialExpiredMsg">Enter your license key to continue using DirHealth.</sys:String>
