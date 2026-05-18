@@ -4,6 +4,42 @@ All notable changes to DirHealth are documented here.
 
 ---
 
+## [2.8.0] — 2026-05-18
+
+### Visual
+- **Card depth** — All card surfaces now have a subtle drop shadow (BlurRadius=12, Opacity=0.12) for better visual hierarchy.
+- **Smooth button hover** — Primary button background fades between accent colours via 120 ms `ColorAnimation`; nav button uses a 120 ms opacity overlay (fully theme-aware).
+- **Thin scrollbar** — Global 6 px scrollbar with rounded thumb; turns accent-blue on hover.
+- **Sidebar gradient** — Sidebar fades from surface colour at the top to a slightly darker tone at the bottom in both Dark and Light themes.
+
+### UX
+- **"HEALTH SCORE"** — Renamed from "Compliance Score" throughout the UI; the internal property name is unchanged.
+- **Remediation links** — Each finding now exposes a "→ Remediation guidance" button in the detail panel that opens the relevant Microsoft Learn documentation.
+- **Score trend** — Health score shows a green ▲ or red ▼ delta (e.g. `▲ +5`) directly below the number after each scan.
+- **Findings badge** — The Findings navigation button now shows a red count bubble with the total number of open findings.
+- **First-run welcome card** — Dashboard shows a 3-step onboarding guide on the right panel when no scan has been run yet.
+
+---
+
+## [2.7.6] — 2026-05-18
+
+### Security
+- **SHA-256 mandatory on auto-update** — Installer download is aborted if the release has no `.sha256` asset; user is directed to download manually from GitHub Releases.
+- **Checksum URL host pinning** — SHA-256 asset URL must be `https://objects.githubusercontent.com/…`; any other host or HTTP scheme is silently ignored and treated as if no checksum existed.
+- **WMI hostname validation** — `AdWmiClient` validates all hostname parameters against `^[a-zA-Z0-9][a-zA-Z0-9\-\.]{0,253}$` before any WMI or ping call; invalid hostnames return empty / false.
+- **WQL logName allowlist** — `GetEventLogAsync` only accepts `"System"`, `"Security"`, or `"Application"` as the log name (case-sensitive); any other value returns an empty list without touching WMI.
+- **LDAP filter escaping** — `AdConnector.EscapeFilterValue` is now `public static`; all user-supplied strings that enter LDAP filter attribute-value positions go through RFC 4515 escaping.
+- **SID format validation** — `AdSearcher.SearchBySid` validates the query against `^S-\d+-\d+(-\d+)*$` before LDAP; rejects anything that doesn't match.
+- **OU path validation** — `AdSearcher.SearchByOu` rejects paths that don't start with `CN=`, `OU=`, or `DC=` to prevent LDAP server redirection.
+
+### Tests
+- `AdConnectorEscapeTests` — covers backslash, wildcard `*`, parentheses, NUL, and filter break-out payload escaping.
+- `AdSearcherValidationTests` — invalid SID formats, invalid/valid OU paths; confirms validation gates fire before any LDAP call.
+- `AdWmiClientAllowlistTests` — logName allowlist (valid + invalid, case-sensitive), hostname validation in `GetDisksAsync` and `PingAsync`.
+- `UpdateCheckerTests` — two new cases: rogue-host checksum URL and HTTP checksum URL both result in `ExpectedSha256 == null`.
+
+---
+
 ## [2.7.5] — 2026-05-17
 
 ### Fixed
