@@ -92,7 +92,7 @@
                              BorderThickness="0"
                              Visibility="{Binding IsLoadingCounts, Converter={StaticResource BoolToVisibility}}" />
                 <UniformGrid Columns="3" Margin="0,0,0,16">
-                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                    <Border Style="{StaticResource Card}" Margin="0,4,8,8">
                         <StackPanel>
                             <TextBlock Text="USERS" FontSize="10"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -100,7 +100,7 @@
                                        FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                    <Border Style="{StaticResource Card}" Margin="0,4,8,8">
                         <StackPanel>
                             <TextBlock Text="COMPUTERS" FontSize="10"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -108,7 +108,7 @@
                                        FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
                         </StackPanel>
                     </Border>
-                    <Border Style="{StaticResource Card}">
+                    <Border Style="{StaticResource Card}" Margin="0,4,0,8">
                         <StackPanel>
                             <TextBlock Text="GROUPS" FontSize="10"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />

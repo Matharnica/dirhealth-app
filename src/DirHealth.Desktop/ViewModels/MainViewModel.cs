@@ -44,8 +44,11 @@ public partial class MainViewModel : BaseViewModel
     private long    _updateFileSize;
     private string? _updateExpectedSha256;
 
-    public string AppVersion   { get; } = UpdateChecker.GetCurrentVersion();
-    public int    FindingsCount => Dashboard.FindingsCount;
+    public string AppVersion      { get; } = UpdateChecker.GetCurrentVersion();
+    public int    FindingsCount   => Dashboard.FindingsCount;
+    public string CurrentViewName => _currentView?.GetType().Name ?? "";
+
+    partial void OnCurrentViewChanged(BaseViewModel value) => OnPropertyChanged(nameof(CurrentViewName));
 
     public MainViewModel(
         DashboardViewModel dashboard,

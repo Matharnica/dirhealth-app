@@ -4,6 +4,16 @@ All notable changes to DirHealth are documented here.
 
 ---
 
+## [2.8.1] — 2026-05-18
+
+### Fixed
+- **NavButton active indicator** — Active nav item now shows a 3 px accent-blue left stripe and accent foreground via `Tag` + `EqualityConverter` binding; no more "all buttons look the same" state.
+- **ProgressBar global style** — Implicit `TargetType="ProgressBar"` style sets `Background=Transparent`, `Foreground=AccentBrush`, `BorderThickness=0`; eliminates system-accent bleed in Light theme.
+- **OU Browser card shadow clipping** — Stat cards in OU detail now have bottom/right margin so the 12 px drop shadow is no longer cut off.
+- **Privileged Groups empty state** — When all 9 groups have zero members after loading, a "No elevated groups have members — your AD is clean. ✓" message is shown via `MultiDataTrigger (IsLoading=False AND Groups.Count=0)`.
+
+---
+
 ## [2.8.0] — 2026-05-18
 
 ### Visual

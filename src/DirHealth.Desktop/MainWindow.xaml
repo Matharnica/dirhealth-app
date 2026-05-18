@@ -281,9 +281,11 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="⊞  Dashboard"
-                            Command="{Binding ShowDashboardCommand}" />
+                            Command="{Binding ShowDashboardCommand}"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DashboardViewModel}" />
                     <Button Style="{StaticResource NavButton}"
-                            Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16">
+                            Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=FindingsViewModel}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -304,44 +306,56 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="🔍  AD Search"
-                            Command="{Binding ShowAdSearchCommand}" />
+                            Command="{Binding ShowAdSearchCommand}"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=AdSearchViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="👥  Users"
-                            Command="{Binding ShowUserBrowserCommand}" Margin="0,2,0,16" />
+                            Command="{Binding ShowUserBrowserCommand}" Margin="0,2,0,16"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=UserBrowserViewModel}" />
 
                     <!-- Computer -->
                     <TextBlock Text="COMPUTER" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="🖥  Computers"
-                            Command="{Binding ShowComputerBrowserCommand}" Margin="0,2,0,16" />
+                            Command="{Binding ShowComputerBrowserCommand}" Margin="0,2,0,16"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=ComputerBrowserViewModel}" />
 
                     <!-- AD Views -->
                     <TextBlock Text="AD VIEWS" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="🏢  OUs"
-                            Command="{Binding ShowOuBrowserCommand}" />
+                            Command="{Binding ShowOuBrowserCommand}"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=OuBrowserViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="👥  Groups"
-                            Command="{Binding ShowGroupManagerCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowGroupManagerCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=GroupManagerViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🔑  Pwd Expiry"
-                            Command="{Binding ShowPasswordReportCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowPasswordReportCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=PasswordReportViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🛡  Domain Admins"
-                            Command="{Binding ShowDomainAdminsCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowDomainAdminsCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DomainAdminsViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🖧  DC Inventory"
-                            Command="{Binding ShowDcInventoryCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowDcInventoryCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DcInventoryViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🛡  Priv. Groups"
-                            Command="{Binding ShowPrivilegedGroupsCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowPrivilegedGroupsCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=PrivilegedGroupsViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🔗  Domain Trusts"
-                            Command="{Binding ShowDomainTrustCommand}" Margin="0,2,0,0" />
+                            Command="{Binding ShowDomainTrustCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DomainTrustViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🕐  Timeline"
-                            Command="{Binding ShowTimelineCommand}" Margin="0,2,0,16" />
+                            Command="{Binding ShowTimelineCommand}" Margin="0,2,0,16"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=TimelineViewModel}" />
 
                     <!-- System -->
                     <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="8,0,0,4" Opacity="0.6" />
                     <Button Style="{StaticResource NavButton}" Content="⚙  Settings"
-                            Command="{Binding ShowSettingsCommand}" />
+                            Command="{Binding ShowSettingsCommand}"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=SettingsViewModel}" />
 
                 </StackPanel>
             </Border>
