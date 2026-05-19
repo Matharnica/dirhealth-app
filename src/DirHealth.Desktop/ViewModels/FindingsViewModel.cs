@@ -60,6 +60,11 @@ public partial class FindingsViewModel : BaseViewModel
         ExportPdfCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnSelectedFindingChanged(AdFinding? value) =>
+        OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
+
+    public bool SelectedFindingIsAcknowledged => SelectedFinding?.IsAcknowledged ?? false;
+
     partial void OnFindingsChanged(List<AdFinding> value)
     {
         OnPropertyChanged(nameof(FilteredFindings));
@@ -107,6 +112,7 @@ public partial class FindingsViewModel : BaseViewModel
             SelectedFinding.IsAcknowledged  = true;
             SelectedFinding.AcknowledgeNote = AcknowledgeNote;
             OnPropertyChanged(nameof(FilteredFindings));
+            OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
             StatusMessage   = "Finding acknowledged.";
             AcknowledgeNote = "";
         }
@@ -124,6 +130,7 @@ public partial class FindingsViewModel : BaseViewModel
             SelectedFinding.IsAcknowledged  = false;
             SelectedFinding.AcknowledgeNote = "";
             OnPropertyChanged(nameof(FilteredFindings));
+            OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
             StatusMessage   = "Acknowledgement removed.";
             AcknowledgeNote = "";
         }

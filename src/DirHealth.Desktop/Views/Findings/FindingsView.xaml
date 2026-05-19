@@ -220,7 +220,7 @@
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedFinding.IsAcknowledged}" Value="True">
+                                        <DataTrigger Binding="{Binding SelectedFindingIsAcknowledged}" Value="True">
                                             <Setter Property="Visibility" Value="Collapsed" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -233,7 +233,7 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedFinding.IsAcknowledged}" Value="True">
+                                        <DataTrigger Binding="{Binding SelectedFindingIsAcknowledged}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
