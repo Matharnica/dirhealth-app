@@ -4,6 +4,13 @@ All notable changes to DirHealth are documented here.
 
 ---
 
+## [2.8.2] — 2026-05-19
+
+### Fixed
+- **Findings acknowledge binding** — `SelectedFinding.IsAcknowledged` chained XAML path replaced with `SelectedFindingIsAcknowledged` computed property on `FindingsViewModel`; eliminates implicit null-propagation dependency in `DataTrigger` bindings and adds explicit `OnPropertyChanged` after each Acknowledge/Unacknowledge call.
+
+---
+
 ## [2.8.1] — 2026-05-18
 
 ### Fixed
