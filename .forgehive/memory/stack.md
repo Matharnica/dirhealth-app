@@ -27,6 +27,14 @@ confidence: high
 - **Batch LDAP — N+1 vermeiden**: DNs in 50er-Gruppen mit OR-Filter batchen: `(|(distinguishedName=dn1)...(dn50))`. Ergebnis in `Dictionary<string, T>(StringComparer.OrdinalIgnoreCase)` für O(1)-Lookup. Limit 50 bleibt sicher unter dem Windows-DC-Filterlimit von 10.240 Zeichen bei normalen DNs.
 - **`DirectoryEntry` ist nicht thread-safe**: bei `Task.WhenAll`/`Task.Run` muss jede parallele Task ihre eigene `_connector.GetRootEntry()`-Instanz öffnen. Niemals einen gemeinsamen `DirectoryEntry` über Thread-Grenzen hinweg teilen.
 
+## Security-Patterns
+
+- **LDAP Filter Value Escaping**: `AdConnector.EscapeFilterValue(value)` — RFC 4515, escapes `\`, `*`, `(`, `)`, NUL. Für Attribut-Wert-Position im Filter (z.B. `(sAMAccountName={value})`). Unterschied zu `EscapeDn()`: letzteres escapet nur `(`, `)`, `\` für DN-Position.
+- **DPAPI Credential Storage**: `ProtectedData.Protect/Unprotect(null, DataProtectionScope.CurrentUser)`. Key gebunden an Windows-Login-Secret + Maschinen-TPM — nicht offline ableitbar. NuGet: `System.Security.Cryptography.ProtectedData 8.0.0`. Nie zu HWID-basierter Ableitung zurückkehren (auf VMs ist HWID = `SHA256("UNKNOWN-UNKNOWN-UNKNOWN")` = öffentlich bekannt).
+- **WMI logName Allowlist**: `if (logName is not ("System" or "Security" or "Application")) return [];` — immer vor WQL-Interpolation. Latente Injection-Fläche bei freiem String.
+- **Update-URL Host-Pinning**: Vor Download validieren: `uri.Host` muss `github.com` oder `objects.githubusercontent.com` sein, `uri.Scheme` muss `https` sein. Temp-Dateiname: `Guid.NewGuid():N` — kein vorhersehbarer Pfad.
+- **AdSearch LDAP Filter Mode**: Intentionaler Raw-Passthrough — Power-User-Feature. `AdSearchView` zeigt permanentes Amber-Banner wenn `IsLdapMode == true`. Binding nie entfernen.
+
 ## Score-System
 
 Penalties in `ComputeComplianceScoreAsync()`:

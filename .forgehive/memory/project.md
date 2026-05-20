@@ -36,6 +36,20 @@ Keine Phase 5, keine neuen Views oder Findings vorschlagen. Scope beschränkt au
 - SID History Finding — `(sIDHistory=*)` auf enabled users; -3/Account, Cap 12; Medium ab 1, High ab 6
 - Timeline / Recent Changes — `whenChanged >= {generalizedTime}` LDAP-Filter; Created/Modified unterschieden über whenCreated/whenChanged Delta < 5 min; 7/30/90d wählbar via RadioButtons + EqualityConverter
 
+### Security-Hardening ✅ (2026-05-17)
+
+Vollständiger Security-Audit durch Vera (Security Analyst) + Sam (QA Architect). Alle HIGH- und MEDIUM-Findings gefixt:
+
+- **LDAP-Injection in `IsDomainAdmin()`** — `samName` aus Login-Formular wurde roh in LDAP-Filter interpoliert. Fix: `AdConnector.EscapeFilterValue()` (RFC 4515: `\`, `*`, `(`, `)`, NUL).
+- **DPAPI für Credential-Storage** — HWID-basierter Schlüssel kollabiert auf VMs zu `SHA256("UNKNOWN-UNKNOWN-UNKNOWN")`. Fix: `ProtectedData.Protect/Unprotect(CurrentUser)` mit automatischer Migration beim ersten `Load()`. NuGet: `System.Security.Cryptography.ProtectedData 8.0.0`.
+- **Update-Binary ohne Integritätsprüfung** — Installer wurde ohne Hash/Signatur-Verifikation ausgeführt. Fix: URL-Host-Pinning auf `github.com`/`objects.githubusercontent.com` + HTTPS + GUID-basierter Temp-Dateiname.
+- **WMI `logName` WQL-Injection** — `logName`-Parameter wurde roh in WQL interpoliert. Fix: Allowlist `{"System", "Security", "Application"}` vor Query-Build.
+- **LDAP Filter Mode Warning** — Raw LDAP-Filtermodus in AdSearchView zeigt jetzt persistentes Amber-Warning-Banner (`IsLdapMode`-Binding + DataTrigger).
+- **`SearchBySid` Formatvalidierung** — SID-String-Regex vor LDAP-Filterübergabe.
+- **`SearchByOu` Pfadvalidierung** — DN-Prefix-Check (`CN=`/`OU=`/`DC=`) vor `GetEntry`.
+
+Sam's Test-Gap-Analyse: `CredentialStore`, `AdConnector.IsDomainAdmin`, `UpdateChecker` haben null Test-Coverage — kritischste Lücken.
+
 ### Performance-Release ✅ (v2.6.0)
 - ListBox Recycling-Virtualisierung in User/Computer/Group Browser Sidebars
 - Group Member List: `ItemsControl` → virtualisiertes `ListBox` in Grid-Row `Height="*"`

@@ -5,6 +5,14 @@ Wird von Claude aktualisiert wenn Sam Entscheidungen trifft.
 
 ## Entscheidungen
 
+[2026-05-17] Security Test Coverage Audit (Security Party). Kritischste Lücken identifiziert (noch ungefixt):
+- `CredentialStore` — null Tests. Primäre Credential-at-Rest-Kontrolle.
+- `AdConnector.IsDomainAdmin()` — null Tests. LDAP-Filter mit User-Input.
+- `LoginViewModel`/`SettingsViewModel` — null Tests. Auth-Failure-Pfade ungesichert.
+- `CryptoHelper` — truncated Blob wirft Exception statt false; Unicode/NUL-Roundtrip ungetestet.
+- `HwidManager` — Tests rufen SHA256 direkt auf, nicht HwidManager.ComputeHWID(); VM-Fallback (`UNKNOWN-UNKNOWN-UNKNOWN`) undokumentiert.
+Für Testbarkeit: `CredentialStore` braucht Injectable Path oder Interface; `AdConnector.EscapeFilterValue` ist `internal static` → braucht `InternalsVisibleTo`.
+
 [2026-05-16] Security test coverage audit completed (v2.6.0). Critical gaps found in UpdateChecker (zero tests), CredentialStore (zero tests), and CSV injection paths. Tests added for all three, plus CryptoHelper edge cases (truncated blob, empty plaintext, HMAC-region tampering).
 
 ## Projekt-Kontext

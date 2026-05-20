@@ -36,6 +36,14 @@ confidence: high
 ## WMI
 - **WMI-Verbindung kann scheitern ohne Exception zu werfen** wenn die Firewall-Regel fehlt — immer im catch auf `StatusMessage` setzen und WMI-Fehler als nicht-kritisch behandeln (AD-Daten bleiben verfügbar).
 
+## Security-Muster
+
+- **Nie user-supplied Text roh in LDAP-Filter-Attribut-Position**: immer `AdConnector.EscapeFilterValue()` verwenden. `EscapeDn()` reicht nicht — es escapet kein `*` oder NUL.
+- **Credential-Encryption: DPAPI, nicht HWID-Ableitung**: HWID kollabiert auf VMs zu deterministischem bekanntem Hash. `ProtectedData.Protect(CurrentUser)` ist der korrekte Windows-Ansatz.
+- **WMI-Parameter vor Interpolation gegen Allowlist prüfen**: `logName` und ähnliche Enum-artigen Parameter nie frei interpolieren — C# `is not (...)` Pattern-Switch vor Query-Build.
+- **Download-URLs vor Ausführung validieren**: Host + Scheme prüfen bevor ein heruntergeladenes Binary per `Process.Start` ausgeführt wird. Vorhersehbare Temp-Namen sind ein Race-Condition-Risiko.
+- **Intentionale Raw-Features mit UI-Warnung absichern**: Wenn ein Feature bewusst ungefilterten AD-Zugriff erlaubt (z.B. LDAP Filter Mode), muss die UI das permanent sichtbar machen — nicht nur als Tooltip.
+
 ## Performance-Muster (v2.6.0)
 - **N+1 LDAP**: immer prüfen ob eine Loop über `GetEntry(dn)` durch einen OR-Filter-Batch ersetzt werden kann. Schwellwert: ab ca. 10 Einträgen lohnt sich das Batching.
 - **`Task.WhenAll` statt sequentiellem await**: bei unabhängigen Queries strukturell bevorzugen. Aber: `DirectoryEntry` niemals teilen — jede Task braucht eigene Instanz via `_connector.GetRootEntry()`.

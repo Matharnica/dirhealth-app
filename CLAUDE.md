@@ -42,7 +42,7 @@ src/DirHealth.Desktop/
 │   │   ├── ScanScheduler.cs       ← DispatcherTimer for scheduled auto-scans
 │   │   └── UpdateChecker.cs       ← GitHub releases API; startup (5s delay) + manual check
 │   ├── Storage/             ← All persistence to %APPDATA%\DirHealth\
-│   │   ├── CredentialStore.cs     ← AES-256 encrypted credentials.dat
+│   │   ├── CredentialStore.cs     ← DPAPI-encrypted credentials.dat (CurrentUser scope); migration from legacy HWID format on first load
 │   │   ├── ScanCacheStore.cs      ← Cached scan results (JSON)
 │   │   ├── ScoreHistoryStore.cs   ← Score trend data
 │   │   ├── AcknowledgeStore.cs    ← acknowledged.json for dismissed findings
@@ -103,6 +103,15 @@ src/DirHealth.Desktop/
 - **WMI connectivity:** Requires port 135 (DCE/RPC) + dynamic RPC ports + Windows firewall rule "WMI-In" enabled on target machines. Out of scope: write operations, patch management, RDP control.
 - **Terminal Server HWID fallback:** On RDS/Terminal Server environments, append UserName to prevent all sessions sharing the same HWID: SHA256(CPU+MB+Disk+UserName). `AdWmiClient` covers: disks, local admins, active sessions, event log.
 - **`AdSearcher` search modes:** 5 modes — Users, Computers, Groups, OUs, Any. Free-text across `sAMAccountName`, `displayName`, `cn`, `description`.
+- **`AdSearcher` — LDAP Filter mode is intentional raw passthrough** (power-user feature). `AdSearchView` shows a persistent amber warning banner whenever this mode is active — never remove the `IsLdapMode` binding or the warning `Border`.
+- **`AdWmiClient.GetEventLogAsync` — `logName` allowlist:** Validate against `{"System", "Security", "Application"}` before WQL interpolation. Any other value returns an empty list. Never interpolate a free-form `logName` into a WQL query string.
+
+### Security
+
+- **LDAP filter value escaping:** Use `AdConnector.EscapeFilterValue(value)` for any user-supplied string that goes into an LDAP filter *attribute value* position (e.g. `(sAMAccountName={value})`). It escapes `\`, `*`, `(`, `)`, NUL per RFC 4515. Distinguished from `EscapeDn()` which only escapes `(`, `)`, `\` for use in DN position within a filter.
+- **Credential storage — DPAPI:** `CredentialStore` uses `ProtectedData.Protect/Unprotect(null, DataProtectionScope.CurrentUser)`. Keys are bound to the Windows user's login secret and machine TPM — not derivable offline, even from a copy of the file. NuGet: `System.Security.Cryptography.ProtectedData 8.0.0`. `Load()` includes a transparent migration path: if DPAPI fails, tries the legacy HWID-based format and re-saves with DPAPI on success. Never revert to HWID-based key derivation — on VMs all three WMI values return `"UNKNOWN"`, making the key globally known.
+- **SID format validation:** `AdSearcher.SearchBySid` validates the query against `^S-\d+-\d+(-\d+)*$` before passing it to the LDAP filter. Reject anything that doesn't match.
+- **OU path validation:** `AdSearcher.SearchByOu` validates the query starts with `CN=`, `OU=`, or `DC=` (case-insensitive) before passing to `GetEntry`. Rejects free-form input that could redirect to a rogue LDAP server.
 
 ### WPF quirks
 
@@ -128,6 +137,7 @@ src/DirHealth.Desktop/
 - GitHub CDN omits `Content-Length`. Read file size from `assets[].size` in the API response and store in `UpdateInfo.FileSize`.
 - Inno Setup restart: add a second `[Run]` entry with `Check: WizardSilent` for silent-mode restarts. `/RESTARTAPP` is not a valid Inno Setup switch.
 - File lock: dispose the `FileStream` before calling `Process.Start` on the downloaded installer.
+- **Download URL host pinning:** Before downloading the installer, validate that the URL host is `github.com` or `objects.githubusercontent.com` and scheme is `https`. Reject anything else with a user-visible error. Use `Guid.NewGuid():N` in the temp filename — never a predictable fixed name.
 
 ### Export
 
@@ -155,7 +165,8 @@ Feature roadmap with LDAP filters and implementation notes: [`docs/feature-roadm
 | 3 | Stale Domain Admins, Fine-Grained Password Policies, Privileged Groups Overview | ✅ Done |
 | 4 | Domain Trust View, SID History, Timeline / Recent Changes | ✅ Done |
 | Perf (v2.6.0) | ListBox virtualization, batch LDAP, parallel scans, navigation cache, frozen brushes | ✅ Done |
-| **5 — Next** | GPO Browser, AD Data Quality Report | 🔜 Next |
+| Security | LDAP injection fixes, DPAPI credentials, WMI allowlist, update URL pinning, LDAP filter warning | ✅ Done |
+| **5 — Next** | GPO Browser, AD Data Quality Report | 🔜 Next (on hold) |
 
 <!-- forgehive:start -->
 ## forgehive
