@@ -49,6 +49,15 @@ public class IsNegativeConverter : IValueConverter
         => throw new NotImplementedException();
 }
 
+public class EqualityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value?.ToString() == parameter?.ToString();
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is true ? System.Convert.ChangeType(parameter, typeof(int)) : System.Windows.DependencyProperty.UnsetValue;
+}
+
 public class DaysToExpiryColorConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

@@ -5,7 +5,7 @@
   No license key. No subscription. No nag screens.</p>
 
   <a href="https://github.com/matharnica/dirhealth/releases/latest">
-    <img alt="Download" src="https://img.shields.io/github/v/release/matharnica/dirhealth?label=Download&style=for-the-badge&color=6366f1" />
+    <img alt="Download" src="https://img.shields.io/github/v/release/matharnica/dirhealth-app?label=Download&style=for-the-badge&color=6366f1" />
   </a>
   &nbsp;
   <a href="https://ko-fi.com/matharnica">
@@ -64,11 +64,11 @@ Requires Windows 10/11. Self-contained .exe — no .NET runtime installation nee
 
 ## Support the project
 
-DirHealth is free and open source, maintained in spare time. If it saved you an afternoon of manual AD cleanup, consider buying a coffee:
+DirHealth is free to use and source-available, maintained in spare time. If it saved you an afternoon of manual AD cleanup, consider buying a coffee:
 
 → [**☕ Support on Ko-fi**](https://ko-fi.com/matharnica)  
 → [**💳 Donate via Stripe**](https://donate.stripe.com/8x2aEP30W7So5YR3Gaawo01)
 
 ## License
 
-[MIT](LICENSE) — do whatever you want, attribution appreciated.
+[Elastic License 2.0](LICENSE) — free to use and self-host. The source code is publicly available for auditing and modification, but you may not offer DirHealth as a hosted or managed service to third parties. This differs from open source licenses in that commercial hosting is restricted; personal use, self-hosting, and private modification are fully permitted.

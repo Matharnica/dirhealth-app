@@ -131,10 +131,14 @@ public partial class App : Application
         var passwordReport   = new PasswordReportViewModel(scanner);
         var domainAdmins     = new DomainAdminsViewModel(scanner);
         var dcInventory      = new DcInventoryViewModel(scanner);
+        var privilegedGroups = new PrivilegedGroupsViewModel(scanner);
+        var domainTrust      = new DomainTrustViewModel(scanner);
+        var timeline         = new TimelineViewModel(scanner);
         var mainVm           = new MainViewModel(dashboard, findings, appSettings,
                                                  adSearch, computerBrowser, userBrowser,
                                                  ouBrowser, groupManager, passwordReport,
-                                                 domainAdmins, dcInventory);
+                                                 domainAdmins, dcInventory, privilegedGroups,
+                                                 domainTrust, timeline);
 
         Log("Creating MainWindow");
         var mainWindow = new MainWindow(mainVm);

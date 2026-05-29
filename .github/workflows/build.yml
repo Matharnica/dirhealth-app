@@ -3,6 +3,8 @@ name: Build & Release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - dev
     tags:
       - 'v*'
 
@@ -50,12 +52,18 @@ jobs:
           path: installer/setup.iss
           options: /O+ /DAppVersion=${{ steps.version.outputs.version }}
 
+      # Upload unsigned artifact — SignPath downloads it from here for signing
       - name: Upload artifact
+        id: upload-installer
         uses: actions/upload-artifact@v4
         with:
           name: DirHealth-Setup
           path: installer/Output/DirHealth-Setup-${{ steps.version.outputs.version }}.exe
           retention-days: 7
+
+      # TODO: Add SignPath.io code signing once the Foundation account is approved.
+      # Setup steps: https://signpath.io/open-source (requires MIT/Apache license + public repo)
+      # Secrets needed: SIGNPATH_CI_TOKEN, SIGNPATH_ORG_ID
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -66,4 +74,3 @@ jobs:
           tag_name: ${{ github.ref_name }}
           prerelease: false
           draft: false
-

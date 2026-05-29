@@ -17,7 +17,11 @@ public partial class MainViewModel : BaseViewModel
     public OuBrowserViewModel       OuBrowser       { get; }
     public GroupManagerViewModel    GroupManager    { get; }
     public PasswordReportViewModel  PasswordReport  { get; }
-    public DomainAdminsViewModel    DomainAdmins    { get; }
+    public DomainAdminsViewModel      DomainAdmins      { get; }
+    public DcInventoryViewModel       DcInventory       { get; }
+    public PrivilegedGroupsViewModel  PrivilegedGroups  { get; }
+    public DomainTrustViewModel       DomainTrust       { get; }
+    public TimelineViewModel          Timeline          { get; }
 
     [ObservableProperty] private BaseViewModel _currentView;
     [ObservableProperty] private bool          _showScoreDropAlert;
@@ -36,6 +40,7 @@ public partial class MainViewModel : BaseViewModel
 
     private string _updateDownloadUrl = "";
     private bool   _updateHasDirectDownload;
+    private long   _updateFileSize;
 
     public string AppVersion { get; } = UpdateChecker.GetCurrentVersion();
 
@@ -49,7 +54,11 @@ public partial class MainViewModel : BaseViewModel
         OuBrowserViewModel ouBrowser,
         GroupManagerViewModel groupManager,
         PasswordReportViewModel passwordReport,
-        DomainAdminsViewModel domainAdmins)
+        DomainAdminsViewModel domainAdmins,
+        DcInventoryViewModel dcInventory,
+        PrivilegedGroupsViewModel privilegedGroups,
+        DomainTrustViewModel domainTrust,
+        TimelineViewModel timeline)
     {
         Dashboard       = dashboard;
         Findings        = findings;
@@ -60,7 +69,11 @@ public partial class MainViewModel : BaseViewModel
         OuBrowser       = ouBrowser;
         GroupManager    = groupManager;
         PasswordReport  = passwordReport;
-        DomainAdmins    = domainAdmins;
+        DomainAdmins     = domainAdmins;
+        DcInventory      = dcInventory;
+        PrivilegedGroups = privilegedGroups;
+        DomainTrust      = domainTrust;
+        Timeline         = timeline;
         _currentView    = dashboard;
 
         Dashboard.PropertyChanged += (_, e) =>
@@ -154,6 +167,34 @@ public partial class MainViewModel : BaseViewModel
     }
 
     [RelayCommand]
+    public async Task ShowDcInventoryAsync()
+    {
+        CurrentView = DcInventory;
+        await DcInventory.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowPrivilegedGroupsAsync()
+    {
+        CurrentView = PrivilegedGroups;
+        await PrivilegedGroups.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowDomainTrustAsync()
+    {
+        CurrentView = DomainTrust;
+        await DomainTrust.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowTimelineAsync()
+    {
+        CurrentView = Timeline;
+        await Timeline.LoadAsync();
+    }
+
+    [RelayCommand]
     public void DismissScoreAlert() => ShowScoreDropAlert = false;
 
     [RelayCommand]
@@ -176,24 +217,23 @@ public partial class MainViewModel : BaseViewModel
             using var http = new System.Net.Http.HttpClient();
             using var response = await http.GetAsync(_updateDownloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
-            var total = response.Content.Headers.ContentLength ?? -1;
-            using var src  = await response.Content.ReadAsStreamAsync();
-            using var dest = File.Create(tmp);
-            var buf = new byte[81920];
-            long downloaded = 0;
-            int read;
-            while ((read = await src.ReadAsync(buf)) > 0)
+            var total = _updateFileSize > 0 ? _updateFileSize
+                      : response.Content.Headers.ContentLength ?? -1;
+            using (var src  = await response.Content.ReadAsStreamAsync())
+            using (var dest = File.Create(tmp))
             {
-                await dest.WriteAsync(buf.AsMemory(0, read));
-                downloaded += read;
-                if (total > 0)
-                    DownloadProgress = (int)(downloaded * 100 / total);
-            }
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            var args = $"/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /RESTARTEXITCODE=0";
-            if (!string.IsNullOrEmpty(exePath))
-                args += $" /RESTARTAPP=\"{exePath}\"";
-            System.Diagnostics.Process.Start(tmp, args);
+                var buf = new byte[81920];
+                long downloaded = 0;
+                int read;
+                while ((read = await src.ReadAsync(buf)) > 0)
+                {
+                    await dest.WriteAsync(buf.AsMemory(0, read));
+                    downloaded += read;
+                    if (total > 0)
+                        DownloadProgress = (int)(downloaded * 100 / total);
+                }
+            } // file handle closed here before starting installer
+            System.Diagnostics.Process.Start(tmp, "/SILENT /CLOSEAPPLICATIONS");
             Application.Current.Shutdown();
         }
         catch (Exception ex)
@@ -206,9 +246,10 @@ public partial class MainViewModel : BaseViewModel
 
     public void SetUpdateAvailable(UpdateInfo info)
     {
-        _updateDownloadUrl      = info.DownloadUrl;
+        _updateDownloadUrl       = info.DownloadUrl;
         _updateHasDirectDownload = info.HasDirectDownload;
-        UpdateVersion           = info.Version;
-        ShowUpdateBanner        = true;
+        _updateFileSize          = info.FileSize;
+        UpdateVersion            = info.Version;
+        ShowUpdateBanner         = true;
     }
 }
