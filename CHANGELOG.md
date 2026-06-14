@@ -4,6 +4,13 @@ All notable changes to DirHealth are documented here.
 
 ---
 
+## [2.8.3] — 2026-06-14
+
+### Fixed
+- **Build error CS0165** — `RelativeScanTimeConverter` used unassigned local variable `s` in the `is not string` branch; replaced `return s ?? "Never"` with `return "Never"`.
+
+---
+
 ## [2.8.2] — 2026-05-19
 
 ### Fixed
