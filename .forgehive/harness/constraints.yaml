@@ -1,8 +1,0 @@
-file_complexity:
-  max_lines: 300
-  max_functions_per_file: 15
-require_tests_for_new_exports: true
-no_new_dependencies_without_review: true
-protected_branches:
-  - main
-  - master

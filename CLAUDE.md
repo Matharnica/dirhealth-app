@@ -12,6 +12,21 @@ git tag v1.x.x && git push origin v1.x.x
 ```
 The GitHub Actions workflow builds a self-contained single-file exe and creates a GitHub Release.
 
+## Active Plugin Context
+
+### Aktive Plugins
+- **Workflow**: superpowers (writing-plans, executing-plans)
+- **Dev**: systems-programming (Go), context7
+- **Security**: insecure-defaults, supply-chain-risk-auditor, security-guidance
+- **Code Quality**: comprehensive-review, sonarqube
+- **Git**: commit-commands, git-cleanup, gh-cli
+- **Testing**: tdd-workflows, property-based-testing
+- **Overnight**: claude-session-driver, double-shot-latte
+
+### Nicht relevant — nicht laden
+- playwright, frontend-mobile-security, frontend-mobile-development
+- DB Plugins, c4-architecture, full-stack-orchestration
+- blockchain, gaming, marketing, ml-ops, kubernetes
 ## Build & Test
 
 ```bash
@@ -22,7 +37,7 @@ dotnet test src/DirHealth.Tests/DirHealth.Tests.csproj
 dotnet publish src/DirHealth.Desktop/DirHealth.Desktop.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o ./publish
 ```
 
-Test framework: **xunit** + **Moq**. Test files: `CryptoHelperTests.cs`, `CsvExporterTests.cs`, `HwidTests.cs`.
+Test framework: **xunit** + **Moq** (`net8.0-windows`; DPAPI tests require Windows, covered by CI on `windows-latest`). Test files: `CryptoHelperTests.cs`, `CsvExporterTests.cs`, `HwidTests.cs`, `CredentialStoreTests.cs`, `UpdateCheckerTests.cs`, `AdConnectorEscapeTests.cs`, `AdSearcherValidationTests.cs`, `AdWmiClientAllowlistTests.cs`. `UpdateCheckerTests` mocks the GitHub API via a `SequencedMockHandler` (`HttpMessageHandler` subclass); `CredentialStoreTests` uses a backup/restore pattern on `credentials.dat` to preserve real dev-machine credentials.
 
 ## Architecture
 
@@ -139,9 +154,18 @@ src/DirHealth.Desktop/
 - File lock: dispose the `FileStream` before calling `Process.Start` on the downloaded installer.
 - **Download URL host pinning:** Before downloading the installer, validate that the URL host is `github.com` or `objects.githubusercontent.com` and scheme is `https`. Reject anything else with a user-visible error. Use `Guid.NewGuid():N` in the temp filename — never a predictable fixed name.
 
+### Installer (Inno Setup / ISPP)
+
+- **No backup block in `CurStepChanged(ssInstall)`:** the installer never writes to `%APPDATA%`, so renaming user data there was pointless and made it invisible after upgrade. Removed.
+- **No standalone `#13#10` lines:** ISPP reads a line starting with `#` as a preprocessor directive. Always append `#13#10` to the previous line, never on its own line.
+- **No `on E: Exception do`:** Inno Setup Pascal has no typed exception handler. Use bare `except ... end` only.
+- **No `VersionInfoVersion` with a suffix:** `0.0.0-dev` is not a valid Windows version string. Omit `VersionInfoVersion` entirely on dev builds.
+
 ### Export
 
 - Wrap all exporter calls in try/catch with `StatusMessage = $"Export failed: {ex.Message}"` — file locks and network-share failures must not reach the global crash handler.
+- **CSV formula injection:** `CsvExporter.SafeField()` prefixes any field value starting with `=`, `+`, `-`, `@`, tab, or CR with a leading apostrophe so spreadsheet apps don't execute it as a formula. Route every exported field through it.
+- **No CSV export for single detail rows:** a one-row CSV (e.g. a single user detail) isn't useful — only offer list exports.
 - PdfSharp: reprint column headers after every `NewPage()` call.
 - **Export CanExecute guard:** All export command buttons must have `CanExecute = false` when their data list is empty. Wire via `[RelayCommand(CanExecute = nameof(HasData))]` or equivalent.
 - **`FullReportData` record:** `(string Domain, int Score, List<AdFinding> Findings, List<AdUser> InactiveUsers, List<AdUser> ExpiringPasswords, List<string> DomainAdmins)` — passed to `PdfExporter.ExportFullReport()`.
@@ -166,71 +190,6 @@ Feature roadmap with LDAP filters and implementation notes: [`docs/feature-roadm
 | 4 | Domain Trust View, SID History, Timeline / Recent Changes | ✅ Done |
 | Perf (v2.6.0) | ListBox virtualization, batch LDAP, parallel scans, navigation cache, frozen brushes | ✅ Done |
 | Security | LDAP injection fixes, DPAPI credentials, WMI allowlist, update URL pinning, LDAP filter warning | ✅ Done |
-| **5 — Next** | GPO Browser, AD Data Quality Report | 🔜 Next (on hold) |
+| **5 — Next** | GPO Browser, AD Data Quality Report | ⏸️ On hold (no start date) |
 
-<!-- forgehive:start -->
-## forgehive
-
-This project uses **forgehive** for structured AI-assisted development.
-
-### Session Start (Required)
-
-1. Read `.forgehive/capabilities.yaml`
-   - If `status: draft` → tell the user: "Run `fh confirm` to activate capabilities."
-   - If `status: confirmed` → load silently and apply throughout the session
-2. Read `.forgehive/memory/MEMORY.md` — follow the index links to load project context
-3. Run `fh scan --check` to verify the stack snapshot is current
-4. Run `fh status` for the daily overview (sprint, code health, watch events)
-
-### During the Session
-
-- Only suggest tools and libraries listed in `capabilities.yaml`
-- If a capability has a `check` field: verify it before use
-- If a capability has a `fulfill` field and the check fails: fulfill it
-- At session end: append brief notes to `.forgehive/state/YYYY-MM-DD.md`
-- If you learn something non-obvious about the project, offer to persist it to memory
-
-### Skills — Progressive Loading
-
-Before starting a technical task, read `.forgehive/skills/INDEX.yaml` to find relevant skills.
-Load only the skills matching your current task — not all skills at once.
-
-Examples:
-- Working with TypeScript types → load `expert/typescript-patterns.md`
-- Database migration → load `expert/database-patterns.md`
-- Reviewing a PR → load `expert/code-review.md`
-- Security review → load `expert/security-checklist.md`
-- Performance issue → load `expert/performance-patterns.md`
-
-### Workflow Commands
-
-ForgeHive installs slash commands in `.claude/commands/`:
-- `/fh-start-task` — start a new feature branch with full context loaded
-- `/fh-ship` — pre-ship checklist: tests, diff review, PR draft
-- `/fh-review` — structured code review using the review skill
-- `/fh-hotfix` — minimal hotfix protocol (< 50 lines rule)
-
-### Agent Memory
-
-Each agent has persistent memory in `.forgehive/agents/memory/<name>.md`.
-Before activating a party set, read the relevant agent memory files.
-Update memory files when agents make significant decisions.
-Format: `[YYYY-MM-DD] <decision or learned context>`
-
-### Party Mode
-
-Slash commands auto-configured by forgehive:
-- `/party` — activate build agents (Viktor + Kai + Sam)
-- `/design-party` — activate design agents (Suki + Viktor)
-- `/review-party` — activate review agents (Kai + Sam + Eli)
-- `/full-party` — activate all agents
-
-### Prohibited
-
-- Writing to paths outside the project root
-- Modifying `.forgehive/scan-result.yaml` manually
-- Skipping the session-start capability and memory check
-- Suggesting tools not in `capabilities.yaml` without explicitly noting the deviation
-- Activating party agents without reading their memory files first
-
-<!-- forgehive:end -->
+**Current focus (since v2.7.0): stability, performance, and code quality — no new features.** Do not propose Phase 5, new views, or new findings. Scope is limited to bugfixes, performance work, test coverage, refactoring, and security hardening. Phase 5 stays on hold until the user initiates it. Latest release: **v2.8.3** (2026-06-14).
