@@ -4,7 +4,7 @@
   <p><strong>Free Active Directory health scanner for Windows admins.</strong><br/>
   No license key. No subscription. No nag screens.</p>
 
-  <a href="https://github.com/matharnica/dirhealth/releases/latest">
+  <a href="https://github.com/matharnica/dirhealth-app/releases/latest">
     <img alt="Download" src="https://img.shields.io/github/v/release/matharnica/dirhealth-app?label=Download&style=for-the-badge&color=6366f1" />
   </a>
   &nbsp;
