@@ -65,7 +65,7 @@ public class PdfExporter
             y += 16;
 
             // Remediation (wrapped) — the concrete fix, printed under the description
-            y = DrawRemediation(gfx, ui, page, finding, y);
+            y = ui.DrawRemediation(gfx, page, finding, y);
 
             // Affected objects
             if (finding.AffectedObjects.Count > 0)
@@ -88,78 +88,6 @@ public class PdfExporter
                 PdfPageBuilder.Margin, y + 16);
 
         doc.Save(filePath);
-    }
-
-    // Draws the wrapped remediation guidance under a finding; returns the new y. No-op when empty.
-    private static double DrawRemediation(XGraphics gfx, PdfPageBuilder ui, PdfPage page, AdFinding finding, double y)
-    {
-        if (string.IsNullOrEmpty(finding.Remediation)) return y;
-        var fixBrush = new XSolidBrush(PdfPageBuilder.ColGradEnd);
-        double maxW  = ui.ContentWidth(page) - 24;
-        foreach (var line in PdfPageBuilder.WrapText(gfx, "→ Fix: " + finding.Remediation, PdfPageBuilder.F9, maxW))
-        {
-            gfx.DrawString(line, PdfPageBuilder.F9, fixBrush, PdfPageBuilder.Margin + 14, y + 12);
-            y += 13;
-        }
-        return y + 3;
-    }
-
-    // "Changes since last scan" section built from the ScanDiff — new / resolved / changed findings.
-    private static void DrawDiffSection(PdfDocument doc, PdfPageBuilder ui, ref int pageNum,
-        FullReportData data, ScanDiff diff)
-    {
-        var page = doc.AddPage();
-        var gfx  = XGraphics.FromPdfPage(page);
-        ui.DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
-        ui.DrawFooter(gfx, page, data.Domain, pageNum++);
-        double y = ui.ContentTop + 16;
-
-        var bodyBrush = new XSolidBrush(PdfPageBuilder.ColBodyText);
-        int localPageNum = pageNum;
-
-        void Ensure()
-        {
-            if (y <= ui.ContentBottom(page) - 24) return;
-            page = doc.AddPage();
-            gfx  = XGraphics.FromPdfPage(page);
-            ui.DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
-            ui.DrawFooter(gfx, page, data.Domain, localPageNum++);
-            y = ui.ContentTop + 16;
-        }
-
-        if (data.ScoreDelta is int d)
-        {
-            string t = d > 0 ? $"Score improved by {d} point(s) since the previous scan."
-                     : d < 0 ? $"Score dropped by {-d} point(s) since the previous scan."
-                     :         "Score unchanged since the previous scan.";
-            gfx.DrawString(t, PdfPageBuilder.F10B, bodyBrush, PdfPageBuilder.Margin, y);
-            y += 24;
-        }
-
-        void Group(string heading, XColor color, IEnumerable<string> items)
-        {
-            var list = items.ToList();
-            if (list.Count == 0) return;
-            Ensure();
-            gfx.DrawString(heading, PdfPageBuilder.F9B, new XSolidBrush(color), PdfPageBuilder.Margin, y);
-            y += 16;
-            foreach (var item in list)
-            {
-                Ensure();
-                gfx.DrawString($"●  {item}", PdfPageBuilder.F9, bodyBrush, PdfPageBuilder.Margin + 8, y);
-                y += 15;
-            }
-            y += 8;
-        }
-
-        Group($"▲ NEW ({diff.NewFindings.Count})", PdfPageBuilder.ColCritical,
-            diff.NewFindings.Select(f => f.Title));
-        Group($"✓ RESOLVED ({diff.ResolvedFindings.Count})", PdfPageBuilder.ColMedium,
-            diff.ResolvedFindings.Select(f => f.Title));
-        Group($"± CHANGED ({diff.ChangedFindings.Count})", PdfPageBuilder.ColHigh,
-            diff.ChangedFindings.Select(c => $"{c.Finding.Title}  ({(c.Delta > 0 ? "+" : "")}{c.Delta})"));
-
-        pageNum = localPageNum;
     }
 
     public void ExportFullReport(FullReportData data, string filePath)
@@ -274,7 +202,7 @@ public class PdfExporter
 
         // ── 1b. CHANGES SINCE LAST SCAN (only when a predecessor scan exists) ─────
         if (data.Diff is { HasChanges: true } diff)
-            DrawDiffSection(doc, ui, ref pageNum, data, diff);
+            ui.DrawDiffSection(doc, ref pageNum, data, diff);
 
         // ── 2. FINDINGS (per-finding blocks: title · description · remediation) ───
         {
@@ -309,7 +237,7 @@ public class PdfExporter
                     PdfPageBuilder.Margin + 14, y + 12);
                 y += 16;
 
-                y = DrawRemediation(gfx, ui, page, f, y);
+                y = ui.DrawRemediation(gfx, page, f, y);
 
                 if (f.AffectedObjects.Count > 0)
                 {
@@ -810,6 +738,75 @@ file sealed class PdfPageBuilder
         }
         if (current.Length > 0) lines.Add(current);
         return lines;
+    }
+
+    // Draws the wrapped remediation guidance under a finding; returns the new y. No-op when empty.
+    internal double DrawRemediation(XGraphics gfx, PdfPage page, AdFinding finding, double y)
+    {
+        if (string.IsNullOrEmpty(finding.Remediation)) return y;
+        var fixBrush = new XSolidBrush(ColGradEnd);
+        double maxW  = ContentWidth(page) - 24;
+        foreach (var line in WrapText(gfx, "→ Fix: " + finding.Remediation, F9, maxW))
+        {
+            gfx.DrawString(line, F9, fixBrush, Margin + 14, y + 12);
+            y += 13;
+        }
+        return y + 3;
+    }
+
+    // "Changes since last scan" section built from the ScanDiff — new / resolved / changed findings.
+    internal void DrawDiffSection(PdfDocument doc, ref int pageNum, FullReportData data, ScanDiff diff)
+    {
+        var page = doc.AddPage();
+        var gfx  = XGraphics.FromPdfPage(page);
+        DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
+        DrawFooter(gfx, page, data.Domain, pageNum++);
+        double y = ContentTop + 16;
+
+        var bodyBrush = new XSolidBrush(ColBodyText);
+        int localPageNum = pageNum;
+
+        void Ensure()
+        {
+            if (y <= ContentBottom(page) - 24) return;
+            page = doc.AddPage();
+            gfx  = XGraphics.FromPdfPage(page);
+            DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
+            DrawFooter(gfx, page, data.Domain, localPageNum++);
+            y = ContentTop + 16;
+        }
+
+        if (data.ScoreDelta is int d)
+        {
+            string t = d > 0 ? $"Score improved by {d} point(s) since the previous scan."
+                     : d < 0 ? $"Score dropped by {-d} point(s) since the previous scan."
+                     :         "Score unchanged since the previous scan.";
+            gfx.DrawString(t, F10B, bodyBrush, Margin, y);
+            y += 24;
+        }
+
+        void Group(string heading, XColor color, IEnumerable<string> items)
+        {
+            var list = items.ToList();
+            if (list.Count == 0) return;
+            Ensure();
+            gfx.DrawString(heading, F9B, new XSolidBrush(color), Margin, y);
+            y += 16;
+            foreach (var item in list)
+            {
+                Ensure();
+                gfx.DrawString($"●  {item}", F9, bodyBrush, Margin + 8, y);
+                y += 15;
+            }
+            y += 8;
+        }
+
+        Group($"▲ NEW ({diff.NewFindings.Count})", ColCritical, diff.NewFindings.Select(f => f.Title));
+        Group($"✓ RESOLVED ({diff.ResolvedFindings.Count})", ColMedium, diff.ResolvedFindings.Select(f => f.Title));
+        Group($"± CHANGED ({diff.ChangedFindings.Count})", ColHigh,
+            diff.ChangedFindings.Select(c => $"{c.Finding.Title}  ({(c.Delta > 0 ? "+" : "")}{c.Delta})"));
+
+        pageNum = localPageNum;
     }
 
     internal (XColor bg, XColor border, XSolidBrush text) SeverityStyle(FindingSeverity sev) =>
