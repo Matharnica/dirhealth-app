@@ -190,6 +190,8 @@ Feature roadmap with LDAP filters and implementation notes: [`docs/feature-roadm
 | 4 | Domain Trust View, SID History, Timeline / Recent Changes | ✅ Done |
 | Perf (v2.6.0) | ListBox virtualization, batch LDAP, parallel scans, navigation cache, frozen brushes | ✅ Done |
 | Security | LDAP injection fixes, DPAPI credentials, WMI allowlist, update URL pinning, LDAP filter warning | ✅ Done |
-| **5 — Next** | GPO Browser, AD Data Quality Report | ⏸️ On hold (no start date) |
+| 5 (GPO/Data Quality) | GPO Browser, AD Data Quality Report | ✅ Done (Sprint 10, v2.9.0) |
+| Sprint 11 | Remediation field, scan-core tests, PDF delta/remediation, findings panel, scan log | ✅ Done (v2.9.0) |
+| Sprint 12 | Unified empty/error states, accessibility pass, AdScanner partial split | ✅ Done (v2.9.0) |
 
-**Current focus (since v2.7.0): stability, performance, and code quality — no new features.** Do not propose Phase 5, new views, or new findings. Scope is limited to bugfixes, performance work, test coverage, refactoring, and security hardening. Phase 5 stays on hold until the user initiates it. Latest release: **v2.8.3** (2026-06-14).
+**Phase 5 hold was lifted by the user on 2026-07-04.** Sprints 10–12 shipped as **v2.9.0** (2026-07-04). See [`docs/sprints/sprints.md`](docs/sprints/sprints.md) and the CHANGELOG `[2.9.0]` section. **S12-4 localization is Won't-do** (decided 2026-07-04): DirHealth targets a global admin audience and IT-admin tooling is English worldwide, so the English UI stays the default — do not extract strings to `Strings.xaml` on spec. New views/findings beyond Sprints 10–12 still require the user to initiate them.

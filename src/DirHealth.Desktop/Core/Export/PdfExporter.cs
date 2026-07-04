@@ -1,4 +1,5 @@
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.Core.Services;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using System.IO;
@@ -40,8 +41,8 @@ public class PdfExporter
 
         foreach (var finding in findings)
         {
-            // Each finding takes ≈ 3 lines (title + description + affected)
-            if (y > ui.ContentBottom(page) - 60) NewPage();
+            // Each finding takes ≈ title + description + wrapped remediation + affected
+            if (y > ui.ContentBottom(page) - 90) NewPage();
 
             var (bg, border, txt) = ui.SeverityStyle(finding.Severity);
 
@@ -62,6 +63,9 @@ public class PdfExporter
                 new XSolidBrush(PdfPageBuilder.ColLabelGray),
                 PdfPageBuilder.Margin + 14, y + 12);
             y += 16;
+
+            // Remediation (wrapped) — the concrete fix, printed under the description
+            y = DrawRemediation(gfx, ui, page, finding, y);
 
             // Affected objects
             if (finding.AffectedObjects.Count > 0)
@@ -84,6 +88,78 @@ public class PdfExporter
                 PdfPageBuilder.Margin, y + 16);
 
         doc.Save(filePath);
+    }
+
+    // Draws the wrapped remediation guidance under a finding; returns the new y. No-op when empty.
+    private static double DrawRemediation(XGraphics gfx, PdfPageBuilder ui, PdfPage page, AdFinding finding, double y)
+    {
+        if (string.IsNullOrEmpty(finding.Remediation)) return y;
+        var fixBrush = new XSolidBrush(PdfPageBuilder.ColGradEnd);
+        double maxW  = ui.ContentWidth(page) - 24;
+        foreach (var line in PdfPageBuilder.WrapText(gfx, "→ Fix: " + finding.Remediation, PdfPageBuilder.F9, maxW))
+        {
+            gfx.DrawString(line, PdfPageBuilder.F9, fixBrush, PdfPageBuilder.Margin + 14, y + 12);
+            y += 13;
+        }
+        return y + 3;
+    }
+
+    // "Changes since last scan" section built from the ScanDiff — new / resolved / changed findings.
+    private static void DrawDiffSection(PdfDocument doc, PdfPageBuilder ui, ref int pageNum,
+        FullReportData data, ScanDiff diff)
+    {
+        var page = doc.AddPage();
+        var gfx  = XGraphics.FromPdfPage(page);
+        ui.DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
+        ui.DrawFooter(gfx, page, data.Domain, pageNum++);
+        double y = ui.ContentTop + 16;
+
+        var bodyBrush = new XSolidBrush(PdfPageBuilder.ColBodyText);
+        int localPageNum = pageNum;
+
+        void Ensure()
+        {
+            if (y <= ui.ContentBottom(page) - 24) return;
+            page = doc.AddPage();
+            gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "Changes Since Last Scan", data.Domain);
+            ui.DrawFooter(gfx, page, data.Domain, localPageNum++);
+            y = ui.ContentTop + 16;
+        }
+
+        if (data.ScoreDelta is int d)
+        {
+            string t = d > 0 ? $"Score improved by {d} point(s) since the previous scan."
+                     : d < 0 ? $"Score dropped by {-d} point(s) since the previous scan."
+                     :         "Score unchanged since the previous scan.";
+            gfx.DrawString(t, PdfPageBuilder.F10B, bodyBrush, PdfPageBuilder.Margin, y);
+            y += 24;
+        }
+
+        void Group(string heading, XColor color, IEnumerable<string> items)
+        {
+            var list = items.ToList();
+            if (list.Count == 0) return;
+            Ensure();
+            gfx.DrawString(heading, PdfPageBuilder.F9B, new XSolidBrush(color), PdfPageBuilder.Margin, y);
+            y += 16;
+            foreach (var item in list)
+            {
+                Ensure();
+                gfx.DrawString($"●  {item}", PdfPageBuilder.F9, bodyBrush, PdfPageBuilder.Margin + 8, y);
+                y += 15;
+            }
+            y += 8;
+        }
+
+        Group($"▲ NEW ({diff.NewFindings.Count})", PdfPageBuilder.ColCritical,
+            diff.NewFindings.Select(f => f.Title));
+        Group($"✓ RESOLVED ({diff.ResolvedFindings.Count})", PdfPageBuilder.ColMedium,
+            diff.ResolvedFindings.Select(f => f.Title));
+        Group($"± CHANGED ({diff.ChangedFindings.Count})", PdfPageBuilder.ColHigh,
+            diff.ChangedFindings.Select(c => $"{c.Finding.Title}  ({(c.Delta > 0 ? "+" : "")}{c.Delta})"));
+
+        pageNum = localPageNum;
     }
 
     public void ExportFullReport(FullReportData data, string filePath)
@@ -145,6 +221,16 @@ public class PdfExporter
                 new XSolidBrush(scoreColor),
                 PdfPageBuilder.Margin + scoreW + 8 + suffixW, heroY + 135);
 
+            // Executive summary: score delta vs the previous scan
+            if (data.ScoreDelta is int delta && delta != 0)
+            {
+                string deltaText  = delta > 0 ? $"▲ +{delta} since last scan" : $"▼ {delta} since last scan";
+                XColor deltaColor = delta > 0 ? PdfPageBuilder.ColScoreGood : PdfPageBuilder.ColScoreCrit;
+                gfx.DrawString(deltaText, PdfPageBuilder.F9B,
+                    new XSolidBrush(deltaColor),
+                    PdfPageBuilder.Margin, heroY + 158);
+            }
+
             // Severity summary strip
             const double stripY = heroY + heroH;
             const double stripH = 52;
@@ -186,17 +272,18 @@ public class PdfExporter
             }
         }
 
-        // ── 2. FINDINGS ──────────────────────────────────────────────────────────
+        // ── 1b. CHANGES SINCE LAST SCAN (only when a predecessor scan exists) ─────
+        if (data.Diff is { HasChanges: true } diff)
+            DrawDiffSection(doc, ui, ref pageNum, data, diff);
+
+        // ── 2. FINDINGS (per-finding blocks: title · description · remediation) ───
         {
             var page = doc.AddPage();
             var gfx  = XGraphics.FromPdfPage(page);
             ui.DrawHeader(gfx, page, "Findings", data.Domain);
             ui.DrawFooter(gfx, page, data.Domain, pageNum++);
-            double y = ui.ContentTop + 10;
-
-            double[] colX   = { PdfPageBuilder.Margin, PdfPageBuilder.Margin + 210,
-                                 PdfPageBuilder.Margin + 360, PdfPageBuilder.Margin + 440 };
-            string[] colHdr = { "TITLE", "CATEGORY", "SEVERITY", "COUNT" };
+            double y        = ui.ContentTop + 16;
+            double contentW = ui.ContentWidth(page);
 
             void FindingsNewPage()
             {
@@ -204,25 +291,37 @@ public class PdfExporter
                 gfx  = XGraphics.FromPdfPage(page);
                 ui.DrawHeader(gfx, page, "Findings", data.Domain);
                 ui.DrawFooter(gfx, page, data.Domain, pageNum++);
-                y = ui.ContentTop + 10;
-                y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
+                y = ui.ContentTop + 16;
             }
-
-            y = ui.DrawColHeaders(gfx, page, y, colX, colHdr);
 
             foreach (var f in data.Findings)
             {
-                if (y > ui.ContentBottom(page) - 30) FindingsNewPage();
+                if (y > ui.ContentBottom(page) - 96) FindingsNewPage();
                 var (bg, border, txt) = ui.SeverityStyle(f.Severity);
-                y = ui.DrawRow(gfx, PdfPageBuilder.Margin, y,
-                    ui.ContentWidth(page), border, bg,
-                    (g, baseline) =>
-                    {
-                        g.DrawString(f.Title,              PdfPageBuilder.F10B, txt,                            colX[0] + 10, baseline);
-                        g.DrawString(f.Category,           PdfPageBuilder.F9,   new XSolidBrush(PdfPageBuilder.ColBodyText), colX[1],      baseline);
-                        g.DrawString(f.Severity.ToString(),PdfPageBuilder.F9B,  txt,                            colX[2],      baseline);
-                        g.DrawString(f.Count.ToString(),   PdfPageBuilder.F9,   new XSolidBrush(PdfPageBuilder.ColBodyText), colX[3],      baseline);
-                    });
+                gfx.DrawRectangle(new XSolidBrush(bg),     PdfPageBuilder.Margin, y, contentW, PdfPageBuilder.RowH);
+                gfx.DrawRectangle(new XSolidBrush(border), PdfPageBuilder.Margin, y, 3,        PdfPageBuilder.RowH);
+                gfx.DrawString($"[{f.Severity}]  {f.Title}", PdfPageBuilder.F10B, txt,
+                    PdfPageBuilder.Margin + 10, y + PdfPageBuilder.RowH - 6);
+                y += PdfPageBuilder.RowH;
+
+                gfx.DrawString(f.Description, PdfPageBuilder.F9,
+                    new XSolidBrush(PdfPageBuilder.ColLabelGray),
+                    PdfPageBuilder.Margin + 14, y + 12);
+                y += 16;
+
+                y = DrawRemediation(gfx, ui, page, f, y);
+
+                if (f.AffectedObjects.Count > 0)
+                {
+                    var preview = string.Join(", ", f.AffectedObjects.Take(5));
+                    if (f.AffectedObjects.Count > 5)
+                        preview += $" (+{f.AffectedObjects.Count - 5} more)";
+                    gfx.DrawString(preview, PdfPageBuilder.F9,
+                        new XSolidBrush(PdfPageBuilder.ColLow),
+                        PdfPageBuilder.Margin + 14, y + 12);
+                    y += 16;
+                }
+                y += PdfPageBuilder.RowGap + 4;
             }
             if (data.Findings.Count == 0)
                 gfx.DrawString("No findings — AD environment looks healthy!",
@@ -690,6 +789,27 @@ file sealed class PdfPageBuilder
         y += 5;
         gfx.DrawLine(new XPen(ColBorder, 2), Margin, y, Margin + ContentWidth(page), y);
         return y + 7;
+    }
+
+    // Greedy word-wrap so multi-sentence text (e.g. remediation) fits the content width.
+    internal static List<string> WrapText(XGraphics gfx, string text, XFont font, double maxWidth)
+    {
+        var lines = new List<string>();
+        if (string.IsNullOrEmpty(text)) return lines;
+        var words = text.Split(' ');
+        var current = "";
+        foreach (var word in words)
+        {
+            var candidate = current.Length == 0 ? word : current + " " + word;
+            if (gfx.MeasureString(candidate, font).Width > maxWidth && current.Length > 0)
+            {
+                lines.Add(current);
+                current = word;
+            }
+            else current = candidate;
+        }
+        if (current.Length > 0) lines.Add(current);
+        return lines;
     }
 
     internal (XColor bg, XColor border, XSolidBrush text) SeverityStyle(FindingSeverity sev) =>

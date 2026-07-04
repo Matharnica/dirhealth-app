@@ -1,6 +1,7 @@
 <UserControl x:Class="DirHealth.Desktop.Views.DcInventory.DcInventoryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
@@ -108,25 +109,14 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Empty / not-loaded state — only when not loading AND no data -->
+            <!-- Not-loaded placeholder -->
             <TextBlock Grid.RowSpan="2" Text="Click Refresh to load domain controllers."
                        Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
-                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding DomainControllers}" Value="{x:Null}" />
-                                    <Condition Binding="{Binding IsLoading}" Value="False" />
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible" />
-                            </MultiDataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding ShowPlaceholder, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- Shared empty / error state (S12-1) -->
+            <shared:ListStateOverlay Grid.RowSpan="2" />
 
             <!-- Column header row -->
             <Grid Grid.Row="0" Margin="16,0,0,6">

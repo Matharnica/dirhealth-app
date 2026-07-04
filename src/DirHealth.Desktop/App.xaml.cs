@@ -141,11 +141,13 @@ public partial class App : Application
         var privilegedGroups = new PrivilegedGroupsViewModel(scanner);
         var domainTrust      = new DomainTrustViewModel(scanner);
         var timeline         = new TimelineViewModel(scanner);
+        var gpoBrowser       = new GpoBrowserViewModel(scanner);
+        var dataQuality      = new DataQualityViewModel(scanner);
         var mainVm           = new MainViewModel(dashboard, findings, appSettings,
                                                  adSearch, computerBrowser, userBrowser,
                                                  ouBrowser, groupManager, passwordReport,
                                                  domainAdmins, dcInventory, privilegedGroups,
-                                                 domainTrust, timeline);
+                                                 domainTrust, timeline, gpoBrowser, dataQuality);
 
         Log("Creating MainWindow");
         var mainWindow = new MainWindow(mainVm);

@@ -23,6 +23,8 @@ public partial class MainViewModel : BaseViewModel
     public PrivilegedGroupsViewModel  PrivilegedGroups  { get; }
     public DomainTrustViewModel       DomainTrust       { get; }
     public TimelineViewModel          Timeline          { get; }
+    public GpoBrowserViewModel        GpoBrowser        { get; }
+    public DataQualityViewModel       DataQuality       { get; }
 
     [ObservableProperty] private BaseViewModel _currentView;
     [ObservableProperty] private bool          _showScoreDropAlert;
@@ -64,7 +66,9 @@ public partial class MainViewModel : BaseViewModel
         DcInventoryViewModel dcInventory,
         PrivilegedGroupsViewModel privilegedGroups,
         DomainTrustViewModel domainTrust,
-        TimelineViewModel timeline)
+        TimelineViewModel timeline,
+        GpoBrowserViewModel gpoBrowser,
+        DataQualityViewModel dataQuality)
     {
         Dashboard       = dashboard;
         Findings        = findings;
@@ -80,6 +84,8 @@ public partial class MainViewModel : BaseViewModel
         PrivilegedGroups = privilegedGroups;
         DomainTrust      = domainTrust;
         Timeline         = timeline;
+        GpoBrowser       = gpoBrowser;
+        DataQuality      = dataQuality;
         _currentView    = dashboard;
 
         Dashboard.PropertyChanged += (_, e) =>
@@ -207,6 +213,20 @@ public partial class MainViewModel : BaseViewModel
     {
         CurrentView = Timeline;
         await Timeline.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowGpoBrowserAsync()
+    {
+        CurrentView = GpoBrowser;
+        await GpoBrowser.LoadAsync();
+    }
+
+    [RelayCommand]
+    public async Task ShowDataQualityAsync()
+    {
+        CurrentView = DataQuality;
+        await DataQuality.LoadAsync();
     }
 
     [RelayCommand]

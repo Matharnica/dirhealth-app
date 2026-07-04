@@ -1,9 +1,12 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.DirectoryServices;
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.Core.Storage;
 
 namespace DirHealth.Desktop.Core.AD;
 
-public class AdScanner
+public partial class AdScanner
 {
     private readonly AdConnector _connector;
 
@@ -19,35 +22,6 @@ public class AdScanner
         ("DnsAdmins",           "Can execute DLL code on DCs via DNS plugin"),
         ("Remote Desktop Users","Can RDP into all DCs"),
     ];
-
-    private static readonly (string Substring, DateTime EolDate)[] EolTable =
-    [
-        ("Windows XP",       new DateTime(2014,  4,  8)),
-        ("Windows Vista",    new DateTime(2017,  4, 11)),
-        ("Windows 8.1",      new DateTime(2023,  1, 10)),
-        ("Windows 8",        new DateTime(2016,  1, 12)),
-        ("Windows 7",        new DateTime(2020,  1, 14)),
-        ("Server 2003",      new DateTime(2015,  7, 14)),
-        ("Server 2008 R2",   new DateTime(2020,  1, 14)),
-        ("Server 2008",      new DateTime(2020,  1, 14)),
-        ("Server 2012 R2",   new DateTime(2023, 10, 10)),
-        ("Server 2012",      new DateTime(2023, 10, 10)),
-    ];
-
-    private static bool TryGetEolDate(string os, out DateTime eolDate)
-    {
-        eolDate = default;
-        if (string.IsNullOrEmpty(os)) return false;
-        foreach (var (sub, date) in EolTable)
-        {
-            if (os.Contains(sub, StringComparison.OrdinalIgnoreCase))
-            {
-                eolDate = date;
-                return true;
-            }
-        }
-        return false;
-    }
 
     public AdScanner(AdConnector connector)
     {
@@ -65,38 +39,48 @@ public class AdScanner
 
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
-        var totalUsersTask     = Task.Run(() => CountObjects("(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
-        var totalGroupsTask    = Task.Run(() => CountObjects("(objectClass=group)"));
-        var totalComputersTask = Task.Run(() => CountObjects("(&(objectClass=computer)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
-        var inactiveUsersTask  = GetInactiveUsersAsync();
-        var neverExpiresTask   = GetNeverExpiresUsersAsync();
-        var expiredPwdTask     = GetExpiredPasswordUsersAsync();
-        var emptyGroupsTask    = GetEmptyGroupsAsync();
-        var singleMemberTask   = GetSingleMemberGroupsAsync();
-        var inactiveCompsTask  = GetInactiveComputersAsync();
-        var noOsTask           = GetComputersWithoutOsAsync();
-        var securityTask       = GetKerberoastableAccountsAsync();
-        var adminSdTask        = GetAdminSdHolderAccountsAsync();
-        var policyTask         = GetPasswordPolicyFindingsAsync();
-        var eolTask            = GetEolComputersAsync();
-        var asRepTask          = GetAsRepRoastableAccountsAsync();
-        var undelCompsTask     = GetUnconstrainedDelegationComputersAsync();
-        var undelUsersTask     = GetUnconstrainedDelegationUsersAsync();
-        var passwdNotReqdTask  = GetPasswordNotRequiredAccountsAsync();
-        var staleDAsTask       = GetStaleDomainAdminsAsync();
-        var fgppTask           = GetFineGrainedPasswordPoliciesAsync();
-        var sidHistoryTask     = GetSidHistoryAccountsAsync();
-        var allUsersTask       = GetAllUsersAsync();
-        var domainAdminsTask   = GetDomainAdminsAsync();
+        var scanLog = new ConcurrentBag<ScanLogEntry>();
 
-        await Task.WhenAll(
-            totalUsersTask, totalGroupsTask, totalComputersTask,
-            inactiveUsersTask, neverExpiresTask, expiredPwdTask,
-            emptyGroupsTask, singleMemberTask, inactiveCompsTask,
-            noOsTask, securityTask, adminSdTask, policyTask, eolTask,
-            asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
-            staleDAsTask, fgppTask, sidHistoryTask,
-            allUsersTask, domainAdminsTask);
+        var totalUsersTask     = Timed("TotalUsers",     () => Task.Run(() => CountObjects("(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))")), scanLog);
+        var totalGroupsTask    = Timed("TotalGroups",    () => Task.Run(() => CountObjects("(objectClass=group)")), scanLog);
+        var totalComputersTask = Timed("TotalComputers", () => Task.Run(() => CountObjects("(&(objectClass=computer)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))")), scanLog);
+        var inactiveUsersTask  = Timed("InactiveUsers",            () => GetInactiveUsersAsync(),                    scanLog);
+        var neverExpiresTask   = Timed("NeverExpires",             () => GetNeverExpiresUsersAsync(),               scanLog);
+        var expiredPwdTask     = Timed("ExpiredPasswords",         () => GetExpiredPasswordUsersAsync(),            scanLog);
+        var emptyGroupsTask    = Timed("EmptyGroups",              () => GetEmptyGroupsAsync(),                     scanLog);
+        var singleMemberTask   = Timed("SingleMemberGroups",       () => GetSingleMemberGroupsAsync(),              scanLog);
+        var inactiveCompsTask  = Timed("InactiveComputers",        () => GetInactiveComputersAsync(),               scanLog);
+        var noOsTask           = Timed("ComputersWithoutOS",       () => GetComputersWithoutOsAsync(),              scanLog);
+        var securityTask       = Timed("KerberoastableAccounts",   () => GetKerberoastableAccountsAsync(),          scanLog);
+        var adminSdTask        = Timed("AdminSdHolderAccounts",    () => GetAdminSdHolderAccountsAsync(),           scanLog);
+        var policyTask         = Timed("PasswordPolicy",           () => GetPasswordPolicyFindingsAsync(),          scanLog);
+        var eolTask            = Timed("EolComputers",             () => GetEolComputersAsync(),                    scanLog);
+        var asRepTask          = Timed("AsRepRoasting",            () => GetAsRepRoastableAccountsAsync(),          scanLog);
+        var undelCompsTask     = Timed("UnconstrDelegationComps",  () => GetUnconstrainedDelegationComputersAsync(),scanLog);
+        var undelUsersTask     = Timed("UnconstrDelegationUsers",  () => GetUnconstrainedDelegationUsersAsync(),    scanLog);
+        var passwdNotReqdTask  = Timed("PasswordNotRequired",      () => GetPasswordNotRequiredAccountsAsync(),     scanLog);
+        var staleDAsTask       = Timed("StaleDomainAdmins",        () => GetStaleDomainAdminsAsync(),               scanLog);
+        var fgppTask           = Timed("FineGrainedPwdPolicies",   () => GetFineGrainedPasswordPoliciesAsync(),     scanLog);
+        var sidHistoryTask     = Timed("SidHistory",               () => GetSidHistoryAccountsAsync(),              scanLog);
+        var allUsersTask       = Timed("AllUsers",                 () => GetAllUsersAsync(),                        scanLog);
+        var domainAdminsTask   = Timed("DomainAdmins",             () => GetDomainAdminsAsync(),                    scanLog);
+
+        try
+        {
+            await Task.WhenAll(
+                totalUsersTask, totalGroupsTask, totalComputersTask,
+                inactiveUsersTask, neverExpiresTask, expiredPwdTask,
+                emptyGroupsTask, singleMemberTask, inactiveCompsTask,
+                noOsTask, securityTask, adminSdTask, policyTask, eolTask,
+                asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
+                staleDAsTask, fgppTask, sidHistoryTask,
+                allUsersTask, domainAdminsTask);
+        }
+        finally
+        {
+            // Additive observability — Task.WhenAll has awaited every sub-query, so the log is complete.
+            new ScanLogger().WriteRun(scanLog, DateTime.Now);
+        }
 
         var inactiveUsers      = inactiveUsersTask.Result;
         var neverExpires       = neverExpiresTask.Result;
@@ -314,29 +298,34 @@ public class AdScanner
                 AffectedObjects = sidHistoryAccounts.Select(u => u.SamAccountName).ToList()
             });
 
-        // ── Compute score ─────────────────────────────────────────────────────────
-        int score = 100;
-        score -= PctPenalty(inactiveUsers.Count,    totalUsers,     maxPenalty: 20, fullAtPct: 30);
-        score -= PctPenalty(neverExpires.Count,      totalUsers,     maxPenalty: 15, fullAtPct: 50);
-        score -= PctPenalty(expiredPwd.Count,        totalUsers,     maxPenalty: 18, fullAtPct: 30);
-        score -= PctPenalty(emptyGroups.Count,       totalGroups,    maxPenalty:  8, fullAtPct: 35);
-        score -= PctPenalty(singleMember.Count,      totalGroups,    maxPenalty:  6, fullAtPct: 35);
-        score -= PctPenalty(inactiveComps.Count,     totalComputers, maxPenalty: 10, fullAtPct: 40);
-        score -= Math.Min(5, noOs.Count);
-        score -= Math.Min(12, kerberoastable.Count * 4);
-        foreach (var f in policyFindings)
-            score -= f.Severity == FindingSeverity.High ? 8 : 4;
+        // ── Compute score (all arithmetic lives in ScoreCalculator — pure & tested) ──
         var eolDcCount = eolComputers.Count(c => c.IsDomainController);
         var eolPcCount = eolComputers.Count(c => !c.IsDomainController);
-        score -= Math.Min(15, eolDcCount * 8 + eolPcCount * 3);
-        score -= Math.Min(15, asRepRoastable.Count * 3);
-        score -= Math.Min(20, (undelComputers.Count + undelUsers.Count) * 6);
-        score -= Math.Min(10, passwdNotRequired.Count * 2);
-        score -= Math.Min(20, staleDomainAdmins.Count * 5);
-        foreach (var f in fgppFindings)
-            score -= f.Severity == FindingSeverity.High ? 8 : 4;
-        score -= Math.Min(12, sidHistoryAccounts.Count * 3);
-        score = Math.Max(10, score);
+        int score = ScoreCalculator.Compute(new ScoreInputs
+        {
+            TotalUsers              = totalUsers,
+            TotalGroups             = totalGroups,
+            TotalComputers          = totalComputers,
+            InactiveUsers           = inactiveUsers.Count,
+            NeverExpires            = neverExpires.Count,
+            ExpiredPwd              = expiredPwd.Count,
+            EmptyGroups             = emptyGroups.Count,
+            SingleMember            = singleMember.Count,
+            InactiveComputers       = inactiveComps.Count,
+            NoOs                    = noOs.Count,
+            Kerberoastable          = kerberoastable.Count,
+            PolicyHighCount         = policyFindings.Count(f => f.Severity == FindingSeverity.High),
+            PolicyOtherCount        = policyFindings.Count(f => f.Severity != FindingSeverity.High),
+            EolDcCount              = eolDcCount,
+            EolPcCount              = eolPcCount,
+            AsRepRoastable          = asRepRoastable.Count,
+            UnconstrainedDelegation = undelComputers.Count + undelUsers.Count,
+            PasswordNotRequired     = passwdNotRequired.Count,
+            StaleDomainAdmins       = staleDomainAdmins.Count,
+            FgppHighCount           = fgppFindings.Count(f => f.Severity == FindingSeverity.High),
+            FgppOtherCount          = fgppFindings.Count(f => f.Severity != FindingSeverity.High),
+            SidHistory              = sidHistoryAccounts.Count,
+        });
 
         // ── Expiring passwords (from already-loaded allUsers) ─────────────────────
         var expiringPasswords = allUsersTask.Result
@@ -348,6 +337,33 @@ public class AdScanner
 
         return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins);
     }
+
+    // Wraps a sub-query so RunCompleteScanAsync can log its name, duration, result count and any error.
+    // Preserves behaviour: exceptions still propagate (they are only recorded on the way out).
+    private static async Task<T> Timed<T>(string name, Func<Task<T>> factory, ConcurrentBag<ScanLogEntry> log)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var result = await factory();
+            sw.Stop();
+            log.Add(new ScanLogEntry(name, sw.ElapsedMilliseconds, CountOf(result), null));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            log.Add(new ScanLogEntry(name, sw.ElapsedMilliseconds, 0, ex.Message));
+            throw;
+        }
+    }
+
+    private static int CountOf(object? result) => result switch
+    {
+        System.Collections.ICollection c => c.Count,
+        int i                            => i,
+        _                                => -1,
+    };
 
     public async Task<List<AdUser>> GetInactiveUsersAsync(int daysThreshold = 90)
     {
@@ -421,7 +437,7 @@ public class AdScanner
             var eol = new List<AdComputer>();
             foreach (var c in computers)
             {
-                if (TryGetEolDate(c.OperatingSystem, out var eolDate))
+                if (EolMatcher.TryGetEolDate(c.OperatingSystem, out var eolDate))
                 {
                     c.IsEol   = true;
                     c.EolDate = eolDate;
@@ -484,7 +500,7 @@ public class AdScanner
                         .ToList(),
                 };
 
-                if (TryGetEolDate(os, out var eolDate))
+                if (EolMatcher.TryGetEolDate(os, out var eolDate))
                 {
                     dc.IsEol   = true;
                     dc.EolDate = eolDate;
@@ -572,14 +588,6 @@ public class AdScanner
     {
         var r = await RunCompleteScanAsync();
         return r.Score;
-    }
-
-    // Returns penalty proportional to (count/total) up to maxPenalty at fullAtPct%
-    private static int PctPenalty(int count, int total, int maxPenalty, double fullAtPct)
-    {
-        if (total == 0 || count == 0) return 0;
-        var pct = (double)count / total * 100.0;
-        return (int)Math.Min(maxPenalty, Math.Round(maxPenalty * pct / fullAtPct));
     }
 
     private int CountObjects(string filter)
@@ -832,76 +840,6 @@ public class AdScanner
         return [.. await Task.WhenAll(tasks)];
     }
 
-    public async Task<List<AdUser>> GetAsRepRoastableAccountsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            // userAccountControl bit 4194304 = DONT_REQUIRE_PREAUTH
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=4194304))";
-            return QueryUsers(filter);
-        });
-    }
-
-    public async Task<List<AdComputer>> GetUnconstrainedDelegationComputersAsync()
-    {
-        return await Task.Run(() =>
-        {
-            // bit 524288 = TRUSTED_FOR_DELEGATION; exclude DCs (bit 8192)
-            var filter = "(&(objectClass=computer)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=8192))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
-            return QueryComputers(filter);
-        });
-    }
-
-    public async Task<List<AdUser>> GetUnconstrainedDelegationUsersAsync()
-    {
-        return await Task.Run(() =>
-        {
-            // bit 524288 = TRUSTED_FOR_DELEGATION
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
-            return QueryUsers(filter);
-        });
-    }
-
-    public async Task<List<AdUser>> GetPasswordNotRequiredAccountsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            // userAccountControl bit 32 = PASSWD_NOTREQD
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=32))";
-            return QueryUsers(filter);
-        });
-    }
-
-    public async Task<List<AdUser>> GetKerberoastableAccountsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(servicePrincipalName=*)(!(samAccountName=krbtgt)))";
-            return QueryUsers(filter);
-        });
-    }
-
-    public async Task<List<AdUser>> GetAdminSdHolderAccountsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(adminCount=1))";
-            return QueryUsers(filter);
-        });
-    }
-
     public async Task<List<AdFinding>> GetPasswordPolicyFindingsAsync()
     {
         return await Task.Run(() =>
@@ -980,309 +918,10 @@ public class AdScanner
         return val is int i ? i : val is long l ? (int)l : 0;
     }
 
-    public async Task<List<AdDomainTrust>> GetDomainTrustsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            var trusts = new List<AdDomainTrust>();
-            string domainDn = "";
-            try
-            {
-                var dsePath = string.IsNullOrEmpty(_connector.Domain)
-                    ? "LDAP://RootDSE"
-                    : $"LDAP://{_connector.Domain}/RootDSE";
-                using var dse = _connector.GetEntry(dsePath);
-                domainDn = dse.Properties["defaultNamingContext"]?[0]?.ToString() ?? "";
-            }
-            catch { }
-
-            if (domainDn.Length == 0) return trusts;
-
-            try
-            {
-                using var systemEntry = GetEntryByDn($"CN=System,{domainDn}");
-                using var searcher = _connector.CreateSearcher(systemEntry,
-                    "(objectClass=trustedDomain)",
-                    "cn", "trustType", "trustDirection", "trustAttributes");
-                searcher.SearchScope = SearchScope.OneLevel;
-                using var results = searcher.FindAll();
-
-                foreach (SearchResult r in results)
-                {
-                    var props      = r.Properties;
-                    var trustType  = (int)GetLong(props, "trustType");
-                    var direction  = (int)GetLong(props, "trustDirection");
-                    var attributes = (int)GetLong(props, "trustAttributes");
-
-                    trusts.Add(new AdDomainTrust
-                    {
-                        Name          = GetString(props, "cn"),
-                        TrustType     = trustType switch
-                        {
-                            1 => "Downlevel (NT4)",
-                            2 => "AD / Kerberos",
-                            3 => "MIT Kerberos",
-                            _ => $"Unknown ({trustType})"
-                        },
-                        Direction     = direction switch
-                        {
-                            1 => "Inbound",
-                            2 => "Outbound",
-                            3 => "Bidirectional",
-                            _ => "Unknown"
-                        },
-                        IsForestTrust = (attributes & 8) != 0,
-                    });
-                }
-            }
-            catch { }
-
-            return trusts.OrderBy(t => t.Name).ToList();
-        });
-    }
-
-    public async Task<List<AdUser>> GetSidHistoryAccountsAsync()
-    {
-        return await Task.Run(() =>
-            QueryUsers("(&(objectClass=user)(objectCategory=person)" +
-                       "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                       "(sIDHistory=*))"));
-    }
-
-    public async Task<List<AdRecentChange>> GetRecentChangesAsync(int days = 30)
-    {
-        return await Task.Run(() =>
-        {
-            var changes  = new List<AdRecentChange>();
-            var cutoff   = DateTime.UtcNow.AddDays(-days);
-            var ldapTime = cutoff.ToString("yyyyMMddHHmmss.0") + "Z";
-            var filter   = $"(|(&(objectClass=user)(objectCategory=person)(whenChanged>={ldapTime}))" +
-                           $"(&(objectClass=computer)(whenChanged>={ldapTime})))";
-
-            using var root     = _connector.GetRootEntry();
-            using var searcher = _connector.CreateSearcher(root, filter,
-                "cn", "objectClass", "whenCreated", "whenChanged", "distinguishedName");
-
-            using var results = searcher.FindAll();
-            foreach (SearchResult r in results)
-            {
-                var props  = r.Properties;
-                var objClasses = props["objectClass"];
-                bool isComputer = false;
-                for (int i = 0; i < objClasses.Count; i++)
-                    if (objClasses[i]?.ToString() == "computer") { isComputer = true; break; }
-
-                var whenCreated = GetAdDateTime(props, "whenCreated");
-                var whenChanged = GetAdDateTime(props, "whenChanged");
-                if (whenChanged is null) continue;
-
-                var isNew = whenCreated.HasValue
-                    && (whenChanged.Value - whenCreated.Value).TotalMinutes < 5;
-
-                changes.Add(new AdRecentChange
-                {
-                    Name              = GetString(props, "cn"),
-                    ObjectType        = isComputer ? "Computer" : "User",
-                    Action            = isNew ? "Created" : "Modified",
-                    ChangedAt         = whenChanged.Value,
-                    DistinguishedName = GetString(props, "distinguishedName"),
-                });
-            }
-
-            return changes.OrderByDescending(c => c.ChangedAt).ToList();
-        });
-    }
-
-    private static DateTime? GetAdDateTime(ResultPropertyCollection props, string name)
-    {
-        if (props[name].Count == 0) return null;
-        var val = props[name][0];
-        if (val is DateTime dt) return dt.ToUniversalTime();
-        return null;
-    }
-
     public async Task<List<AdFinding>> RunFullScanAsync()
     {
         var r = await RunCompleteScanAsync();
         return r.Findings;
-    }
-
-    public async Task<List<AdOU>> GetAllOUsAsync()
-    {
-        return await Task.Run(() =>
-        {
-            var ous = new List<AdOU>();
-            using var root     = _connector.GetRootEntry();
-            using var searcher = _connector.CreateSearcher(root,
-                "(objectClass=organizationalUnit)",
-                "ou", "description", "distinguishedName");
-            using var results = searcher.FindAll();
-            foreach (SearchResult r in results)
-            {
-                ous.Add(new AdOU
-                {
-                    Name              = GetString(r.Properties, "ou"),
-                    DistinguishedName = GetString(r.Properties, "distinguishedName"),
-                    Description       = GetString(r.Properties, "description"),
-                });
-            }
-            return ous.OrderBy(o => o.Name).ToList();
-        });
-    }
-
-    public async Task<(int Users, int Computers, int Groups)> GetOUCountsAsync(string distinguishedName)
-    {
-        return await Task.Run(() => (
-            CountObjectsInOU(distinguishedName, "(&(objectClass=user)(objectCategory=person))"),
-            CountObjectsInOU(distinguishedName, "(objectClass=computer)"),
-            CountObjectsInOU(distinguishedName, "(objectClass=group)")
-        ));
-    }
-
-    private int CountObjectsInOU(string ouDn, string filter)
-    {
-        try
-        {
-            using var entry    = _connector.GetEntry($"LDAP://{ouDn}");
-            using var searcher = new DirectorySearcher(entry)
-            {
-                Filter      = filter,
-                PageSize    = 1000,
-                SearchScope = SearchScope.OneLevel
-            };
-            using var results = searcher.FindAll();
-            return results.Count;
-        }
-        catch { return 0; }
-    }
-
-    public async Task<List<AdGroup>> GetAllGroupsWithCountAsync()
-    {
-        return await Task.Run(() => QueryGroups("(objectClass=group)"));
-    }
-
-    public async Task<AdGroupDetail> GetGroupDetailAsync(string distinguishedName)
-    {
-        return await Task.Run(() =>
-        {
-            var detail = new AdGroupDetail { DistinguishedName = distinguishedName };
-            try
-            {
-                var escaped = EscapeDn(distinguishedName);
-                using var root = _connector.GetRootEntry();
-
-                // Read base group properties
-                using var searcher = _connector.CreateSearcher(root,
-                    $"(distinguishedName={escaped})",
-                    "cn", "description", "groupType");
-                var result = searcher.FindOne();
-                if (result is null) return detail;
-
-                detail.Name        = GetString(result.Properties, "cn");
-                detail.Description = GetString(result.Properties, "description");
-
-                var gt = GetLong(result.Properties, "groupType");
-                detail.GroupScope = (gt & 0x8) != 0 ? "Universal"
-                                  : (gt & 0x4) != 0 ? "Local"
-                                  :                   "Global";
-
-                // Range retrieval for member attribute (AD limits per-page)
-                var memberDns = new List<string>();
-                int start = 0;
-                while (true)
-                {
-                    var rangeAttr = $"member;range={start}-*";
-                    using var rs = _connector.CreateSearcher(root,
-                        $"(distinguishedName={escaped})", rangeAttr);
-                    var rr = rs.FindOne();
-                    if (rr is null) break;
-
-                    bool lastPage = false;
-                    int count = 0;
-                    foreach (string key in rr.Properties.PropertyNames)
-                    {
-                        if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
-                        lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
-                        foreach (var v in rr.Properties[key])
-                        {
-                            memberDns.Add(v?.ToString() ?? "");
-                            count++;
-                        }
-                        break;
-                    }
-                    if (lastPage || count == 0) break;
-                    start += count;
-                }
-
-                detail.Members.AddRange(BatchResolveGroupMembers(root, memberDns));
-            }
-            catch { }
-            return detail;
-        });
-    }
-
-    private List<AdGroupMember> BatchResolveGroupMembers(DirectoryEntry root, List<string> memberDns)
-    {
-        var members = new List<AdGroupMember>(memberDns.Count);
-        const int batchSize = 50;
-        for (int i = 0; i < memberDns.Count; i += batchSize)
-        {
-            var batch  = memberDns.Skip(i).Take(batchSize).ToList();
-            var filter = "(|" + string.Join("", batch.Select(dn => $"(distinguishedName={EscapeDn(dn)})")) + ")";
-            try
-            {
-                using var searcher = _connector.CreateSearcher(root, filter,
-                    "cn", "sAMAccountName", "objectClass", "distinguishedName");
-                using var results = searcher.FindAll();
-                var found = new Dictionary<string, AdGroupMember>(StringComparer.OrdinalIgnoreCase);
-                foreach (SearchResult r in results)
-                {
-                    var dn       = GetString(r.Properties, "distinguishedName");
-                    var objClass = r.Properties["objectClass"].Cast<string>().ToList();
-                    var type     = objClass.Contains("group")    ? "Group"
-                                 : objClass.Contains("computer") ? "Computer"
-                                 :                                 "User";
-                    found[dn] = new AdGroupMember
-                    {
-                        Name              = GetString(r.Properties, "cn"),
-                        SamAccountName    = GetString(r.Properties, "sAMAccountName"),
-                        ObjectType        = type,
-                        DistinguishedName = dn,
-                    };
-                }
-                foreach (var dn in batch)
-                    members.Add(found.TryGetValue(dn, out var m)
-                        ? m
-                        : new AdGroupMember { Name = dn, DistinguishedName = dn });
-            }
-            catch
-            {
-                foreach (var dn in batch)
-                    members.Add(new AdGroupMember { Name = dn, DistinguishedName = dn });
-            }
-        }
-        return members;
-    }
-
-    public async Task<AdGroupDetail> GetDomainAdminsAsync()
-    {
-        var dn = await Task.Run(() =>
-        {
-            try
-            {
-                using var root     = _connector.GetRootEntry();
-                using var searcher = _connector.CreateSearcher(root,
-                    "(&(objectClass=group)(cn=Domain Admins))", "distinguishedName");
-                var result = searcher.FindOne();
-                return result is not null ? GetString(result.Properties, "distinguishedName") : "";
-            }
-            catch { return ""; }
-        });
-
-        if (string.IsNullOrEmpty(dn))
-            return new AdGroupDetail { Name = "Domain Admins", Description = "Group not found." };
-
-        return await GetGroupDetailAsync(dn);
     }
 
     public async Task<List<AdUser>> GetExpiringPasswordUsersAsync(int withinDays = 30)
@@ -1313,8 +952,8 @@ public class AdScanner
                 Email               = GetString(props, "mail"),
                 LastLogon           = GetDateTime(props, "lastLogonTimestamp"),
                 PasswordLastSet     = GetDateTime(props, "pwdLastSet"),
-                PasswordNeverExpires = (GetLong(props, "userAccountControl") & 65536) != 0,
-                IsEnabled           = (GetLong(props, "userAccountControl") & 2) == 0,
+                PasswordNeverExpires = UacFlags.PasswordNeverExpires((int)GetLong(props, "userAccountControl")),
+                IsEnabled           = UacFlags.IsEnabled((int)GetLong(props, "userAccountControl")),
                 DistinguishedName   = GetString(props, "distinguishedName"),
             });
         }
@@ -1355,15 +994,15 @@ public class AdScanner
         foreach (SearchResult result in results)
         {
             var props = result.Properties;
-            var uac = GetLong(props, "userAccountControl");
+            var uac = (int)GetLong(props, "userAccountControl");
             computers.Add(new AdComputer
             {
                 Name                = GetString(props, "cn"),
                 OperatingSystem     = GetString(props, "operatingSystem"),
                 OsVersion           = GetString(props, "operatingSystemVersion"),
                 LastLogon           = GetDateTime(props, "lastLogonTimestamp"),
-                IsEnabled           = (uac & 2) == 0,
-                IsDomainController  = (uac & 8192) != 0,
+                IsEnabled           = UacFlags.IsEnabled(uac),
+                IsDomainController  = UacFlags.IsDomainController(uac),
                 DistinguishedName   = GetString(props, "distinguishedName"),
             });
         }

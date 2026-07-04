@@ -52,8 +52,10 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 🔗 Domain Trusts | All inter-domain/forest trust relationships with direction and type |
 | 🕵️ SID History | Accounts carrying historical SIDs — silent privilege escalation risk |
 | 📅 Timeline | All AD objects created or modified in the last 7 / 30 / 90 days |
+| 📜 GPO Browser | Every Group Policy Object with its link status — orphaned (unlinked) and disabled GPOs flagged |
+| 📋 AD Data Quality | Completeness of user master data (email, phone, department, title, manager, office) |
 
-Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the number climb.
+Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the number climb. Each finding now ships a **concrete remediation step**, shown in the app and in the exported PDF report — which also includes the score delta and what changed since your last scan.
 
 ## Getting started
 

@@ -1,0 +1,21 @@
+<UserControl x:Class="DirHealth.Desktop.Views.Shared.ListStateOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False">
+    <!-- Reusable empty / error state driven by the list VM's ShowEmptyState / HasError.
+         DataContext is inherited from the hosting view's VM. -->
+    <Grid>
+        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="13" TextWrapping="Wrap" MaxWidth="420"
+                   TextAlignment="Center"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Text="{Binding EmptyMessage}"
+                   Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVisibility}}" />
+
+        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="13" TextWrapping="Wrap" MaxWidth="420"
+                   TextAlignment="Center" Foreground="#FCA5A5"
+                   Text="{Binding ErrorMessage, StringFormat='⚠ Could not load: {0}'}"
+                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+    </Grid>
+</UserControl>

@@ -1,6 +1,7 @@
 <UserControl x:Class="DirHealth.Desktop.Views.Timeline.TimelineView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
@@ -87,45 +88,14 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Not-loaded state -->
+            <!-- Not-loaded placeholder -->
             <TextBlock Grid.RowSpan="2" Text="Click Refresh to load recent changes."
                        Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
-                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding Changes}" Value="{x:Null}" />
-                                    <Condition Binding="{Binding IsLoading}" Value="False" />
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible" />
-                            </MultiDataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding ShowPlaceholder, Converter={StaticResource BoolToVisibility}}" />
 
-            <!-- Zero-results state after load -->
-            <TextBlock Grid.RowSpan="2" Text="No changes in this period. ✓"
-                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
-                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding Changes.Count}" Value="0" />
-                                    <Condition Binding="{Binding IsLoading}" Value="False" />
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible" />
-                            </MultiDataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
+            <!-- Shared empty / error state (S12-1) -->
+            <shared:ListStateOverlay Grid.RowSpan="2" />
 
             <!-- Column headers -->
             <Grid Grid.Row="0" Margin="16,0,0,6">

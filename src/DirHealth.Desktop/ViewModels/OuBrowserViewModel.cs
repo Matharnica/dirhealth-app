@@ -6,11 +6,10 @@ using System.Collections.ObjectModel;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class OuBrowserViewModel : BaseViewModel
+public partial class OuBrowserViewModel : ListBrowserViewModel
 {
     private readonly AdScanner _scanner;
 
-    [ObservableProperty] private bool    _isLoading;
     [ObservableProperty] private string  _filterText  = "";
     [ObservableProperty] private AdOU?   _selectedOU;
     [ObservableProperty] private int     _selectedOuUserCount;
@@ -21,21 +20,24 @@ public partial class OuBrowserViewModel : BaseViewModel
     public ObservableCollection<AdOU> OUs { get; } = new();
     private List<AdOU> _allOUs = new();
 
+    protected override bool IsEmpty => _allOUs.Count == 0;
+    public override string EmptyMessage => "No organizational units found.";
+
     public OuBrowserViewModel(AdScanner scanner) { _scanner = scanner; }
 
     [RelayCommand]
     public async Task LoadAsync()
     {
-        IsLoading = true;
+        BeginLoad();
         OUs.Clear();
         _allOUs.Clear();
         try
         {
             _allOUs = await _scanner.GetAllOUsAsync();
             ApplyFilter();
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to load OUs: {ex.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception ex) { SetError($"Failed to load OUs: {ex.Message}"); }
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();

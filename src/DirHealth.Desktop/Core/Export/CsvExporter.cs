@@ -59,6 +59,21 @@ public class CsvExporter
         }
     }
 
+    public void ExportDataQuality(IEnumerable<AdAttributeCompleteness> attributes, string filePath)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv    = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        csv.WriteHeader<DataQualityRow>();
+        csv.NextRecord();
+        foreach (var a in attributes)
+        {
+            csv.WriteRecord(new DataQualityRow(
+                SafeField(a.AttributeName), SafeField(a.LdapName),
+                a.FilledCount, a.TotalCount, a.PercentLabel));
+            csv.NextRecord();
+        }
+    }
+
     // Prefix formula-starting characters to prevent CSV injection when the file is opened in spreadsheet software
     private static string SafeField(string? value)
     {
@@ -69,4 +84,5 @@ public class CsvExporter
     private record FindingRow(string Category, string Title, string Severity, int Count, string AffectedObjects);
     private record PasswordReportRow(string DisplayName, string SamAccountName, string Email, string PasswordExpires, string DaysRemaining, string OU);
     private record InactiveUserRow(string DisplayName, string SamAccountName, string Email, string LastLogon, string OU);
+    private record DataQualityRow(string Attribute, string LdapName, int Filled, int Total, string Percent);
 }

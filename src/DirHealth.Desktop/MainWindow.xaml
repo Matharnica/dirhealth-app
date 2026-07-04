@@ -17,6 +17,8 @@
         xmlns:privilegedgroups="clr-namespace:DirHealth.Desktop.Views.PrivilegedGroups"
         xmlns:domaintrust="clr-namespace:DirHealth.Desktop.Views.DomainTrust"
         xmlns:timeline="clr-namespace:DirHealth.Desktop.Views.Timeline"
+        xmlns:gpobrowser="clr-namespace:DirHealth.Desktop.Views.GpoBrowser"
+        xmlns:dataquality="clr-namespace:DirHealth.Desktop.Views.DataQuality"
         Title="DirHealth" Height="700" Width="1100" MinHeight="600" MinWidth="900"
         Background="{DynamicResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen">
@@ -73,6 +75,12 @@
         <DataTemplate DataType="{x:Type vm:TimelineViewModel}">
             <timeline:TimelineView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GpoBrowserViewModel}">
+            <gpobrowser:GpoBrowserView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DataQualityViewModel}">
+            <dataquality:DataQualityView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -118,6 +126,7 @@
                     <Button Width="46" Height="36"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Click="TitleBar_Minimize"
+                            AutomationProperties.Name="Minimize"
                             Background="Transparent" BorderThickness="0"
                             Foreground="{DynamicResource TextSecondaryBrush}"
                             FontSize="12" Content="&#xE921;"
@@ -148,6 +157,7 @@
                     <Button Width="46" Height="36"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Click="TitleBar_MaximizeRestore"
+                            AutomationProperties.Name="Maximize or restore"
                             Foreground="{DynamicResource TextSecondaryBrush}"
                             x:Name="MaximizeButton">
                         <Button.Style>
@@ -179,6 +189,7 @@
                     <Button Width="46" Height="36"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Click="TitleBar_Close"
+                            AutomationProperties.Name="Close"
                             Foreground="{DynamicResource TextSecondaryBrush}"
                             FontSize="11" Content="&#xE8BB;"
                             FontFamily="Segoe MDL2 Assets">
@@ -223,6 +234,7 @@
                         <Run Text="{Binding ScoreDropMessage}" />
                     </TextBlock>
                     <Button Grid.Column="1" Content="✕" FontSize="11"
+                            AutomationProperties.Name="Dismiss score alert"
                             Background="Transparent" BorderThickness="0"
                             Foreground="#FCA5A5" Cursor="Hand"
                             Command="{Binding DismissScoreAlertCommand}" />
@@ -253,6 +265,7 @@
                         </Button.Content>
                     </Button>
                     <Button Grid.Column="2" Content="✕" FontSize="11"
+                            AutomationProperties.Name="Dismiss update notification"
                             Background="Transparent" BorderThickness="0"
                             Foreground="#93C5FD" Cursor="Hand"
                             Command="{Binding DismissUpdateBannerCommand}" />
@@ -285,6 +298,7 @@
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DashboardViewModel}" />
                     <Button Style="{StaticResource NavButton}"
                             Command="{Binding ShowFindingsCommand}" Margin="0,2,0,16"
+                            AutomationProperties.Name="Findings"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=FindingsViewModel}">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -346,8 +360,14 @@
                             Command="{Binding ShowDomainTrustCommand}" Margin="0,2,0,0"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DomainTrustViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="🕐  Timeline"
-                            Command="{Binding ShowTimelineCommand}" Margin="0,2,0,16"
+                            Command="{Binding ShowTimelineCommand}" Margin="0,2,0,0"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=TimelineViewModel}" />
+                    <Button Style="{StaticResource NavButton}" Content="📜  GPO Browser"
+                            Command="{Binding ShowGpoBrowserCommand}" Margin="0,2,0,0"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=GpoBrowserViewModel}" />
+                    <Button Style="{StaticResource NavButton}" Content="📋  Data Quality"
+                            Command="{Binding ShowDataQualityCommand}" Margin="0,2,0,16"
+                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DataQualityViewModel}" />
 
                     <!-- System -->
                     <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"

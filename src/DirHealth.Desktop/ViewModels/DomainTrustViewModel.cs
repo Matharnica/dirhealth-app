@@ -5,24 +5,26 @@ using DirHealth.Desktop.Core.AD.Models;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class DomainTrustViewModel : BaseViewModel
+public partial class DomainTrustViewModel : ListBrowserViewModel
 {
     private readonly AdScanner _scanner;
 
-    [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private List<AdDomainTrust>? _trusts;
 
     public int TrustCount         => Trusts?.Count ?? 0;
     public int BidirectionalCount => Trusts?.Count(t => t.IsBidirectional) ?? 0;
     public int ForestTrustCount   => Trusts?.Count(t => t.IsForestTrust) ?? 0;
 
+    protected override bool IsEmpty => Trusts is { Count: 0 };
+    public override string EmptyMessage => "No domain trusts found.";
+
     public DomainTrustViewModel(AdScanner scanner) { _scanner = scanner; }
 
     [RelayCommand]
     public async Task LoadAsync()
     {
-        IsLoading = true;
-        Trusts    = null;
+        BeginLoad();
+        Trusts = null;
         try
         {
             Trusts = await _scanner.GetDomainTrustsAsync();
@@ -32,8 +34,8 @@ public partial class DomainTrustViewModel : BaseViewModel
             StatusMessage = Trusts.Count == 0
                 ? "No domain trusts found."
                 : $"{Trusts.Count} trust(s) found";
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Error: {ex.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception ex) { SetError($"Error: {ex.Message}"); }
     }
 }

@@ -4,6 +4,30 @@ All notable changes to DirHealth are documented here.
 
 ---
 
+## [2.9.0] — 2026-07-04
+
+Phase 5 was taken off hold on 2026-07-04; this release bundles Sprints 10–12.
+
+### Added — Sprint 10 (Phase 5)
+- **GPO Browser** (S10-1) — new view listing every Group Policy Object with creation/modification dates, link count, and a status badge (Active / Orphaned / Disabled). Two-stage LDAP: enumerate `groupPolicyContainer` objects under `CN=Policies,CN=System,…`, then count `gPLink` references across the domain and join by GUID. Orphaned (unlinked) GPOs are surfaced first. Link/status logic extracted to the pure, unit-tested `GpoLogic` helper.
+- **AD Data Quality Report** (S10-2) — new view measuring completeness of user master data (`mail`, `telephoneNumber`, `department`, `title`, `manager`, `physicalDeliveryOfficeName`). Horizontal completeness bars sorted worst-first, with CSV export (`CsvExporter.ExportDataQuality`). Not score-relevant — intended for MSP reporting.
+
+### Added — Sprint 11 (Quality, Tests & Report Depth)
+- **Per-finding remediation** (S11-1) — new `AdFinding.Remediation` property gives a concrete, plain-text fix for every finding category; shown in the Findings detail panel and in both PDF reports.
+- **Testable scan core** (S11-2) — pure score/EOL/UAC logic extracted from `AdScanner` into `ScoreCalculator`, `EolMatcher` and `UacFlags`. New `AdScannerLogicTests` covers score clamp/minimum/proportional penalties, the EOL ordering rule (`2012 R2` before `2012`), and UAC bit masks — all without an AD or Windows dependency.
+- **Richer full report** (S11-3) — the full PDF now shows the score delta vs the previous scan on the cover, a "Changes Since Last Scan" section (new / resolved / changed findings from `ScanDiffCalculator`), and each finding's remediation under its description. `PdfPageBuilder` anatomy and per-page column headers unchanged.
+- **Findings detail panel** (S11-4) — findings list sorted by severity (Critical → Low) with a colour-coded severity badge per row; the detail panel now shows the recommended fix plus the Microsoft Learn link. Existing acknowledge flow unchanged.
+- **Structured scan log** (S11-5) — `RunCompleteScanAsync` writes one line per sub-query (name, duration, result count, any error) to `%APPDATA%\DirHealth\scan.log` with rolling truncation. Purely additive; scan behaviour unchanged.
+
+### Added — Sprint 12 (UX Consistency & Maintainability)
+- **Unified empty / error states** (S12-1) — new `ListBrowserViewModel` base plus a reusable `ListStateOverlay` control give every list view (Users, Computers, OUs, Groups, DC Inventory, Domain Trust, Timeline) the same three distinguishable states: loading, empty-after-load, and error. No list view is left blank without feedback.
+- **Accessibility pass** (S12-2) — `AutomationProperties.Name` on all icon-only controls (title-bar buttons, banner dismiss buttons, the Findings nav button, GPO/Data-Quality actions). Login/Settings tab order verified as document-order-logical; dark/light text contrast spot-checked against WCAG AA.
+
+### Changed
+- `AdScanner` is now a `partial` class, split by theme: `AdScanner.Phase5.cs` (GPO + data quality), `AdScanner.Kerberos.cs` (delegation / Kerberos queries), `AdScanner.Trust.cs` (trust / SID history / timeline), `AdScanner.Groups.cs` (OU + group queries). Core dropped from ~1400 to ~1030 lines. `RunCompleteScanAsync` remains the single scan entry point; behaviour unchanged (S12-3).
+
+---
+
 ## [2.8.3] — 2026-06-14
 
 ### Fixed

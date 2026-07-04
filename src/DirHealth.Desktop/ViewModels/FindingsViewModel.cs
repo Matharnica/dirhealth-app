@@ -35,7 +35,8 @@ public partial class FindingsViewModel : BaseViewModel
                 list = list.Where(f =>
                     f.Title.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
                     f.Category.Contains(FilterText, StringComparison.OrdinalIgnoreCase));
-            return list.ToList();
+            // Critical → High → Medium → Low, then alphabetical (severity enum is Low..Critical ascending)
+            return list.OrderByDescending(f => f.Severity).ThenBy(f => f.Title).ToList();
         }
     }
 

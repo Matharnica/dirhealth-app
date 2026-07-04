@@ -1,7 +1,6 @@
-<UserControl x:Class="DirHealth.Desktop.Views.DomainTrust.DomainTrustView"
+<UserControl x:Class="DirHealth.Desktop.Views.GpoBrowser.GpoBrowserView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
@@ -21,10 +20,10 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Domain Trusts" FontSize="20" FontWeight="Bold"
+                <TextBlock Grid.Row="0" Text="Group Policy" FontSize="20" FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"
                            TextWrapping="Wrap" />
-                <TextBlock Grid.Row="0" Text="Inter-domain relationships" FontSize="11"
+                <TextBlock Grid.Row="0" Text="GPO hygiene &amp; link status" FontSize="11"
                            VerticalAlignment="Bottom"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,16" />
 
@@ -33,9 +32,9 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="TOTAL TRUSTS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="TOTAL GPOS" FontSize="9" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding TrustCount}" FontSize="24" FontWeight="Black"
+                            <TextBlock Text="{Binding GpoCount}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                         </StackPanel>
                     </Border>
@@ -44,9 +43,9 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="BIDIRECTIONAL" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="ORPHANED (UNLINKED)" FontSize="9" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding BidirectionalCount}" FontSize="24" FontWeight="Black"
+                            <TextBlock Text="{Binding OrphanedCount}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                         </StackPanel>
                     </Border>
@@ -55,15 +54,16 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="FOREST TRUSTS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="DISABLED" FontSize="9" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding ForestTrustCount}" FontSize="24" FontWeight="Black"
+                            <TextBlock Text="{Binding DisabledCount}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                         </StackPanel>
                     </Border>
 
                     <Button Style="{StaticResource PrimaryButton}"
                             Content="↻  Refresh" Command="{Binding LoadCommand}"
+                            AutomationProperties.Name="Refresh group policy objects"
                             IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBool}}"
                             HorizontalAlignment="Stretch" Margin="0,0,0,8" />
 
@@ -80,62 +80,60 @@
             </Grid>
         </Border>
 
-        <!-- Right: trust list -->
+        <!-- Right: GPO list -->
         <Grid Grid.Column="1" Margin="24,20,24,20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.RowSpan="2" Text="Click Refresh to load domain trusts."
+            <!-- Not-loaded placeholder -->
+            <TextBlock Grid.RowSpan="2" Text="Click Refresh to load group policy objects."
                        Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="{Binding ShowPlaceholder, Converter={StaticResource BoolToVisibility}}" />
 
-            <!-- Shared empty / error state (S12-1) -->
-            <shared:ListStateOverlay Grid.RowSpan="2" />
+            <!-- Error state -->
+            <TextBlock Grid.RowSpan="2" FontSize="13" TextWrapping="Wrap" MaxWidth="420"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="#FCA5A5"
+                       Text="{Binding ErrorMessage, StringFormat='⚠ Could not load GPOs: {0}'}"
+                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
 
-            <!-- Column headers -->
-            <Grid Grid.Row="0" Margin="16,0,0,6">
-                <Grid.Style>
-                    <Style TargetType="Grid">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Trusts}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
+            <!-- Empty state (loaded, zero rows) -->
+            <TextBlock Grid.RowSpan="2" Text="No group policy objects found. ✓"
+                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- Column headers (only once rows exist) -->
+            <Grid Grid.Row="0" Margin="16,0,0,6"
+                  Visibility="{Binding GpoCount, Converter={StaticResource NonZeroToVisibility}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="160" />
-                    <ColumnDefinition Width="130" />
-                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="100" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="DOMAIN" FontSize="10" FontWeight="SemiBold"
+                <TextBlock Grid.Column="0" Text="GPO" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
-                <TextBlock Grid.Column="1" Text="TYPE" FontSize="10" FontWeight="SemiBold"
+                <TextBlock Grid.Column="1" Text="CREATED" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
-                <TextBlock Grid.Column="2" Text="DIRECTION" FontSize="10" FontWeight="SemiBold"
+                <TextBlock Grid.Column="2" Text="MODIFIED" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
-                <TextBlock Grid.Column="3" Text="FOREST" FontSize="10" FontWeight="SemiBold"
+                <TextBlock Grid.Column="3" Text="LINKS" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
+                <TextBlock Grid.Column="4" Text="STATUS" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.7" />
             </Grid>
 
-            <ListBox Grid.Row="1" ItemsSource="{Binding Trusts}"
+            <ListBox Grid.Row="1" ItemsSource="{Binding Gpos}"
                      Background="Transparent" BorderThickness="0"
+                     AutomationProperties.Name="Group policy objects"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListBox.Style>
-                    <Style TargetType="ListBox">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Trusts}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ListBox.Style>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="0" />
@@ -158,52 +156,61 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="160" />
-                                    <ColumnDefinition Width="130" />
-                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="100" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                           FontWeight="SemiBold" FontSize="13"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
+                                               FontSize="13" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Guid}" FontSize="10" FontFamily="Consolas"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
 
-                                <TextBlock Grid.Column="1" Text="{Binding TrustType}"
-                                           FontSize="12" VerticalAlignment="Center"
+                                <TextBlock Grid.Column="1" Text="{Binding WhenCreated, StringFormat='yyyy-MM-dd'}"
+                                           FontSize="12" FontFamily="Consolas" VerticalAlignment="Center"
                                            Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="{Binding WhenChanged, StringFormat='yyyy-MM-dd'}"
+                                           FontSize="12" FontFamily="Consolas" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Grid.Column="3" Text="{Binding LinkCount}"
+                                           FontSize="13" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
 
-                                <Border Grid.Column="2" CornerRadius="4" Padding="8,3"
+                                <Border Grid.Column="4" CornerRadius="4" Padding="8,3"
                                         HorizontalAlignment="Left" VerticalAlignment="Center">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#1E3A5F" />
+                                            <Setter Property="Background" Value="#14532D" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsBidirectional}" Value="True">
-                                                    <Setter Property="Background" Value="#7F1D1D" />
+                                                <DataTrigger Binding="{Binding Status}" Value="Orphaned">
+                                                    <Setter Property="Background" Value="#78350F" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Disabled">
+                                                    <Setter Property="Background" Value="#374151" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
-                                    <TextBlock Text="{Binding Direction}" FontSize="11" FontWeight="SemiBold">
+                                    <TextBlock Text="{Binding Status}" FontSize="11" FontWeight="SemiBold">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="#93C5FD" />
+                                                <Setter Property="Foreground" Value="#86EFAC" />
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsBidirectional}" Value="True">
-                                                        <Setter Property="Foreground" Value="#FCA5A5" />
+                                                    <DataTrigger Binding="{Binding Status}" Value="Orphaned">
+                                                        <Setter Property="Foreground" Value="#FCD34D" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="#D1D5DB" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
-                                </Border>
-
-                                <Border Grid.Column="3" CornerRadius="4" Padding="8,3"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center"
-                                        Background="#14532D"
-                                        Visibility="{Binding IsForestTrust, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Forest" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="#86EFAC" />
                                 </Border>
                             </Grid>
                         </Border>

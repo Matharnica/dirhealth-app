@@ -176,13 +176,19 @@ public partial class DashboardViewModel : BaseViewModel
         StatusMessage = "Building full report…";
         try
         {
+            int? scoreDelta = ScoreHistory.Count >= 2
+                ? ScoreHistory[^1].Score - ScoreHistory[^2].Score
+                : null;
+
             var data = new FullReportData(
                 Domain:            _scanner.DomainName,
                 Score:             ComplianceScore,
                 Findings:          Findings,
                 InactiveUsers:     _cachedInactiveUsers,
                 ExpiringPasswords: _cachedExpiringPasswords,
-                DomainAdmins:      _cachedDomainAdmins
+                DomainAdmins:      _cachedDomainAdmins,
+                ScoreDelta:        scoreDelta,
+                Diff:              LastDiff
             );
 
             _pdfExporter.ExportFullReport(data, dlg.FileName);

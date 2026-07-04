@@ -6,12 +6,11 @@ using System.Collections.ObjectModel;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class ComputerBrowserViewModel : BaseViewModel
+public partial class ComputerBrowserViewModel : ListBrowserViewModel
 {
     private readonly AdScanner              _scanner;
     private readonly ComputerDetailViewModel _detail;
 
-    [ObservableProperty] private bool   _isLoading;
     [ObservableProperty] private string _filterText = "";
     [ObservableProperty] private bool   _showDetail;
 
@@ -21,6 +20,9 @@ public partial class ComputerBrowserViewModel : BaseViewModel
     private List<AdComputer> _allComputers = new();
     private DateTime _lastLoaded = DateTime.MinValue;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    protected override bool IsEmpty => _allComputers.Count == 0;
+    public override string EmptyMessage => "No computer accounts found.";
 
     public ComputerBrowserViewModel() : this(null!, null!) { }
 
@@ -39,7 +41,7 @@ public partial class ComputerBrowserViewModel : BaseViewModel
             ApplyFilter();
             return;
         }
-        IsLoading = true;
+        BeginLoad();
         Computers.Clear();
         _allComputers.Clear();
         try
@@ -47,9 +49,9 @@ public partial class ComputerBrowserViewModel : BaseViewModel
             _allComputers = await _scanner.GetAllComputersAsync();
             _lastLoaded   = DateTime.Now;
             ApplyFilter();
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to load computers: {ex.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception ex) { SetError($"Failed to load computers: {ex.Message}"); }
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();

@@ -6,12 +6,11 @@ using System.Collections.ObjectModel;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class UserBrowserViewModel : BaseViewModel
+public partial class UserBrowserViewModel : ListBrowserViewModel
 {
     private readonly AdScanner          _scanner;
     private readonly UserDetailViewModel _detail;
 
-    [ObservableProperty] private bool   _isLoading;
     [ObservableProperty] private string _filterText = "";
     [ObservableProperty] private string _userFilter = "All";
     [ObservableProperty] private bool   _showDetail;
@@ -23,6 +22,9 @@ public partial class UserBrowserViewModel : BaseViewModel
     private List<AdUser> _allUsers = new();
     private DateTime _lastLoaded = DateTime.MinValue;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    protected override bool IsEmpty => _allUsers.Count == 0;
+    public override string EmptyMessage => "No user accounts found.";
 
     public UserBrowserViewModel() : this(null!, null!) { }
 
@@ -41,7 +43,7 @@ public partial class UserBrowserViewModel : BaseViewModel
             ApplyFilter();
             return;
         }
-        IsLoading = true;
+        BeginLoad();
         Users.Clear();
         _allUsers.Clear();
         try
@@ -49,9 +51,9 @@ public partial class UserBrowserViewModel : BaseViewModel
             _allUsers   = await _scanner.GetAllUsersAsync();
             _lastLoaded = DateTime.Now;
             ApplyFilter();
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to load users: {ex.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception ex) { SetError($"Failed to load users: {ex.Message}"); }
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();

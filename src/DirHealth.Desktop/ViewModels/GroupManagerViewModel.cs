@@ -6,11 +6,10 @@ using System.Collections.ObjectModel;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class GroupManagerViewModel : BaseViewModel
+public partial class GroupManagerViewModel : ListBrowserViewModel
 {
     private readonly AdScanner _scanner;
 
-    [ObservableProperty] private bool          _isLoading;
     [ObservableProperty] private bool          _isLoadingDetail;
     [ObservableProperty] private string        _filterText = "";
     [ObservableProperty] private AdGroupDetail? _selectedGroup;
@@ -19,6 +18,9 @@ public partial class GroupManagerViewModel : BaseViewModel
     private List<AdGroup> _allGroups = new();
     private DateTime _lastLoaded = DateTime.MinValue;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    protected override bool IsEmpty => _allGroups.Count == 0;
+    public override string EmptyMessage => "No groups found.";
 
     public GroupManagerViewModel(AdScanner scanner) { _scanner = scanner; }
 
@@ -30,7 +32,7 @@ public partial class GroupManagerViewModel : BaseViewModel
             ApplyFilter();
             return;
         }
-        IsLoading = true;
+        BeginLoad();
         Groups.Clear();
         _allGroups.Clear();
         try
@@ -38,9 +40,9 @@ public partial class GroupManagerViewModel : BaseViewModel
             _allGroups  = await _scanner.GetAllGroupsWithCountAsync();
             _lastLoaded = DateTime.Now;
             ApplyFilter();
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to load groups: {ex.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception ex) { SetError($"Failed to load groups: {ex.Message}"); }
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();

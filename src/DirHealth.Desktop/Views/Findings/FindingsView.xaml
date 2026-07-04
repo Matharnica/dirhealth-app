@@ -81,6 +81,9 @@
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="#64748B" />
                                         <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                <Setter Property="Background" Value="#DC2626" />
+                                            </DataTrigger>
                                             <DataTrigger Binding="{Binding Severity}" Value="High">
                                                 <Setter Property="Background" Value="#EF4444" />
                                             </DataTrigger>
@@ -98,12 +101,34 @@
                                     <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextWrapping="Wrap" />
-                                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
-                                               Margin="0,4,0,0">
-                                        <Run Text="{Binding Count, Mode=OneWay}" />
-                                        <Run Text=" affected · " />
-                                        <Run Text="{Binding Severity, Mode=OneWay}" />
-                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                        <!-- Colour-coded severity badge -->
+                                        <Border CornerRadius="3" Padding="6,1" VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#334155" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                            <Setter Property="Background" Value="#7F1D1D" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="High">
+                                                            <Setter Property="Background" Value="#7F1D1D" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                                                            <Setter Property="Background" Value="#78350F" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Severity, Mode=OneWay}" FontSize="10"
+                                                       FontWeight="SemiBold" Foreground="White" />
+                                        </Border>
+                                        <TextBlock FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}">
+                                            <Run Text="{Binding Count, Mode=OneWay}" />
+                                            <Run Text=" affected" />
+                                        </TextBlock>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -170,8 +195,23 @@
                                TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Description}" FontSize="13"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               TextWrapping="Wrap" Margin="0,0,0,8" />
-                    <Button Content="→ Remediation guidance"
+                               TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                    <!-- Recommended fix (S11-1 Remediation) -->
+                    <Border Background="{DynamicResource BackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="12,10" Margin="0,0,0,12"
+                            Visibility="{Binding Remediation, Converter={StaticResource StringToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="RECOMMENDED FIX" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBrush}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding Remediation}" FontSize="12.5"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Button Content="→ Microsoft Learn guidance"
                             Style="{StaticResource SecondaryButton}"
                             Padding="10,4" FontSize="11" HorizontalAlignment="Left"
                             Margin="0,0,0,16"
