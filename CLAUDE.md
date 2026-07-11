@@ -1,5 +1,14 @@
 # CLAUDE.md
 
+**Gemeinsamer Arbeitsprozess:** @../project-template/PROCESS.md
+
+> Der verbindliche Prozess — Grundhaltung, Agent-Verhalten, Sprint-Workflow, Definition of Done,
+> Verifikations-Eskalationsleiter, Git-Konventionen, Doku-Pflege, Verbote, ADRs, Decision Framework —
+> steht dort und gilt für **alle** Projekte. **Nicht hierher kopieren.**
+> Diese Datei enthält nur, was für *dieses* Projekt spezifisch ist (Stack, Commands, Invarianten,
+> Hard-Won Lessons, Sprint-Stand). Bei Konflikt gewinnen die Projekt-Overrides dieser Datei.
+
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
