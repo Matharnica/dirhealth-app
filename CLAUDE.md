@@ -204,3 +204,15 @@ Feature roadmap with LDAP filters and implementation notes: [`docs/feature-roadm
 | Sprint 12 | Unified empty/error states, accessibility pass, AdScanner partial split | ✅ Done (v2.9.0) |
 
 **Phase 5 hold was lifted by the user on 2026-07-04.** Sprints 10–12 shipped as **v2.9.0** (2026-07-04). See [`docs/sprints/sprints.md`](docs/sprints/sprints.md) and the CHANGELOG `[2.9.0]` section. **S12-4 localization is Won't-do** (decided 2026-07-04): DirHealth targets a global admin audience and IT-admin tooling is English worldwide, so the English UI stays the default — do not extract strings to `Strings.xaml` on spec. New views/findings beyond Sprints 10–12 still require the user to initiate them.
+
+---
+
+## Sprint-Stand
+
+> Verbindlicher Zeiger auf den Ledger (PROCESS.md P6). Der Pfad kann projektspezifisch sein —
+> dieser Abschnitt nennt ihn, damit ihn ein frischer Agent beim Session-Start findet.
+
+Historie / Ledger: `docs/sprints/sprints.md`
+Aktueller Plan: `docs/sprints/sprint.md` (wird von `/sprint` erzeugt)
+
+Stand: siehe Ledger — hier bewusst nicht dupliziert (P9: eine Quelle pro Thema).
