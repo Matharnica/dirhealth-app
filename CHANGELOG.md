@@ -14,6 +14,17 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 15 (Search and user dossier)
+- **Search results as a table** (S15-1) — sortable, exportable, with a type icon (tooltip shows the type). Searches stop at 500 rows and say so: "Showing 500 of more than 500 — narrow your search". The LDAP-filter warning is unchanged.
+- **Detail next to the results** (S15-2) — double-click or Enter opens the user, computer or group detail on the right; the list and selection stay. Esc or ✕ closes it.
+- **Search prefixes** (S15-3) — `user:`, `group:`, `computer:`, `ou:` search one object type by name (e.g. `group:admins`). Works from any mode except the raw LDAP filter.
+- **New user detail** (S15-4) — every attribute in one name/value list (UAC flags, SPNs, delegation, SID, creation date, account expiry, adminCount, …), both logon values labelled honestly ("replicated, ±14 d" and "this DC"), collapsible "Member Of (n)" with direct/nested/primary and Tier 0 per group, "Affected by Findings (n)", and a "Tier 0 member" badge.
+- **User security dossier** (S15-5) — "Export dossier…" writes a PDF (attributes, every group with its path such as `jdoe → IT-Admins → Domain Admins`, affected findings with fixes, metadata) plus a groups CSV and a findings CSV, each with a `.meta.txt` holding its SHA-256.
+- **Quick filters** (S15-6) — chips in the user browser (Disabled, Password never expires, Admin (adminCount), Inactive > 90 d) and the computer browser (Disabled, Inactive > 90 d). They narrow the loaded list; the counter follows.
+
+### Removed — Sprint 15
+- The old single-user PDF ("User Profile") — replaced by the dossier. It highlighted privileged groups by English name only.
+
 ### Added — Sprint 14 (Tables and user export)
 - **Shared data table** (S14-1) — every list is now a sortable table (click a header; arrow shows the direction), the header stays visible while scrolling, a counter shows "37 of 1,204" for the local filter, and an **Export** menu writes "CSV (37 filtered)" in the displayed order or "CSV (all 1,204)". Right-click a row: Copy DN / Copy SID / Copy sAMAccountName.
 - **Rolled out to 11 views** (S14-1/2/3) — Users, Computers, Password Report, Domain Admins, Privileged Groups (one row per membership; empty or missing groups keep a row with a status), Group Manager (groups and members), DC Inventory, Domain Trusts, GPOs, OUs, Recent Changes. Selection and detail panels work as before; Esc closes the detail.
