@@ -40,6 +40,27 @@ public class CsvExporter
         return new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture) { Delimiter = _delimiter });
     }
 
+    /// <summary>
+    /// Generic table export (S14-1): one header per column, every cell through
+    /// <see cref="SafeField"/>. Returns the number of data rows written.
+    /// </summary>
+    public int ExportTable(IEnumerable<object> rows, IReadOnlyList<ITableColumn> columns, string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(columns);
+        using var csv = OpenCsv(filePath);
+        foreach (var c in columns) csv.WriteField(SafeField(c.Header));
+        csv.NextRecord();
+        int count = 0;
+        foreach (var row in rows)
+        {
+            foreach (var c in columns) csv.WriteField(SafeField(c.ExportValue(row)));
+            csv.NextRecord();
+            count++;
+        }
+        return count;
+    }
+
     public void ExportFindings(List<AdFinding> findings, string filePath)
     {
         using var csv    = OpenCsv(filePath);

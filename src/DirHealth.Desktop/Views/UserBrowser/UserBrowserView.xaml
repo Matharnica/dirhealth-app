@@ -4,11 +4,11 @@
              xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" MinWidth="420" />
+            <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <!-- User list -->
+        <!-- User table (S14-1) -->
         <Border Grid.Column="0"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
@@ -19,52 +19,45 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Users" FontSize="22" FontWeight="Bold"
-                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
-            <TextBox Grid.Row="1" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                     Background="{DynamicResource InputBackgroundBrush}"
-                     Foreground="{DynamicResource TextPrimaryBrush}"
-                     BorderBrush="{DynamicResource InputBorderBrush}"
-                     Padding="8,6" Margin="0,0,0,8" />
-            <ComboBox Grid.Row="2" ItemsSource="{Binding UserFilterOptions}"
-                      SelectedItem="{Binding UserFilter}"
-                      Margin="0,0,0,8"
-                      Background="{DynamicResource InputBackgroundBrush}"
-                      Foreground="{DynamicResource TextPrimaryBrush}"
-                      BorderBrush="{DynamicResource InputBorderBrush}">
-                <ComboBox.Resources>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}"     Color="#1E293B" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F1F5F9" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"  Color="#6366F1" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
-                </ComboBox.Resources>
-            </ComboBox>
-            <ProgressBar Grid.Row="3" Height="2" IsIndeterminate="True" Margin="0,0,0,4"
+            <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
+                <TextBlock DockPanel.Dock="Left" Text="Users" FontSize="22" FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <!-- S14-4: ADRecon-style export with opt-in personal columns -->
+                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}"
+                        Content="Export users…" Padding="12,4" FontSize="12" VerticalAlignment="Center"
+                        Click="ExportUsers_Click" IsEnabled="{Binding Table.HasAnyRows, Mode=OneWay}"
+                        AutomationProperties.Name="Export users with all attributes" />
+            </DockPanel>
+            <Grid Grid.Row="1" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="180" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                         Background="{DynamicResource InputBackgroundBrush}"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         BorderBrush="{DynamicResource InputBorderBrush}"
+                         Padding="8,6" Margin="0,0,8,0"
+                         AutomationProperties.Name="Filter users" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding UserFilterOptions}"
+                          SelectedItem="{Binding UserFilter}"
+                          Background="{DynamicResource InputBackgroundBrush}"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          BorderBrush="{DynamicResource InputBorderBrush}">
+                    <ComboBox.Resources>
+                        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}"     Color="#1E293B" />
+                        <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F1F5F9" />
+                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"  Color="#6366F1" />
+                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+                    </ComboBox.Resources>
+                </ComboBox>
+            </Grid>
+            <ProgressBar Grid.Row="2" Height="2" IsIndeterminate="True" Margin="0,0,0,4"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
-            <Grid Grid.Row="4">
-                <ListBox x:Name="UserList"
-                         ItemsSource="{Binding Users}"
-                         Background="Transparent" BorderThickness="0"
-                         VirtualizingStackPanel.IsVirtualizing="True"
-                         VirtualizingStackPanel.VirtualizationMode="Recycling"
-                         ScrollViewer.IsDeferredScrollingEnabled="True"
-                         SelectionChanged="UserList_SelectionChanged">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="4,4">
-                                <TextBlock Text="{Binding DisplayName}"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding SamAccountName}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="11" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+            <Grid Grid.Row="3">
+                <shared:DataTable x:Name="UserTable" DataContext="{Binding Table}" />
                 <!-- Shared empty / error state (S12-1) -->
                 <shared:ListStateOverlay />
             </Grid>
@@ -72,7 +65,7 @@
         </Border>
 
         <!-- User detail -->
-        <ScrollViewer Grid.Column="1"
+        <ScrollViewer Grid.Column="1" Width="460"
                       Margin="24,20,24,20"
                       Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibility}}"
                       VerticalScrollBarVisibility="Auto">
