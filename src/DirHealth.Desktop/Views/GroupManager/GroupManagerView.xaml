@@ -4,7 +4,7 @@
              xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" MinWidth="420" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -31,26 +31,7 @@
             <TextBlock Grid.Row="2" Text="Loading…" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
-            <ListBox Grid.Row="3" x:Name="GroupList" ItemsSource="{Binding Groups}"
-                     Background="Transparent" BorderThickness="0"
-                     VirtualizingStackPanel.IsVirtualizing="True"
-                     VirtualizingStackPanel.VirtualizationMode="Recycling"
-                     ScrollViewer.IsDeferredScrollingEnabled="True"
-                     SelectionChanged="GroupList_SelectionChanged">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="4,4">
-                            <TextBlock Text="{Binding Name}"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       FontWeight="SemiBold" />
-                            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11">
-                                <Run Text="{Binding MemberCount, Mode=OneWay}" />
-                                <Run Text=" members" />
-                            </TextBlock>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <shared:DataTable Grid.Row="3" DataContext="{Binding Table}" />
 
             <!-- Shared empty / error state (S12-1) -->
             <shared:ListStateOverlay Grid.Row="3" />
@@ -123,67 +104,8 @@
                 <TextBlock Grid.Row="1" Text="MEMBERS" FontSize="10" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
 
-                <!-- Member list — ListBox with virtualization, no selection highlight -->
-                <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
-                    <ListBox ItemsSource="{Binding SelectedGroup.Members}"
-                             Background="Transparent" BorderThickness="0"
-                             VirtualizingStackPanel.IsVirtualizing="True"
-                             VirtualizingStackPanel.VirtualizationMode="Recycling"
-                             ScrollViewer.IsDeferredScrollingEnabled="True">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter />
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="0,0,0,1" Padding="16,10">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border CornerRadius="3" Padding="6,2" Margin="0,0,10,0"
-                                                VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="#1D3461" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ObjectType}" Value="Group">
-                                                            <Setter Property="Background" Value="#312E81" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding ObjectType}" Value="Computer">
-                                                            <Setter Property="Background" Value="#1E3A2F" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="{Binding ObjectType}" FontSize="10"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{Binding Name}"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       FontWeight="SemiBold" FontSize="13" />
-                                            <TextBox Text="{Binding SamAccountName, Mode=OneWay}"
-                                                     Style="{StaticResource CopyableText}"
-                                                     Foreground="{DynamicResource TextSecondaryBrush}"
-                                                     FontSize="11" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Border>
+                <!-- Member table (S14-2) -->
+                <shared:DataTable Grid.Row="2" DataContext="{Binding MembersTable}" />
 
                 <!-- DN -->
                 <StackPanel Grid.Row="3" Margin="0,16,0,0">

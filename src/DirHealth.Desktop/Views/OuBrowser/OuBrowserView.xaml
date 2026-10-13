@@ -4,8 +4,8 @@
              xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" MinWidth="420" />
+            <ColumnDefinition Width="360" />
         </Grid.ColumnDefinitions>
 
         <!-- Left: OU list -->
@@ -27,27 +27,12 @@
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource TextPrimaryBrush}"
                      BorderBrush="{DynamicResource InputBorderBrush}"
-                     Padding="8,6" Margin="0,0,0,8" />
+                     Padding="8,6" Margin="0,0,0,8" AutomationProperties.Name="Filter OUs" />
             <TextBlock Grid.Row="2" Text="Loading…" FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
             <Grid Grid.Row="3">
-                <ListBox x:Name="OUList" ItemsSource="{Binding OUs}"
-                         Background="Transparent" BorderThickness="0"
-                         SelectionChanged="OUList_SelectionChanged">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="4,4">
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Description}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="11" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <shared:DataTable DataContext="{Binding Table}" />
                 <!-- Shared empty / error state (S12-1) -->
                 <shared:ListStateOverlay />
             </Grid>

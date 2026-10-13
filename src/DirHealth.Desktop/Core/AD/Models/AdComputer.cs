@@ -1,3 +1,5 @@
+using DirHealth.Desktop.Core.Export;
+
 namespace DirHealth.Desktop.Core.AD.Models;
 
 public class AdComputer
@@ -11,4 +13,6 @@ public class AdComputer
     public bool IsEol               { get; set; }
     public DateTime? EolDate        { get; set; }
     public string DistinguishedName { get; set; } = "";
+
+    public string Ou => DnHelper.OuFromDn(DistinguishedName);
 }

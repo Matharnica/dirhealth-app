@@ -19,6 +19,8 @@ public interface ITableColumn
     bool    Monospace    { get; }
     /// <summary>Grid shows a bool as Yes/No (export stays TRUE/FALSE).</summary>
     bool    YesNo        { get; }
+    /// <summary>Resource key of an IValueConverter that colours the cell text (grid only).</summary>
+    string? ForegroundConverterKey { get; }
     /// <summary>Cell value as text for export (not yet formula-escaped).</summary>
     string  ExportValue(object row);
 }
@@ -33,9 +35,11 @@ public sealed class TableColumn<T> : ITableColumn where T : class
     /// <param name="format">Display format in the grid; also used for export unless exportFormat is set.</param>
     public TableColumn(string header, Func<T, object?> value, string? bindingPath = null,
                        string? format = null, double width = 0, bool monospace = false,
-                       string? exportFormat = null, bool yesNo = false)
+                       string? exportFormat = null, bool yesNo = false,
+                       string? foregroundConverterKey = null)
     {
         YesNo         = yesNo;
+        ForegroundConverterKey = foregroundConverterKey;
         Header        = header;
         _value        = value;
         BindingPath   = bindingPath;
@@ -51,6 +55,7 @@ public sealed class TableColumn<T> : ITableColumn where T : class
     public double  Width        { get; }
     public bool    Monospace    { get; }
     public bool    YesNo        { get; }
+    public string? ForegroundConverterKey { get; }
 
     public string ExportValue(object row) => FormatValue(_value((T)row), _exportFormat);
 

@@ -7,6 +7,7 @@ using Xunit;
 namespace DirHealth.Tests;
 
 // S14-1 shared table, S14-5 export metadata.
+[Collection(ExportHookCollection.Name)]
 public class TableViewModelTests : IDisposable
 {
     private readonly Func<string, string?> _savedPicker = TableViewModel.PickSavePath;

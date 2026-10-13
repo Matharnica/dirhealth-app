@@ -8,6 +8,7 @@ using Xunit;
 namespace DirHealth.Tests;
 
 // S14-4: ADRecon-style user export.
+[Collection(ExportHookCollection.Name)]
 public class UserExportTests
 {
     private static readonly string[] StandardOrder =

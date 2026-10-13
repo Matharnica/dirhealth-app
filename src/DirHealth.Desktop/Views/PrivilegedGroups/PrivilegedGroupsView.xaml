@@ -1,6 +1,7 @@
 <UserControl x:Class="DirHealth.Desktop.Views.PrivilegedGroups.PrivilegedGroupsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" />
@@ -84,120 +85,19 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
+            <!-- One row per membership; empty / not-found groups keep a row with a Status (S14-2) -->
+            <shared:DataTable DataContext="{Binding Table}">
+                <shared:DataTable.Style>
+                    <Style TargetType="UserControl">
                         <Setter Property="Visibility" Value="Visible" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Groups}" Value="{x:Null}">
+                            <DataTrigger Binding="{Binding DataContext.Groups, RelativeSource={RelativeSource AncestorType=Grid}}" Value="{x:Null}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </ScrollViewer.Style>
-                <StackPanel>
-                    <ItemsControl ItemsSource="{Binding Groups}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Expander Margin="0,0,0,8">
-                                <Expander.Header>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,6">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
-                                            <TextBlock Text="{Binding RiskDescription}" FontSize="11"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
-                                            <!-- S13-1: a group that could not be resolved is shown, not dropped -->
-                                            <TextBlock FontSize="11" Foreground="#FCD34D" Margin="0,2,0,0"
-                                                       Visibility="{Binding IsNotFound, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                                                <Run Text="Not found: " /><Run Text="{Binding NotFoundReason, Mode=OneWay}" />
-                                            </TextBlock>
-                                        </StackPanel>
-                                        <Border Grid.Column="1" CornerRadius="12" Padding="10,3"
-                                                VerticalAlignment="Center" Margin="12,0,4,0">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="#1E3A5F" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding MemberCount}" Value="0">
-                                                            <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="{Binding MemberCount}" FontSize="12" FontWeight="Bold">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="#93C5FD" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding MemberCount}" Value="0">
-                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Border>
-                                    </Grid>
-                                </Expander.Header>
-                                <Border Background="{DynamicResource BackgroundBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                        CornerRadius="0,0,4,4" Padding="16,8,16,8">
-                                    <StackPanel>
-                                        <TextBlock Text="No members." FontSize="12" FontStyle="Italic"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   Margin="0,3,0,3">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding MemberCount}" Value="0">
-                                                            <Setter Property="Visibility" Value="Visible" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                        <ItemsControl ItemsSource="{Binding Members}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding}" FontSize="12"
-                                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                                               Margin="0,3,0,3" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-                            </Expander>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Text="No elevated groups have members — your AD is clean. ✓"
-                           HorizontalAlignment="Center" FontSize="13"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           Margin="0,32,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsLoading}" Value="False" />
-                                        <Condition Binding="{Binding Groups.Count}" Value="0" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
-            </ScrollViewer>
+                </shared:DataTable.Style>
+            </shared:DataTable>
         </Grid>
     </Grid>
 </UserControl>

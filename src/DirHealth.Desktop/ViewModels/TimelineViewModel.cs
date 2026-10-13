@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -20,7 +21,16 @@ public partial class TimelineViewModel : ListBrowserViewModel
     protected override bool IsEmpty => Changes is { Count: 0 };
     public override string EmptyMessage => $"No changes in the last {SelectedDays} days.";
 
-    public TimelineViewModel(AdScanner scanner) { _scanner = scanner; }
+    /// <summary>Shared sortable/exportable table (S14-3); mirrors Changes.</summary>
+    public TableViewModel<AdRecentChange> Table { get; } = new("Recent Changes", ViewColumns.RecentChanges) { Dn = c => c.DistinguishedName };
+
+    public TimelineViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+    }
+
+    partial void OnChangesChanged(List<AdRecentChange>? value) => Table.SetRows(value ?? []);
 
     partial void OnSelectedDaysChanged(int value)
     {

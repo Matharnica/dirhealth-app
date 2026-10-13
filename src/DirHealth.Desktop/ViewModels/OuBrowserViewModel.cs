@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
-using System.Collections.ObjectModel;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -17,23 +17,31 @@ public partial class OuBrowserViewModel : ListBrowserViewModel
     [ObservableProperty] private int     _selectedOuGroupCount;
     [ObservableProperty] private bool    _isLoadingCounts;
 
-    public ObservableCollection<AdOU> OUs { get; } = new();
+    /// <summary>Shared sortable/exportable table (S14-3).</summary>
+    public TableViewModel<AdOU> Table { get; } = new("Organizational Units", ViewColumns.OrganizationalUnits) { Dn = o => o.DistinguishedName };
     private List<AdOU> _allOUs = new();
 
     protected override bool IsEmpty => _allOUs.Count == 0;
     public override string EmptyMessage => "No organizational units found.";
 
-    public OuBrowserViewModel(AdScanner scanner) { _scanner = scanner; }
+    public OuBrowserViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        Table.FilterDescription = () => $"text='{FilterText}'";
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+        Table.SelectionChanged += row => { if (row is AdOU ou) _ = SelectOUAsync(ou); };
+    }
 
     [RelayCommand]
     public async Task LoadAsync()
     {
         BeginLoad();
-        OUs.Clear();
+        Table.Clear();
         _allOUs.Clear();
         try
         {
             _allOUs = await _scanner.GetAllOUsAsync();
+            Table.SetRows(_allOUs);
             ApplyFilter();
             EndLoad();
         }
@@ -44,15 +52,10 @@ public partial class OuBrowserViewModel : ListBrowserViewModel
 
     private void ApplyFilter()
     {
-        OUs.Clear();
         var q = FilterText.Trim();
-        foreach (var ou in _allOUs)
-        {
-            if (string.IsNullOrEmpty(q) ||
-                ou.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                ou.Description.Contains(q, StringComparison.OrdinalIgnoreCase))
-                OUs.Add(ou);
-        }
+        Table.SetFilter(string.IsNullOrEmpty(q) ? null : ou =>
+            ou.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            ou.Description.Contains(q, StringComparison.OrdinalIgnoreCase));
     }
 
     [RelayCommand]
