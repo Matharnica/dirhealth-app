@@ -443,6 +443,34 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Quick-filter chip (S15-6): local filter toggle, visually distinct from the search box -->
+    <Style x:Key="FilterChip" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="FontSize"   Value="11" />
+        <Setter Property="Margin"     Value="0,0,6,6" />
+        <Setter Property="Cursor"     Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="ChipBorder" CornerRadius="11" Padding="10,3" BorderThickness="1"
+                            Background="Transparent" BorderBrush="{DynamicResource BorderBrush}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Background" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ListView item hover -->
     <Style TargetType="ListViewItem">
         <Setter Property="Background"       Value="Transparent" />

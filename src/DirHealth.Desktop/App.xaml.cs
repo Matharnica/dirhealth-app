@@ -131,10 +131,20 @@ public partial class App : Application
         var dashboard        = new DashboardViewModel(scanner);
         var findings         = new FindingsViewModel();
         var appSettings      = new SettingsViewModel(connector);
-        var adSearch         = new AdSearchViewModel(searcher);
         var computerDetailVm = new ComputerDetailViewModel(wmi);
+        // Search has its own detail VMs so opening a result does not disturb the browsers (S15-2)
+        var searchUserDetail = new UserDetailViewModel(scanner);
+        var adSearch         = new AdSearchViewModel(searcher, scanner,
+                                                     searchUserDetail,
+                                                     new ComputerDetailViewModel(wmi));
         var computerBrowser  = new ComputerBrowserViewModel(scanner, computerDetailVm);
         var userDetailVm     = new UserDetailViewModel(scanner);
+        // S15-4/S15-5: detail and dossier show the user's findings from the last scan
+        foreach (var detailVm in new[] { userDetailVm, searchUserDetail })
+        {
+            detailVm.FindingsProvider = () => dashboard.Findings;
+            detailVm.ScanTimeProvider = () => dashboard.LastScanTime;
+        }
         var userBrowser      = new UserBrowserViewModel(scanner, userDetailVm);
         var ouBrowser        = new OuBrowserViewModel(scanner);
         var groupManager     = new GroupManagerViewModel(scanner);

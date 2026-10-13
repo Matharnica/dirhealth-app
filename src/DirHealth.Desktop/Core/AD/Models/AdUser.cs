@@ -30,6 +30,8 @@ public class AdUser
     public string    Description        { get; set; } = "";
     public bool      AdminCount         { get; set; }
     public bool      HasSpn             { get; set; }
+    /// <summary>servicePrincipalName values (S15-4 detail).</summary>
+    public List<string> Spns            { get; set; } = [];
     /// <summary>"Unconstrained", "Constrained (any protocol)", "Constrained" or "".</summary>
     public string    Delegation         { get; set; } = "";
 

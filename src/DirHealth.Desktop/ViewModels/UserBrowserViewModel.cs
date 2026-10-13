@@ -18,6 +18,19 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
     [ObservableProperty] private string _userFilter = "All";
     [ObservableProperty] private bool   _showDetail;
 
+    // S15-6 quick-filter chips (local, AND-combined)
+    [ObservableProperty] private bool _chipDisabled;
+    [ObservableProperty] private bool _chipPasswordNeverExpires;
+    [ObservableProperty] private bool _chipAdmin;
+    [ObservableProperty] private bool _chipInactive;
+
+    partial void OnChipDisabledChanged(bool value)             => ApplyFilter();
+    partial void OnChipPasswordNeverExpiresChanged(bool value) => ApplyFilter();
+    partial void OnChipAdminChanged(bool value)                => ApplyFilter();
+    partial void OnChipInactiveChanged(bool value)             => ApplyFilter();
+
+    private QuickFilters.UserChips Chips => new(ChipDisabled, ChipPasswordNeverExpires, ChipAdmin, ChipInactive);
+
     /// <summary>Shared sortable/exportable table (S14-1).</summary>
     public TableViewModel<AdUser> Table { get; }
     public UserDetailViewModel Detail => _detail;
@@ -42,7 +55,7 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
             Sid = u => u.Sid,
             Sam = u => u.SamAccountName,
         };
-        Table.FilterDescription = () => $"text='{FilterText}', status={UserFilter}";
+        Table.FilterDescription = () => $"text='{FilterText}', status={UserFilter}, chips={Chips}";
         if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
         Table.SelectionChanged += row => { if (row is AdUser u) _ = SelectUserAsync(u); };
     }
@@ -78,7 +91,9 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
     {
         var query  = FilterText.Trim();
         var status = UserFilter;
-        Table.SetFilter(u => MatchesFilter(u, query, status));
+        var chips  = Chips;
+        var now    = DateTime.UtcNow;
+        Table.SetFilter(u => MatchesFilter(u, query, status) && QuickFilters.Matches(u, chips, now));
     }
 
     public static bool MatchesFilter(AdUser u, string query, string status)

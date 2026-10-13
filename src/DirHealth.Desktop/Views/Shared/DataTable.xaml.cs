@@ -53,13 +53,19 @@ public partial class DataTable : UserControl
                 MinWidth       = 60,
             };
             if (c.Monospace) col.FontFamily = Mono;
+            Style? element = null;
             if (c.ForegroundConverterKey is { } key && TryFindResource(key) is IValueConverter conv)
             {
-                var style = new Style(typeof(TextBlock));
-                style.Setters.Add(new Setter(TextBlock.ForegroundProperty,
+                element ??= new Style(typeof(TextBlock));
+                element.Setters.Add(new Setter(TextBlock.ForegroundProperty,
                     new Binding(c.BindingPath) { Mode = BindingMode.OneWay, Converter = conv }));
-                col.ElementStyle = style;
             }
+            if (c.ToolTipPath is { } tip)
+            {
+                element ??= new Style(typeof(TextBlock));
+                element.Setters.Add(new Setter(ToolTipProperty, new Binding(tip) { Mode = BindingMode.OneWay }));
+            }
+            if (element is not null) col.ElementStyle = element;
             TableGrid.Columns.Add(col);
         }
     }

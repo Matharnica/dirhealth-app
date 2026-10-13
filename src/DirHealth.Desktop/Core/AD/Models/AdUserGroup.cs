@@ -1,3 +1,5 @@
+using DirHealth.Desktop.Core.AD;
+
 namespace DirHealth.Desktop.Core.AD.Models;
 
 /// <summary>How a user holds a group (S13-2).</summary>
@@ -16,6 +18,13 @@ public class AdUserGroup
     public string              Name              { get; init; } = "";
     public string              DistinguishedName { get; init; } = "";
     public GroupMembershipKind Kind              { get; init; }
+    /// <summary>objectSid of the group (S15-4: Tier 0 detection by SID).</summary>
+    public string              Sid               { get; init; } = "";
+    /// <summary>memberOf of the group itself — the edges for <see cref="Path"/> (S15-5).</summary>
+    public IReadOnlyList<string> ParentDns       { get; init; } = [];
+    /// <summary>"jdoe → IT-Admins → Domain Admins"; set by <c>GroupPaths.Assign</c>.</summary>
+    public string              Path              { get; set; } = "";
+    public bool                IsTier0           => WellKnownGroups.IsTier0Sid(Sid);
 
     public string KindLabel => Kind switch
     {
@@ -33,14 +42,29 @@ public class AdUserGroup
     public static List<AdUserGroup> Merge(
         IEnumerable<(string Dn, string Name)> direct,
         (string Dn, string Name)?             primary,
-        IEnumerable<(string Dn, string Name)> transitive)
+        IEnumerable<(string Dn, string Name)> transitive) =>
+        MergeRefs(direct.Select(g => new GroupRef(g.Dn, g.Name)),
+              primary is { } p ? new GroupRef(p.Dn, p.Name) : null,
+              transitive.Select(g => new GroupRef(g.Dn, g.Name)));
+
+    /// <summary>A group as read from LDAP, with the data needed for paths and Tier 0.</summary>
+    public record GroupRef(string Dn, string Name, string Sid = "", IReadOnlyList<string>? ParentDns = null);
+
+    public static List<AdUserGroup> MergeRefs(
+        IEnumerable<GroupRef> direct,
+        GroupRef?             primary,
+        IEnumerable<GroupRef> transitive)
     {
         var byDn = new Dictionary<string, AdUserGroup>(StringComparer.OrdinalIgnoreCase);
 
-        void Add((string Dn, string Name) g, GroupMembershipKind kind)
+        void Add(GroupRef g, GroupMembershipKind kind)
         {
             if (string.IsNullOrEmpty(g.Dn) || byDn.ContainsKey(g.Dn)) return;
-            byDn[g.Dn] = new AdUserGroup { DistinguishedName = g.Dn, Name = g.Name, Kind = kind };
+            byDn[g.Dn] = new AdUserGroup
+            {
+                DistinguishedName = g.Dn, Name = g.Name, Kind = kind,
+                Sid = g.Sid, ParentDns = g.ParentDns ?? [],
+            };
         }
 
         foreach (var g in direct) Add(g, GroupMembershipKind.Direct);

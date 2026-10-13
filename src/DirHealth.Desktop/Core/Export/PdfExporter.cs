@@ -461,123 +461,128 @@ public class PdfExporter
         doc.Save(filePath);
     }
 
-    public void ExportUserDetail(AdUser user, IEnumerable<AdUserGroup> groups, string filePath)
+    /// <summary>
+    /// Single-user security dossier (S15-5): attributes, Tier 0 status, every group with its
+    /// membership path, affected findings with remediation, and audit metadata. Page breaks
+    /// re-draw header/footer and the section title ("continued").
+    /// </summary>
+    public void ExportUserDossier(UserDossier d, string filePath)
     {
-        ArgumentNullException.ThrowIfNull(groups);
-        // Direct groups plain, primary/nested marked so the badge list stays readable (S13-2)
-        var groupList = groups
-            .Select(g => g.Kind == GroupMembershipKind.Direct ? g.Name : $"{g.Name} ({g.KindLabel})")
-            .ToList();
-        var doc       = new PdfDocument();
-        doc.Info.Title = $"DirHealth — User: {user.DisplayName}";
-        var ui        = new PdfPageBuilder();
-        int pageNum   = 1;
+        var doc = new PdfDocument();
+        doc.Info.Title = $"DirHealth — User dossier: {d.User.SamAccountName}";
+        var ui      = new PdfPageBuilder();
+        int pageNum = 1;
+        PdfPage   page = null!;
+        XGraphics gfx  = null!;
+        double    y    = 0;
+        var label = new XSolidBrush(PdfPageBuilder.ColLabelGray);
+        var body  = new XSolidBrush(PdfPageBuilder.ColBodyText);
+        var warn  = new XSolidBrush(PdfPageBuilder.ColCritical);
+        double x  = PdfPageBuilder.Margin;
+        string section = "";
 
-        var page = doc.AddPage();
-        var gfx  = XGraphics.FromPdfPage(page);
-        ui.DrawHeader(gfx, page, "User Profile");
-        ui.DrawFooter(gfx, page, "—", pageNum++);
-
-        ui.DrawTitleStrip(gfx, page,
-            "User Profile",
-            user.DisplayName,
-            user.SamAccountName);
-
-        double y       = ui.ContentTop + 40 + 20;
-        double labelX  = PdfPageBuilder.Margin;
-        double valueX  = PdfPageBuilder.Margin + 150;
-        const double rowStep = 18;
-
-        var labelBrush = new XSolidBrush(PdfPageBuilder.ColLabelGray);
-        var bodyBrush  = new XSolidBrush(PdfPageBuilder.ColBodyText);
-        var warnBrush  = new XSolidBrush(PdfPageBuilder.ColCritical);
-
-        void Row(string label, string value, bool warn = false)
+        void NewPage()
         {
-            gfx.DrawString(label, PdfPageBuilder.F9B, labelBrush, labelX, y);
-            gfx.DrawString(value, warn ? PdfPageBuilder.F10B : PdfPageBuilder.F10,
-                warn ? warnBrush : bodyBrush, valueX, y);
-            y += rowStep;
-        }
-
-        void RowMono(string label, string value, bool warn = false)
-        {
-            gfx.DrawString(label, PdfPageBuilder.F9B, labelBrush, labelX, y);
-            gfx.DrawString(value, PdfPageBuilder.Mono9,
-                warn ? warnBrush : bodyBrush, valueX, y);
-            y += rowStep;
-        }
-
-        bool pwdExpired = user.PasswordExpires.HasValue
-            && user.DaysUntilPasswordExpiry.HasValue
-            && user.DaysUntilPasswordExpiry.Value <= 0;
-        string pwdExpiresText = user.PasswordExpires.HasValue
-            ? $"{user.PasswordExpires.Value:yyyy-MM-dd}  ({user.DaysUntilPasswordExpiry?.ToString() ?? "?"} days)"
-            : "Never";
-
-        Row("STATUS",             user.IsEnabled ? "Enabled" : "Disabled");
-        Row("SAM ACCOUNT",        user.SamAccountName);
-        Row("EMAIL",              user.Email ?? "—");
-        Row("OU",                 DnHelper.OuFromDn(user.DistinguishedName));
-        RowMono("LAST LOGON (±14 D)", user.LastLogon?.ToString("yyyy-MM-dd") ?? "Never");
-        RowMono("PASSWORD LAST SET",  user.PasswordLastSet?.ToString("yyyy-MM-dd")  ?? "N/A");
-        RowMono("PASSWORD EXPIRES",   pwdExpiresText, pwdExpired);
-        Row("NEVER EXPIRES",      user.PasswordNeverExpires ? "Yes" : "No");
-
-        y += 6;
-        gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 0.5),
-            labelX, y, labelX + ui.ContentWidth(page), y);
-        y += 14;
-
-        gfx.DrawString("GROUP MEMBERSHIPS", PdfPageBuilder.F9B, labelBrush, labelX, y);
-        y += 18;
-
-        double badgeX = labelX;
-        foreach (var g in groupList)
-        {
-            if (y > ui.ContentBottom(page) - 30)
+            page = doc.AddPage();
+            gfx  = XGraphics.FromPdfPage(page);
+            ui.DrawHeader(gfx, page, "User Dossier", d.Context.Domain);
+            ui.DrawFooter(gfx, page, d.Context.Domain, pageNum++);
+            y = ui.ContentTop + 24;
+            if (section.Length > 0)
             {
-                page = doc.AddPage();
-                gfx  = XGraphics.FromPdfPage(page);
-                ui.DrawHeader(gfx, page, "User Profile");
-                ui.DrawFooter(gfx, page, "—", pageNum++);
-                y = ui.ContentTop + 20;
-                gfx.DrawString("GROUP MEMBERSHIPS (continued)", PdfPageBuilder.F9B,
-                    labelBrush, labelX, y);
-                y += 18;
-                badgeX = labelX;
+                gfx.DrawString(section + " (continued)", PdfPageBuilder.F9B, label, x, y);
+                y += 16;
             }
-
-            // Wrap badge to next line if it would overflow the content width
-            double bw = gfx.MeasureString(g, PdfPageBuilder.F9).Width + 12;
-            if (badgeX + bw > labelX + ui.ContentWidth(page))
+        }
+        void Ensure(double h) { if (y + h > ui.ContentBottom(page) - 10) NewPage(); }
+        void Section(string title)
+        {
+            section = "";
+            Ensure(40);
+            y += 8;
+            gfx.DrawString(title, PdfPageBuilder.F11B, body, x, y);
+            y += 6;
+            gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 1), x, y, x + ui.ContentWidth(page), y);
+            y += 14;
+            section = title;
+        }
+        void Wrapped(string text, XFont font, XBrush brush, double indent, double lineH)
+        {
+            foreach (var line in PdfPageBuilder.WrapText(gfx, text, font, ui.ContentWidth(page) - indent))
             {
-                badgeX = labelX;
-                y += rowStep;
-                // Re-check page overflow after line wrap
-                if (y > ui.ContentBottom(page) - 30)
-                {
-                    page = doc.AddPage();
-                    gfx  = XGraphics.FromPdfPage(page);
-                    ui.DrawHeader(gfx, page, "User Profile");
-                    ui.DrawFooter(gfx, page, "—", pageNum++);
-                    y = ui.ContentTop + 20;
-                    gfx.DrawString("GROUP MEMBERSHIPS (continued)", PdfPageBuilder.F9B,
-                        labelBrush, labelX, y);
-                    y += 18;
-                    badgeX = labelX;
-                }
+                Ensure(lineH);
+                gfx.DrawString(line, font, brush, x + indent, y);
+                y += lineH;
             }
-            ui.DrawGroupBadge(gfx, ref badgeX, y, g);
         }
 
-        if (groupList.Count == 0)
-            gfx.DrawString("No group memberships.", PdfPageBuilder.F9,
-                labelBrush, labelX, y);
+        NewPage();
+        ui.DrawTitleStrip(gfx, page, "User Dossier", d.User.DisplayName.Length > 0 ? d.User.DisplayName : d.User.SamAccountName,
+            d.IsTier0 ? $"{d.User.SamAccountName} · TIER 0 MEMBER" : d.User.SamAccountName);
+        y = ui.ContentTop + 40 + 24;
+
+        Section("ATTRIBUTES");
+        const double valueX = 190;
+        foreach (var row in d.Attributes)
+        {
+            var lines = PdfPageBuilder.WrapText(gfx, row.Value, PdfPageBuilder.F9, ui.ContentWidth(page) - valueX);
+            Ensure(13 * Math.Max(1, lines.Count) + 2);
+            gfx.DrawString(row.Label, PdfPageBuilder.F9B, label, x, y);
+            foreach (var line in lines.DefaultIfEmpty(""))
+            {
+                gfx.DrawString(line, PdfPageBuilder.F9, row.Warn ? warn : body, x + valueX, y);
+                y += 13;
+            }
+            y += 2;
+        }
+
+        Section($"GROUP MEMBERSHIPS ({d.Groups.Count})");
+        if (d.Groups.Count == 0) Wrapped("No group memberships.", PdfPageBuilder.F9, label, 0, 13);
+        foreach (var g in d.Groups)
+        {
+            Ensure(28);
+            var tag = g.KindLabel + (g.IsTier0 ? " · TIER 0" : "");
+            gfx.DrawString(g.Name, PdfPageBuilder.F10B, g.IsTier0 ? warn : body, x, y);
+            gfx.DrawString(tag, PdfPageBuilder.F9, label, x + ui.ContentWidth(page) - gfx.MeasureString(tag, PdfPageBuilder.F9).Width, y);
+            y += 13;
+            Wrapped(g.Path, PdfPageBuilder.Mono9, label, 10, 12);
+            y += 4;
+        }
+
+        Section($"AFFECTED BY FINDINGS ({d.Findings.Count})");
+        if (d.Findings.Count == 0) Wrapped("This user appears in no finding of the last scan.", PdfPageBuilder.F9, label, 0, 13);
+        foreach (var f in d.Findings)
+        {
+            Ensure(30);
+            var (_, border, text) = ui.SeverityStyle(f.Severity);
+            gfx.DrawRectangle(new XSolidBrush(border), x, y - 9, 3, 12);
+            gfx.DrawString($"{f.Severity.ToString().ToUpperInvariant()}  {f.Title}", PdfPageBuilder.F10B, text, x + 8, y);
+            y += 14;
+            if (!string.IsNullOrEmpty(f.Remediation))
+                Wrapped("→ Fix: " + f.Remediation, PdfPageBuilder.F9, new XSolidBrush(PdfPageBuilder.ColGradEnd), 8, 12);
+            y += 4;
+        }
+
+        Section("REPORT METADATA");
+        foreach (var (k, v) in new[]
+        {
+            ("Domain",            d.Context.Domain),
+            ("Domain controller", d.Context.DomainController),
+            ("Run by",            d.Context.User),
+            ("Last scan",         d.ScanTime),
+            ("Created (UTC)",     d.CreatedUtc.ToString("yyyy-MM-dd HH:mm:ss'Z'")),
+            ("Tool",              $"DirHealth {d.Version}"),
+            ("Integrity",         "SHA-256 of this file: see the .meta.txt next to it"),
+        })
+        {
+            Ensure(14);
+            gfx.DrawString(k, PdfPageBuilder.F9B, label, x, y);
+            gfx.DrawString(v, PdfPageBuilder.F9, body, x + valueX, y);
+            y += 13;
+        }
 
         doc.Save(filePath);
     }
-
 }
 
 file sealed class PdfPageBuilder
@@ -836,29 +841,4 @@ file sealed class PdfPageBuilder
         score >= 80 ? "Good" :
         score >= 60 ? "Warning" :
                       "Critical";
-
-    internal bool IsPrivilegedGroup(string name)
-    {
-        var lower = name.ToLowerInvariant();
-        return lower is "domain admins" or "schema admins" or "enterprise admins"
-            or "administrators" or "backup operators" or "account operators"
-            or "server operators" or "group policy creator owners";
-    }
-
-    internal void DrawGroupBadge(XGraphics gfx, ref double x, double y, string groupName)
-    {
-        bool   priv   = IsPrivilegedGroup(groupName);
-        XColor bgCol  = priv ? XColor.FromArgb(254, 242, 242) : XColor.FromArgb(239, 246, 255);
-        XColor txtCol = priv ? XColor.FromArgb(220,  38,  38) : XColor.FromArgb( 29,  78, 216);
-        XColor bdCol  = priv ? XColor.FromArgb(254, 202, 202) : XColor.FromArgb(191, 219, 254);
-
-        double tw     = gfx.MeasureString(groupName, F9).Width;
-        double bw     = tw + 12;
-        const double bh = 14;
-
-        gfx.DrawRectangle(new XSolidBrush(bgCol), x, y - 11, bw, bh);
-        gfx.DrawRectangle(new XPen(bdCol, 0.5),   x, y - 11, bw, bh);
-        gfx.DrawString(groupName, F9, new XSolidBrush(txtCol), x + 6, y);
-        x += bw + 5;
-    }
 }

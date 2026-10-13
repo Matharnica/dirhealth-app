@@ -106,4 +106,24 @@ public static class ViewColumns
         new("Changed (local)", c => c.ChangedAtLocal, nameof(AdRecentChange.ChangedAtLocal), "yyyy-MM-dd HH:mm", monospace: true),
         new("Distinguished Name", c => c.DistinguishedName),
     ];
+
+    public static IReadOnlyList<TableColumn<AdSearchResult>> SearchResults { get; } =
+    [
+        new("Type",           r => r.TypeLabel,      nameof(AdSearchResult.TypeIcon), width: 52,
+            toolTipPath: nameof(AdSearchResult.TypeLabel)),
+        new("Name",           r => r.Name,           nameof(AdSearchResult.Name)),
+        new("Display Name",   r => r.DisplayName,    nameof(AdSearchResult.DisplayName)),
+        new("sAMAccountName", r => r.SamAccountName, nameof(AdSearchResult.SamAccountName), monospace: true),
+        new("Email",          r => r.Email,          nameof(AdSearchResult.Email)),
+        new("Enabled",        r => r.IsEnabled,      nameof(AdSearchResult.IsEnabled), yesNo: true),
+        new("OU",             r => r.OU,             nameof(AdSearchResult.OU)),
+        new("SID",            r => r.Sid),
+        new("Distinguished Name", r => r.DistinguishedName),
+    ];
+
+    /// <summary>User detail "Member Of" and the dossier groups CSV (S15-4/S15-5).</summary>
+    public static IReadOnlyList<TableColumn<AdUserGroup>> UserGroups => UserDossierExporter.GroupColumns;
+
+    /// <summary>Dossier findings CSV (S15-5).</summary>
+    public static IReadOnlyList<TableColumn<AdFinding>> UserFindings => UserDossierExporter.FindingColumns;
 }

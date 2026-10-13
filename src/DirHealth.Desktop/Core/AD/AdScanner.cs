@@ -594,6 +594,29 @@ public partial class AdScanner
         catch { return 0; }
     }
 
+    /// <summary>One user by DN (S15-2 search → detail). Null when not found.</summary>
+    public async Task<AdUser?> GetUserByDnAsync(string distinguishedName) =>
+        await Task.Run(() => QueryUsers($"(&(objectClass=user)(distinguishedName={EscapeDn(distinguishedName)}))").FirstOrDefault());
+
+    /// <summary>One computer by DN (S15-2 search → detail). Null when not found.</summary>
+    public async Task<AdComputer?> GetComputerByDnAsync(string distinguishedName) =>
+        await Task.Run(() => QueryComputers($"(&(objectClass=computer)(distinguishedName={EscapeDn(distinguishedName)}))").FirstOrDefault());
+
+    /// <summary>
+    /// The non-replicated lastLogon as seen by the DC this connection is bound to (S15-4).
+    /// Each DC keeps its own value, so it is labelled "this DC" — the true last logon is the
+    /// maximum across all DCs, which DirHealth does not query.
+    /// </summary>
+    public async Task<DateTime?> GetLastLogonOnConnectedDcAsync(string distinguishedName) =>
+        await Task.Run(() =>
+        {
+            using var root     = _connector.GetRootEntry();
+            using var searcher = _connector.CreateSearcher(root,
+                $"(distinguishedName={EscapeDn(distinguishedName)})", "lastLogon");
+            var r = searcher.FindOne();
+            return r is null ? null : GetDateTime(r.Properties, "lastLogon");
+        });
+
     public async Task<List<AdComputer>> GetAllComputersAsync()
     {
         return await Task.Run(() => QueryComputers("(&(objectClass=computer))"));
@@ -644,20 +667,29 @@ public partial class AdScanner
             var escaped = EscapeDn(distinguishedName);
             using var root = _connector.GetRootEntry();
 
-            List<(string Dn, string Name)> Groups(string filter)
+            List<AdUserGroup.GroupRef> Groups(string filter)
             {
-                using var searcher = _connector.CreateSearcher(root, filter, "distinguishedName", "cn");
+                using var searcher = _connector.CreateSearcher(root, filter, "distinguishedName", "cn", "objectSid", "memberOf");
                 using var results  = searcher.FindAll();
-                var list = new List<(string, string)>();
+                var list = new List<AdUserGroup.GroupRef>();
                 foreach (SearchResult r in results)
-                    list.Add((GetString(r.Properties, "distinguishedName"), GetString(r.Properties, "cn")));
+                {
+                    var parents = new List<string>();
+                    foreach (var v in r.Properties["memberOf"]) if (v?.ToString() is { } dn) parents.Add(dn);
+                    list.Add(new AdUserGroup.GroupRef(
+                        GetString(r.Properties, "distinguishedName"),
+                        GetString(r.Properties, "cn"),
+                        r.Properties["objectSid"].Count > 0 && r.Properties["objectSid"][0] is byte[] sid
+                            ? WellKnownGroups.SidBytesToString(sid) : "",
+                        parents));
+                }
                 return list;
             }
 
             var direct     = Groups($"(&(objectClass=group)(member={escaped}))");
             var transitive = Groups($"(&(objectClass=group)(member:{InChain}:={escaped}))");
 
-            (string Dn, string Name)? primary = null;
+            AdUserGroup.GroupRef? primary = null;
             using (var us = _connector.CreateSearcher(root,
                        $"(distinguishedName={escaped})", "objectSid", "primaryGroupID"))
             {
@@ -668,7 +700,7 @@ public partial class AdScanner
                 {
                     var groupSid = WellKnownGroups.PrimaryGroupSid(WellKnownGroups.SidBytesToString(sidBytes), pgid);
                     var pg = Groups($"(&(objectClass=group)(objectSid={groupSid}))").FirstOrDefault();
-                    if (!string.IsNullOrEmpty(pg.Dn))
+                    if (pg is not null && !string.IsNullOrEmpty(pg.Dn))
                     {
                         primary = pg;
                         // Groups the primary group itself belongs to are nested memberships too
@@ -677,7 +709,7 @@ public partial class AdScanner
                 }
             }
 
-            return AdUserGroup.Merge(direct, primary, transitive);
+            return AdUserGroup.MergeRefs(direct, primary, transitive);
         });
     }
 
@@ -1011,6 +1043,7 @@ public partial class AdScanner
                 Description         = GetString(props, "description"),
                 AdminCount          = GetLong(props, "adminCount") > 0,
                 HasSpn              = props["servicePrincipalName"].Count > 0,
+                Spns                = props["servicePrincipalName"].Cast<object>().Select(v => v?.ToString() ?? "").ToList(),
                 Delegation          = AdTime.DelegationKind(uac, props["msDS-AllowedToDelegateTo"].Count > 0),
             });
         }
