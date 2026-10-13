@@ -81,14 +81,15 @@
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="#64748B" />
                                         <Style.Triggers>
+                                            <!-- Accent colours from SeverityPalette, same as the PDF (A9) -->
                                             <DataTrigger Binding="{Binding Severity}" Value="Critical">
-                                                <Setter Property="Background" Value="#DC2626" />
+                                                <Setter Property="Background" Value="{StaticResource CriticalSeverityBrush}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Severity}" Value="High">
-                                                <Setter Property="Background" Value="#EF4444" />
+                                                <Setter Property="Background" Value="{StaticResource HighSeverityBrush}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Severity}" Value="Medium">
-                                                <Setter Property="Background" Value="#F59E0B" />
+                                                <Setter Property="Background" Value="{StaticResource MediumSeverityBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

@@ -1,3 +1,4 @@
+using DirHealth.Desktop.Core;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Services;
 using PdfSharp.Pdf;
@@ -518,7 +519,7 @@ public class PdfExporter
         Row("SAM ACCOUNT",        user.SamAccountName);
         Row("EMAIL",              user.Email ?? "—");
         Row("OU",                 DnHelper.OuFromDn(user.DistinguishedName));
-        RowMono("LAST LOGON",         user.LastLogon?.ToString("yyyy-MM-dd") ?? "Never");
+        RowMono("LAST LOGON (±14 D)", user.LastLogon?.ToString("yyyy-MM-dd") ?? "Never");
         RowMono("PASSWORD LAST SET",  user.PasswordLastSet?.ToString("yyyy-MM-dd")  ?? "N/A");
         RowMono("PASSWORD EXPIRES",   pwdExpiresText, pwdExpired);
         Row("NEVER EXPIRES",      user.PasswordNeverExpires ? "Yes" : "No");
@@ -588,10 +589,13 @@ file sealed class PdfPageBuilder
     internal static readonly XColor ColScoreGood   = XColor.FromArgb(125, 255, 179); // #7DFFB3
     internal static readonly XColor ColScoreWarn   = XColor.FromArgb(252, 211,  77); // #FCD34D
     internal static readonly XColor ColScoreCrit   = XColor.FromArgb(252, 165, 165); // #FCA5A5
-    internal static readonly XColor ColCritical    = XColor.FromArgb(220,  38,  38); // #dc2626
-    internal static readonly XColor ColHigh        = XColor.FromArgb(217, 119,   6); // #d97706
-    internal static readonly XColor ColMedium      = XColor.FromArgb(202, 138,   4); // #ca8a04
-    internal static readonly XColor ColLow         = XColor.FromArgb(107, 114, 128); // #6b7280
+    // Severity accents: single source shared with the app (A9, S14-6)
+    internal static readonly XColor ColCritical    = FromRgb(SeverityPalette.CriticalRgb);
+    internal static readonly XColor ColHigh        = FromRgb(SeverityPalette.HighRgb);
+    internal static readonly XColor ColMedium      = FromRgb(SeverityPalette.MediumRgb);
+    internal static readonly XColor ColLow         = FromRgb(SeverityPalette.LowRgb);
+
+    private static XColor FromRgb((byte R, byte G, byte B) c) => XColor.FromArgb(c.R, c.G, c.B);
     internal static readonly XColor ColBodyText    = XColor.FromArgb( 17,  24,  39); // #111827
     internal static readonly XColor ColLabelGray   = XColor.FromArgb(107, 114, 128); // #6b7280
     internal static readonly XColor ColFooterBg    = XColor.FromArgb(248, 250, 252); // #f8fafc

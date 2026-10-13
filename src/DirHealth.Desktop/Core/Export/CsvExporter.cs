@@ -104,7 +104,7 @@ public class CsvExporter
                 SafeField(u.DisplayName),
                 SafeField(u.SamAccountName),
                 SafeField(u.Email),
-                u.LastLogon?.ToString("yyyy-MM-dd") ?? "Never",
+                u.LastLogon?.ToString("yyyy-MM-dd") ?? "",   // A10: never "Never" in a date column
                 SafeField(DnHelper.OuFromDn(u.DistinguishedName))));
             csv.NextRecord();
         }

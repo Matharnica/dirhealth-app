@@ -47,7 +47,8 @@ public partial class MainViewModel : BaseViewModel
     private string? _updateExpectedSha256;
 
     public string AppVersion      { get; } = UpdateChecker.GetCurrentVersion();
-    public int    FindingsCount   => Dashboard.FindingsCount;
+    /// <summary>Sidebar badge: open (not acknowledged) findings only — S9-8, A6 fixed in S14-6.</summary>
+    public int    FindingsCount   => Findings.OpenFindingsCount;
     public string CurrentViewName => _currentView?.GetType().Name ?? "";
 
     partial void OnCurrentViewChanged(BaseViewModel value) => OnPropertyChanged(nameof(CurrentViewName));
@@ -94,7 +95,11 @@ public partial class MainViewModel : BaseViewModel
                 Findings.LoadFindings(Dashboard.Findings, Dashboard.ComplianceScore);
             if (e.PropertyName == nameof(DashboardViewModel.ComplianceScore))
                 Findings.Score = Dashboard.ComplianceScore;
-            if (e.PropertyName == nameof(DashboardViewModel.FindingsCount))
+        };
+
+        Findings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FindingsViewModel.OpenFindingsCount))
                 OnPropertyChanged(nameof(FindingsCount));
         };
 

@@ -22,6 +22,11 @@ public partial class FindingsViewModel : BaseViewModel
 
     public List<string> SeverityOptions { get; } = ["All", "High", "Medium", "Low"];
 
+    /// <summary>Findings not acknowledged — drives the sidebar badge (S9-8; A6 fix in S14-6).</summary>
+    public int OpenFindingsCount => CountOpen(Findings);
+
+    public static int CountOpen(IEnumerable<AdFinding> findings) => findings.Count(f => !f.IsAcknowledged);
+
     public List<AdFinding> FilteredFindings
     {
         get
@@ -43,6 +48,7 @@ public partial class FindingsViewModel : BaseViewModel
     partial void OnFilterTextChanged(string value)
     {
         OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
         ExportCsvCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
     }
@@ -50,6 +56,7 @@ public partial class FindingsViewModel : BaseViewModel
     partial void OnSeverityFilterChanged(string value)
     {
         OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
         ExportCsvCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
     }
@@ -57,18 +64,25 @@ public partial class FindingsViewModel : BaseViewModel
     partial void OnShowAcknowledgedChanged(bool value)
     {
         OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
         ExportCsvCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnSelectedFindingChanged(AdFinding? value) =>
+    partial void OnSelectedFindingChanged(AdFinding? value)
+    {
+        // A8 (S14-6): the list binds SelectedItem straight to SelectedFinding, so the
+        // SelectFinding command never runs on a click — load the saved note here instead.
+        AcknowledgeNote = value?.AcknowledgeNote ?? "";
         OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
+    }
 
     public bool SelectedFindingIsAcknowledged => SelectedFinding?.IsAcknowledged ?? false;
 
     partial void OnFindingsChanged(List<AdFinding> value)
     {
         OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
         ExportCsvCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
     }
@@ -113,6 +127,7 @@ public partial class FindingsViewModel : BaseViewModel
             SelectedFinding.IsAcknowledged  = true;
             SelectedFinding.AcknowledgeNote = AcknowledgeNote;
             OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
             OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
             StatusMessage   = "Finding acknowledged.";
             AcknowledgeNote = "";
@@ -131,6 +146,7 @@ public partial class FindingsViewModel : BaseViewModel
             SelectedFinding.IsAcknowledged  = false;
             SelectedFinding.AcknowledgeNote = "";
             OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
             OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
             StatusMessage   = "Acknowledgement removed.";
             AcknowledgeNote = "";
