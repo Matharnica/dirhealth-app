@@ -14,6 +14,12 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 16 (Finding card and fix block)
+- **Rule catalog** (S16-1) — every finding has a stable rule id (e.g. `DH-KRB-002`), a weight (1–10; exploitable issues weigh more than hygiene) and references (Microsoft Learn, MITRE ATT&CK). Affected objects are stored with name, DN, SID and type. Scan caches from earlier versions still load.
+- **Finding card** (S16-2) — fixed layout: title with count, rule id · severity · weight, "What is it · Why it matters · How to fix", references, and the affected objects as a sortable, exportable table. Double-click an object to open its detail.
+- **Fix block** (S16-3) — per rule a PowerShell command to copy, the operational risk in one sentence, and an undo command. The command uses **exactly the LDAP filter of the check** (same source in code), writes a backup file first and starts with `-WhatIf`. DirHealth only shows and copies it — it never runs anything.
+- **Check status** (S16-4) — every check reports Found, Passed, Failed (with reason) or Not applicable. A failing query no longer aborts the whole scan, and checks that used to swallow errors (Stale Domain Admins, password policy, fine-grained policies) now report "Failed" instead of a silent pass. The dashboard shows the summary and lists failed checks; the score note says when it may be too high.
+
 ### Added — Sprint 15 (Search and user dossier)
 - **Search results as a table** (S15-1) — sortable, exportable, with a type icon (tooltip shows the type). Searches stop at 500 rows and say so: "Showing 500 of more than 500 — narrow your search". The LDAP-filter warning is unchanged.
 - **Detail next to the results** (S15-2) — double-click or Enter opens the user, computer or group detail on the right; the list and selection stay. Esc or ✕ closes it.
