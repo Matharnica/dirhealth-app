@@ -67,6 +67,6 @@ public class AdSearcherValidationTests
         Assert.False(vm.HasSearched);   // drives the "No results found." empty state
         Assert.False(string.IsNullOrEmpty(vm.ErrorMessage));
         Assert.StartsWith("Search failed:", vm.StatusMessage);
-        Assert.Empty(vm.Results);
+        Assert.Equal(0, vm.Table.TotalCount);
     }
 }

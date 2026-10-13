@@ -1,6 +1,6 @@
 namespace DirHealth.Desktop.Core.AD.Models;
 
-public enum AdObjectType { User, Computer, Group }
+public enum AdObjectType { User, Computer, Group, OrganizationalUnit }
 
 public class AdSearchResult
 {
@@ -19,6 +19,17 @@ public class AdSearchResult
         AdObjectType.User     => "User",
         AdObjectType.Computer => "Computer",
         AdObjectType.Group    => "Group",
+        AdObjectType.OrganizationalUnit => "OU",
         _                    => ""
+    };
+
+    /// <summary>Icon for the type column (S15-1); the tooltip carries <see cref="TypeLabel"/>.</summary>
+    public string TypeIcon => ObjectType switch
+    {
+        AdObjectType.User               => "👤",
+        AdObjectType.Computer           => "🖥",
+        AdObjectType.Group              => "👥",
+        AdObjectType.OrganizationalUnit => "📁",
+        _                               => "",
     };
 }
