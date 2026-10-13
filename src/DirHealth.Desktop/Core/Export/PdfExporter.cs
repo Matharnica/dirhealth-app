@@ -460,10 +460,13 @@ public class PdfExporter
         doc.Save(filePath);
     }
 
-    public void ExportUserDetail(AdUser user, IEnumerable<string> groups, string filePath)
+    public void ExportUserDetail(AdUser user, IEnumerable<AdUserGroup> groups, string filePath)
     {
         ArgumentNullException.ThrowIfNull(groups);
-        var groupList = groups.ToList();
+        // Direct groups plain, primary/nested marked so the badge list stays readable (S13-2)
+        var groupList = groups
+            .Select(g => g.Kind == GroupMembershipKind.Direct ? g.Name : $"{g.Name} ({g.KindLabel})")
+            .ToList();
         var doc       = new PdfDocument();
         doc.Info.Title = $"DirHealth — User: {user.DisplayName}";
         var ui        = new PdfPageBuilder();

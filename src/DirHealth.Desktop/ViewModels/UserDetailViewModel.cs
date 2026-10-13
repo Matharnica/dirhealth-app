@@ -14,8 +14,10 @@ public partial class UserDetailViewModel : BaseViewModel
 
     [ObservableProperty] private AdUser? _user;
     [ObservableProperty] private bool    _isLoading;
+    /// <summary>Set when the group lookup failed — distinct from "no groups" (S13-2).</summary>
+    [ObservableProperty] private string? _groupsError;
 
-    public ObservableCollection<string> Groups { get; } = new();
+    public ObservableCollection<AdUserGroup> Groups { get; } = new();
 
     public UserDetailViewModel(AdScanner scanner)
     {
@@ -26,13 +28,18 @@ public partial class UserDetailViewModel : BaseViewModel
     {
         User      = user;
         IsLoading = true;
+        GroupsError = null;
         Groups.Clear();
         try
         {
             var groups = await _scanner.GetUserGroupsAsync(user.DistinguishedName);
             foreach (var g in groups) Groups.Add(g);
         }
-        catch (Exception ex) { StatusMessage = $"Failed to load user details: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            GroupsError   = $"Group memberships could not be loaded: {ex.Message}";
+            StatusMessage = GroupsError;
+        }
         finally { IsLoading = false; }
     }
 

@@ -10,19 +10,6 @@ public partial class AdScanner
 {
     private readonly AdConnector _connector;
 
-    private static readonly (string Name, string Risk)[] PrivilegedGroupDefs =
-    [
-        ("Domain Admins",       "Full domain control"),
-        ("Enterprise Admins",   "Full forest control"),
-        ("Schema Admins",       "Can permanently alter AD schema"),
-        ("Backup Operators",    "Can read all files including NTDS.dit"),
-        ("Account Operators",   "Can manage accounts and groups"),
-        ("Server Operators",    "Can log on to and manage DCs"),
-        ("Print Operators",     "Can load driver code on DCs"),
-        ("DnsAdmins",           "Can execute DLL code on DCs via DNS plugin"),
-        ("Remote Desktop Users","Can RDP into all DCs"),
-    ];
-
     public AdScanner(AdConnector connector)
     {
         _connector = connector;
@@ -640,23 +627,53 @@ public partial class AdScanner
         return users;
     }
 
-    public async Task<List<string>> GetUserGroupsAsync(string distinguishedName)
+    /// <summary>
+    /// All groups of a user: direct, primary group (primaryGroupID → SID), and nested
+    /// (LDAP_MATCHING_RULE_IN_CHAIN, also through the primary group). Throws on LDAP
+    /// errors so the caller can show "failed" instead of "no groups" (S13-2).
+    /// </summary>
+    public async Task<List<AdUserGroup>> GetUserGroupsAsync(string distinguishedName)
     {
         return await Task.Run(() =>
         {
-            var groups = new List<string>();
-            try
+            const string InChain = "1.2.840.113556.1.4.1941";
+            var escaped = EscapeDn(distinguishedName);
+            using var root = _connector.GetRootEntry();
+
+            List<(string Dn, string Name)> Groups(string filter)
             {
-                var escaped = EscapeDn(distinguishedName);
-                using var root    = _connector.GetRootEntry();
-                using var searcher = _connector.CreateSearcher(root,
-                    $"(&(objectClass=group)(member={escaped}))", "cn");
-                using var results = searcher.FindAll();
+                using var searcher = _connector.CreateSearcher(root, filter, "distinguishedName", "cn");
+                using var results  = searcher.FindAll();
+                var list = new List<(string, string)>();
                 foreach (SearchResult r in results)
-                    groups.Add(GetString(r.Properties, "cn"));
+                    list.Add((GetString(r.Properties, "distinguishedName"), GetString(r.Properties, "cn")));
+                return list;
             }
-            catch { }
-            return groups;
+
+            var direct     = Groups($"(&(objectClass=group)(member={escaped}))");
+            var transitive = Groups($"(&(objectClass=group)(member:{InChain}:={escaped}))");
+
+            (string Dn, string Name)? primary = null;
+            using (var us = _connector.CreateSearcher(root,
+                       $"(distinguishedName={escaped})", "objectSid", "primaryGroupID"))
+            {
+                var user = us.FindOne();
+                if (user is not null
+                    && user.Properties["objectSid"].Count > 0 && user.Properties["objectSid"][0] is byte[] sidBytes
+                    && user.Properties["primaryGroupID"].Count > 0 && user.Properties["primaryGroupID"][0] is int pgid)
+                {
+                    var groupSid = WellKnownGroups.PrimaryGroupSid(WellKnownGroups.SidBytesToString(sidBytes), pgid);
+                    var pg = Groups($"(&(objectClass=group)(objectSid={groupSid}))").FirstOrDefault();
+                    if (!string.IsNullOrEmpty(pg.Dn))
+                    {
+                        primary = pg;
+                        // Groups the primary group itself belongs to are nested memberships too
+                        transitive.AddRange(Groups($"(&(objectClass=group)(member:{InChain}:={EscapeDn(pg.Dn)}))"));
+                    }
+                }
+            }
+
+            return AdUserGroup.Merge(direct, primary, transitive);
         });
     }
 
@@ -674,19 +691,16 @@ public partial class AdScanner
             try
             {
                 using var root = _connector.GetRootEntry();
-                using var gs   = _connector.CreateSearcher(root,
-                    "(&(objectClass=group)(cn=Domain Admins))", "distinguishedName");
-                var gr = gs.FindOne();
-                if (gr is null) return [];
-                var daDn = GetString(gr.Properties, "distinguishedName");
-                if (string.IsNullOrEmpty(daDn)) return [];
+                // By SID, not by name — the group is localized on non-English domains (S13-1)
+                var da = _connector.ResolveGroup(root, WellKnownGroups.DomainAdmins);
+                if (!da.Found) return [];
 
                 var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
-                var escaped        = EscapeDn(daDn);
-                // 1.2.840.113556.1.4.1941 = LDAP_MATCHING_RULE_IN_CHAIN — AD resolves nested membership server-side
+                var escaped        = EscapeDn(da.DistinguishedName!);
+                // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512
                 var filter         = $"(&(objectClass=user)(objectCategory=person)" +
                                      $"(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                                     $"(memberOf:1.2.840.113556.1.4.1941:={escaped})" +
+                                     WellKnownGroups.MembershipClause(escaped, WellKnownGroups.DomainAdminsRid) +
                                      $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
                 return QueryUsers(filter);
             }
@@ -784,58 +798,79 @@ public partial class AdScanner
         });
     }
 
-    private PrivilegedGroupSummary QueryPrivilegedGroup(string groupName, string risk)
+    private PrivilegedGroupSummary QueryPrivilegedGroup(WellKnownGroupDef def)
     {
-        var summary = new PrivilegedGroupSummary { Name = groupName, RiskDescription = risk };
+        var summary = new PrivilegedGroupSummary { Name = def.FallbackName, RiskDescription = def.Risk };
         try
         {
             using var root = _connector.GetRootEntry();
-            using var gs   = _connector.CreateSearcher(root,
-                $"(&(objectClass=group)(cn={EscapeFilterValue(groupName)}))", "distinguishedName");
-            var gr = gs.FindOne();
-            if (gr is not null)
+            var group = _connector.ResolveGroup(root, def);
+            summary.Name = group.Name;
+            if (!group.Found)
             {
-                var dn      = GetString(gr.Properties, "distinguishedName");
-                var escaped = EscapeDn(dn);
-                var members = new List<string>();
-                int start   = 0;
-                while (true)
-                {
-                    using var rs = _connector.CreateSearcher(root,
-                        $"(distinguishedName={escaped})", $"member;range={start}-*");
-                    var rr = rs.FindOne();
-                    if (rr is null) break;
-                    bool lastPage = false;
-                    int  count    = 0;
-                    foreach (string key in rr.Properties.PropertyNames)
-                    {
-                        if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
-                        lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
-                        foreach (var v in rr.Properties[key])
-                        {
-                            var memberDn = v?.ToString() ?? "";
-                            var cn       = memberDn.Split(',')[0];
-                            if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn[3..];
-                            members.Add(cn);
-                            count++;
-                        }
-                        break;
-                    }
-                    if (lastPage || count == 0) break;
-                    start += count;
-                }
-                summary.MemberCount = members.Count;
-                summary.Members     = members;
+                // Visible "not found" instead of silently showing an empty group (S13-1)
+                summary.NotFoundReason = group.Error ?? "Group not found.";
+                return summary;
             }
-        }
-        catch { }
+            var dn      = group.DistinguishedName!;
+            var escaped = EscapeDn(dn);
+            // Forest-root groups (Enterprise/Schema Admins) live outside a child domain's
+            // naming context — read their members from the group's own domain.
+            using var foreignRoot = IsInDomain(dn, root)
+                ? null
+                : _connector.GetEntry($"LDAP://{AdConnector.DnToDnsName(dn)}/{DomainDnOf(dn)}");
+            var searchRoot = foreignRoot ?? root;
+            var members = new List<string>();
+            int start   = 0;
+            while (true)
+            {
+                using var rs = _connector.CreateSearcher(searchRoot,
+                    $"(distinguishedName={escaped})", $"member;range={start}-*");
+                var rr = rs.FindOne();
+                if (rr is null) break;
+                bool lastPage = false;
+                int  count    = 0;
+                foreach (string key in rr.Properties.PropertyNames)
+                {
+                    if (!key.StartsWith("member;range=", StringComparison.OrdinalIgnoreCase)) continue;
+                    lastPage = key.EndsWith("-*", StringComparison.OrdinalIgnoreCase);
+                    foreach (var v in rr.Properties[key])
+                    {
+                        var memberDn = v?.ToString() ?? "";
+                        var cn       = memberDn.Split(',')[0];
+                        if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn[3..];
+                        members.Add(cn);
+                        count++;
+                    }
+                    break;
+                }
+                if (lastPage || count == 0) break;
+                start += count;
+            }
+            summary.MemberCount = members.Count;
+            summary.Members     = members;
+    }
+        catch (Exception ex) { summary.NotFoundReason = $"Query failed: {ex.Message}"; }
         return summary;
+    }
+
+    /// <summary>"CN=X,CN=Users,DC=a,DC=b" → "DC=a,DC=b".</summary>
+    internal static string DomainDnOf(string dn) =>
+        string.Join(',', dn.Split(',')
+            .Select(p => p.Trim())
+            .Where(p => p.StartsWith("DC=", StringComparison.OrdinalIgnoreCase)));
+
+    private static bool IsInDomain(string dn, DirectoryEntry domainRoot)
+    {
+        var rootDn = domainRoot.Properties["distinguishedName"].Value?.ToString();
+        return string.IsNullOrEmpty(rootDn)
+            || string.Equals(DomainDnOf(dn), rootDn, StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<List<PrivilegedGroupSummary>> GetPrivilegedGroupSummariesAsync()
     {
-        var tasks = PrivilegedGroupDefs
-            .Select(def => Task.Run(() => QueryPrivilegedGroup(def.Name, def.Risk)))
+        var tasks = WellKnownGroups.Privileged
+            .Select(def => Task.Run(() => QueryPrivilegedGroup(def)))
             .ToList();
         return [.. await Task.WhenAll(tasks)];
     }

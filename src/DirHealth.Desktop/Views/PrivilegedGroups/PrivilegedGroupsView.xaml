@@ -111,6 +111,11 @@
                                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                                             <TextBlock Text="{Binding RiskDescription}" FontSize="11"
                                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                                            <!-- S13-1: a group that could not be resolved is shown, not dropped -->
+                                            <TextBlock FontSize="11" Foreground="#FCD34D" Margin="0,2,0,0"
+                                                       Visibility="{Binding IsNotFound, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                                <Run Text="Not found: " /><Run Text="{Binding NotFoundReason, Mode=OneWay}" />
+                                            </TextBlock>
                                         </StackPanel>
                                         <Border Grid.Column="1" CornerRadius="12" Padding="10,3"
                                                 VerticalAlignment="Center" Margin="12,0,4,0">
