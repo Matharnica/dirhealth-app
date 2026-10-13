@@ -47,7 +47,7 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 🚫 Password Not Required | Accounts with `PASSWD_NOTREQD` — empty password allowed |
 | 👥 Group Hygiene | Empty groups and single-member groups |
 | 💻 Inactive Computers | Unseen for 90+ days, missing OS info, EOL operating systems |
-| 🏛️ Privileged Groups | Domain Admins, Enterprise Admins, Schema Admins, DnsAdmins, and 5 more |
+| 🏛️ Privileged Groups | Domain Admins, Enterprise Admins, Schema Admins, Key Admins, DnsAdmins, and 7 more — found by SID, so localized group names work |
 | 👑 Stale Domain Admins | Privileged accounts inactive for 30+ days |
 | 🔗 Domain Trusts | All inter-domain/forest trust relationships with direction and type |
 | 🕵️ SID History | Accounts carrying historical SIDs — silent privilege escalation risk |
