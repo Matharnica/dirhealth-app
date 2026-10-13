@@ -53,22 +53,19 @@ public class AdSearcher
         if (!System.Text.RegularExpressions.Regex.IsMatch(query, @"^(CN|OU|DC)=", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             return [];
         var results = new List<AdSearchResult>();
-        try
+        using var ouEntry  = _connector.GetEntry($"LDAP://{query}");
+        using var searcher = new DirectorySearcher(ouEntry,
+            "(|(objectClass=user)(objectClass=computer)(objectClass=group))",
+            new[] { "cn", "displayName", "sAMAccountName", "mail", "objectSid",
+                    "distinguishedName", "objectClass", "userAccountControl" })
         {
-            using var ouEntry  = _connector.GetEntry($"LDAP://{query}");
-            using var searcher = new DirectorySearcher(ouEntry,
-                "(|(objectClass=user)(objectClass=computer)(objectClass=group))",
-                new[] { "cn", "displayName", "sAMAccountName", "mail", "objectSid",
-                        "distinguishedName", "objectClass", "userAccountControl" })
-            {
-                SearchScope = SearchScope.OneLevel,
-                PageSize    = 500
-            };
-            using var sr = searcher.FindAll();
-            foreach (SearchResult r in sr)
-                results.Add(MapResult(r));
-        }
-        catch { }
+            SearchScope = SearchScope.OneLevel,
+            PageSize    = 500
+        };
+        using var sr = searcher.FindAll();
+        foreach (SearchResult r in sr)
+            results.Add(MapResult(r));
+        // No catch: an LDAP failure must reach the UI as an error, not as "No results" (S13-4)
         return results;
     }
 
@@ -81,18 +78,15 @@ public class AdSearcher
     private List<AdSearchResult> RunSearch(string filter)
     {
         var results = new List<AdSearchResult>();
-        try
-        {
-            using var root    = _connector.GetRootEntry();
-            using var searcher = _connector.CreateSearcher(root, filter,
-                "cn", "displayName", "sAMAccountName", "mail", "objectSid",
-                "distinguishedName", "objectClass", "userAccountControl");
-            searcher.SizeLimit = 500;
-            using var found = searcher.FindAll();
-            foreach (SearchResult r in found)
-                results.Add(MapResult(r));
-        }
-        catch { }
+        using var root    = _connector.GetRootEntry();
+        using var searcher = _connector.CreateSearcher(root, filter,
+            "cn", "displayName", "sAMAccountName", "mail", "objectSid",
+            "distinguishedName", "objectClass", "userAccountControl");
+        searcher.SizeLimit = 500;
+        using var found = searcher.FindAll();
+        foreach (SearchResult r in found)
+            results.Add(MapResult(r));
+        // No catch: an LDAP failure must reach the UI as an error, not as "No results" (S13-4)
         return results;
     }
 

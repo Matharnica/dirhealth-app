@@ -114,6 +114,12 @@
                 </TextBlock.Style>
             </TextBlock>
 
+            <!-- S13-4: a failed search is an error, never the "No results" state -->
+            <TextBlock Grid.Row="1" FontSize="13" Foreground="#FCA5A5" TextWrapping="Wrap" MaxWidth="480"
+                       TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="{Binding ErrorMessage, Mode=OneWay, StringFormat='⚠ Search failed: {0}'}"
+                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+
             <ListView Grid.Row="1" ItemsSource="{Binding Results}"
                       Background="Transparent" BorderThickness="0"
                       Foreground="{DynamicResource TextPrimaryBrush}">
