@@ -53,6 +53,12 @@
                         </TextBlock>
                     </StackPanel>
 
+                    <!-- S16-4: status of every check — a failed check is never shown as passed -->
+                    <TextBlock Text="{Binding CheckSummary, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               ToolTip="Passed = checked, nothing found · Found = issues found · Failed = the check could not run · Not applicable = nothing to check in this domain"
+                               Visibility="{Binding CheckSummary, Converter={StaticResource StringToVisibility}}" />
+
                     <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,16,0,16" />
 
                     <!-- Clickable stat rows -->
@@ -149,7 +155,25 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel Grid.Row="0">
+            <!-- S16-4: failed checks are visible, with their reason -->
+            <Border Background="#7F1D1D" CornerRadius="8" Padding="14,10" Margin="0,0,0,12"
+                    Visibility="{Binding HasFailedChecks, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding FailedChecksNote, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="#FCA5A5" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding FailedChecks, Mode=OneWay}" Margin="0,6,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock FontSize="11" Foreground="#FECACA" TextWrapping="Wrap" Margin="0,1">
+                                    <Run Text="{Binding RuleId, Mode=OneWay}" FontFamily="Consolas" /><Run Text="  " /><Run Text="{Binding Category, Mode=OneWay}" /><Run Text=": " /><Run Text="{Binding Reason, Mode=OneWay}" />
+                                </TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+            <Grid Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -162,6 +186,7 @@
                         CommandParameter=""
                         Visibility="{Binding FindingsCount, Converter={StaticResource NonZeroToVisibility}}" />
             </Grid>
+            </StackPanel>
 
             <!-- Findings list -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">

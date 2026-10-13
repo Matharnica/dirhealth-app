@@ -71,9 +71,7 @@ public partial class AdScanner
     public async Task<List<AdUser>> GetSidHistoryAccountsAsync()
     {
         return await Task.Run(() =>
-            QueryUsers("(&(objectClass=user)(objectCategory=person)" +
-                       "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                       "(sIDHistory=*))"));
+            QueryUsers(CheckFilters.SidHistory));
     }
 
     public async Task<List<AdRecentChange>> GetRecentChangesAsync(int days = 30)

@@ -121,6 +121,16 @@ public static class ViewColumns
         new("Distinguished Name", r => r.DistinguishedName),
     ];
 
+    /// <summary>Objects behind a finding — the finding card's table (S16-2).</summary>
+    public static IReadOnlyList<TableColumn<AffectedObject>> AffectedObjects { get; } =
+    [
+        new("Name",   o => o.Name,   nameof(AffectedObject.Name)),
+        new("Type",   o => o.Type,   nameof(AffectedObject.Type)),
+        new("Detail", o => o.Detail, nameof(AffectedObject.Detail)),
+        new("Distinguished Name", o => o.DistinguishedName, nameof(AffectedObject.DistinguishedName), monospace: true),
+        new("SID",    o => o.Sid),
+    ];
+
     /// <summary>User detail "Member Of" and the dossier groups CSV (S15-4/S15-5).</summary>
     public static IReadOnlyList<TableColumn<AdUserGroup>> UserGroups => UserDossierExporter.GroupColumns;
 

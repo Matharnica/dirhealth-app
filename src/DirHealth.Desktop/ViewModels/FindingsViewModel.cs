@@ -4,6 +4,9 @@ using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Export;
 using DirHealth.Desktop.Core.Storage;
 
+using DirHealth.Desktop.Core.AD;
+using DirHealth.Desktop.ViewModels.Tables;
+
 namespace DirHealth.Desktop.ViewModels;
 
 public partial class FindingsViewModel : BaseViewModel
@@ -21,6 +24,24 @@ public partial class FindingsViewModel : BaseViewModel
     [ObservableProperty] private int             _score;
 
     public List<string> SeverityOptions { get; } = ["All", "High", "Medium", "Low"];
+
+    /// <summary>Affected objects of the selected finding as the shared table (S16-2).</summary>
+    public TableViewModel<AffectedObject> ObjectsTable { get; } = new("Affected Objects", ViewColumns.AffectedObjects)
+    {
+        Dn  = o => string.IsNullOrEmpty(o.DistinguishedName) ? null : o.DistinguishedName,
+        Sid = o => string.IsNullOrEmpty(o.Sid) ? null : o.Sid,
+        Sam = o => o.Type == AffectedObjectType.User ? o.Name : null,
+    };
+
+    /// <summary>Opens an object's detail (set by the main VM: switches to the search detail, S15-2).</summary>
+    public Action<AffectedObject>? NavigateToObject { get; set; }
+
+    public FindingRule? SelectedRule => SelectedFinding?.Rule;
+
+    public FindingsViewModel()
+    {
+        ObjectsTable.Activated += row => { if (row is AffectedObject o) OpenObject(o); };
+    }
 
     /// <summary>Findings not acknowledged — drives the sidebar badge (S9-8; A6 fix in S14-6).</summary>
     public int OpenFindingsCount => CountOpen(Findings);
@@ -71,6 +92,11 @@ public partial class FindingsViewModel : BaseViewModel
 
     partial void OnSelectedFindingChanged(AdFinding? value)
     {
+        ObjectsTable.SetRows(value?.Objects ?? []);
+        ObjectsTable.FilterDescription = () => $"finding={value?.RuleId} {value?.Category}";
+        OnPropertyChanged(nameof(SelectedRule));
+        CopyFixCommand.NotifyCanExecuteChanged();
+        CopyRevertCommand.NotifyCanExecuteChanged();
         // A8 (S14-6): the list binds SelectedItem straight to SelectedFinding, so the
         // SelectFinding command never runs on a click — load the saved note here instead.
         AcknowledgeNote = value?.AcknowledgeNote ?? "";
@@ -109,6 +135,38 @@ public partial class FindingsViewModel : BaseViewModel
 
     [RelayCommand]
     public void ClearSelection() => SelectedFinding = null;
+
+    // ── S16-3 fix block: display + copy only. DirHealth never runs these commands. ──
+    private bool HasRule() => SelectedRule is not null;
+
+    [RelayCommand(CanExecute = nameof(HasRule))]
+    public void CopyFix() => CopyScript(SelectedRule?.Fix, "Fix");
+
+    [RelayCommand(CanExecute = nameof(HasRule))]
+    public void CopyRevert() => CopyScript(SelectedRule?.Revert, "Undo");
+
+    private void CopyScript(string? script, string what)
+    {
+        if (string.IsNullOrEmpty(script)) return;
+        try
+        {
+            TableViewModel.SetClipboardText(script);
+            StatusMessage = $"{what} command copied — review it, then run it yourself (it starts with -WhatIf).";
+        }
+        catch (Exception ex) { StatusMessage = $"Copy failed: {ex.Message}"; }
+    }
+
+    /// <summary>Double-click on an affected object opens its detail (S16-2 → S15-2).</summary>
+    public void OpenObject(AffectedObject obj)
+    {
+        if (obj.Type is AffectedObjectType.User or AffectedObjectType.Computer or AffectedObjectType.Group
+            && !string.IsNullOrEmpty(obj.DistinguishedName) && NavigateToObject is not null)
+            NavigateToObject(obj);
+        else
+            StatusMessage = string.IsNullOrEmpty(obj.DistinguishedName)
+                ? $"No directory path stored for {obj.Name} (scan predates S16) — run a new scan or use Copy."
+                : $"{obj.Name} has no detail view.";
+    }
 
     [RelayCommand]
     public void SelectFinding(AdFinding? finding)

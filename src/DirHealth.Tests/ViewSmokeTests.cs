@@ -48,21 +48,28 @@ public class ViewSmokeTests
                 {
                     Source = new Uri($"pack://application:,,,/DirHealth;component/Resources/{name}"),
                 });
+            // Converters exactly as App.xaml declares them — read from the file, so a new
+            // converter cannot be forgotten here.
             var asm = typeof(DirHealth.Desktop.App).Assembly;
-            foreach (var (key, type) in new[]
-            {
-                ("BoolToVisibility",    "BoolToVisibilityConverter"),
-                ("InverseBool",         "InverseBoolConverter"),
-                ("StringToVisibility",  "StringToVisibilityConverter"),
-                ("NonZeroToVisibility", "NonZeroToVisibilityConverter"),
-                ("DaysToExpiryColor",   "DaysToExpiryColorConverter"),
-                ("IsNegativeConverter", "IsNegativeConverter"),
-                ("EqualityConverter",   "EqualityConverter"),
-                ("RelativeScanTime",    "RelativeScanTimeConverter"),
-                ("ScoreColor",          "ScoreColorConverter"),
-            })
+            foreach (var (type, key) in AppXamlConverters())
                 app.Resources[key] = Activator.CreateInstance(asm.GetType($"DirHealth.Desktop.{type}", throwOnError: true)!);
         }
+    }
+
+    private static IEnumerable<(string Type, string Key)> AppXamlConverters()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "src", "DirHealth.Desktop")))
+            dir = dir.Parent;
+        var xaml = File.ReadAllText(Path.Combine(dir!.FullName, "src", "DirHealth.Desktop", "App.xaml"));
+        return System.Text.RegularExpressions.Regex.Matches(xaml, @"<local:(\w+)\s+x:Key=""(\w+)""")
+            .Select(m => (m.Groups[1].Value, m.Groups[2].Value));
+    }
+
+    [Fact]
+    public void AppXamlConverters_AreFound()
+    {
+        Assert.True(AppXamlConverters().Count() >= 10);
     }
 
     private static void Layout(FrameworkElement e)

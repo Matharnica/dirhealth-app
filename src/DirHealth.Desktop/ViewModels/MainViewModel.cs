@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using System.IO;
 using System.Security.Cryptography;
 using System.Windows;
+using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Services;
 
 namespace DirHealth.Desktop.ViewModels;
@@ -105,6 +106,23 @@ public partial class MainViewModel : BaseViewModel
 
         if (Dashboard.Findings.Count > 0)
             Findings.LoadFindings(Dashboard.Findings, Dashboard.ComplianceScore);
+
+        // S16-2: double-click on an affected object opens it in the search detail (S15-2)
+        Findings.NavigateToObject = obj =>
+        {
+            CurrentView = AdSearch;
+            _ = AdSearch.OpenDetailAsync(new AdSearchResult
+            {
+                Name              = obj.Name,
+                DistinguishedName = obj.DistinguishedName,
+                ObjectType        = obj.Type switch
+                {
+                    AffectedObjectType.Computer => AdObjectType.Computer,
+                    AffectedObjectType.Group    => AdObjectType.Group,
+                    _                           => AdObjectType.User,
+                },
+            });
+        };
 
         Dashboard.NavigateToCategory = category =>
         {

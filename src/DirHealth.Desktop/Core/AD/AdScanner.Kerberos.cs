@@ -11,9 +11,7 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             // userAccountControl bit 4194304 = DONT_REQUIRE_PREAUTH
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=4194304))";
+            var filter = CheckFilters.AsRepRoastable;
             return QueryUsers(filter);
         });
     }
@@ -23,9 +21,7 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             // bit 524288 = TRUSTED_FOR_DELEGATION; exclude DCs (bit 8192)
-            var filter = "(&(objectClass=computer)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=8192))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
+            var filter = CheckFilters.UnconstrainedDelegationComputers;
             return QueryComputers(filter);
         });
     }
@@ -35,9 +31,7 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             // bit 524288 = TRUSTED_FOR_DELEGATION
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=524288))";
+            var filter = CheckFilters.UnconstrainedDelegationUsers;
             return QueryUsers(filter);
         });
     }
@@ -47,9 +41,7 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             // userAccountControl bit 32 = PASSWD_NOTREQD
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(userAccountControl:1.2.840.113556.1.4.803:=32))";
+            var filter = CheckFilters.PasswordNotRequired;
             return QueryUsers(filter);
         });
     }
@@ -58,9 +50,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(servicePrincipalName=*)(!(samAccountName=krbtgt)))";
+            var filter = CheckFilters.Kerberoastable;
             return QueryUsers(filter);
         });
     }
@@ -69,9 +59,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var filter = "(&(objectClass=user)(objectCategory=person)" +
-                         "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         "(adminCount=1))";
+            var filter = CheckFilters.AdminSdHolder;
             return QueryUsers(filter);
         });
     }
