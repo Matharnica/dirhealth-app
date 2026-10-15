@@ -159,6 +159,14 @@ public static class FindingCatalog
         ["TrustWithoutSidFiltering"]         = (ScoreMeasure.Count, 1, ScorePopulation.None),
         ["TrustTgtDelegation"]               = (ScoreMeasure.Count, 1, ScorePopulation.None),
         ["TrustInactive"]                    = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        // Sprint 20 (formula v4)
+        ["LapsNotDeployed"]                  = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["ComputersWithoutLaps"]             = (ScoreMeasure.Share, 0.30, ScorePopulation.Computers),
+        ["MachinePasswordNotRotated"]        = (ScoreMeasure.Count, 5, ScorePopulation.None),
+        ["DuplicateObjects"]                 = (ScoreMeasure.Count, 10, ScorePopulation.None),
+        ["AnonymousLdapAllowed"]             = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["AdminSdExMask"]                    = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["SmartcardOldPassword"]             = (ScoreMeasure.Count, 3, ScorePopulation.None),
     };
 
     /// <summary>Object rules whose objects have no SID (trusts) — keyed by name like policy rules (ADR 0001).</summary>
@@ -709,5 +717,90 @@ public static class FindingCatalog
             "None from this list; removing a trust that is still used breaks cross-domain access.",
             "# Read-only listing — nothing to undo.",
             null);
+
+        // ══ Sprint 20 — remaining LDAP checks ════════════════════════════════
+        yield return new("LapsNotDeployed", "DH-CMP-004", 7,
+            "Neither legacy LAPS nor Windows LAPS is present in the schema.",
+            "Without LAPS, local administrator passwords are usually identical across machines — one stolen hash opens every computer.",
+            "Deploy Windows LAPS (built into current Windows) and enable it by GPO for all workstations and member servers.",
+            [new("Microsoft: Windows LAPS overview", "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-overview"), Mitre("T1078.003", "Valid Accounts: Local Accounts")],
+            $"{Ps}\nGet-ADObject -SearchBase (Get-ADRootDSE).schemaNamingContext -LDAPFilter '(|(lDAPDisplayName=ms-Mcs-AdmPwdExpirationTime)(lDAPDisplayName=msLAPS-PasswordExpirationTime))'   # read-only check\n" +
+            "# Deploying LAPS changes the schema and GPOs — follow Microsoft's guide (Update-LapsADSchema), not a one-liner.",
+            "None from this list; the schema update itself is forest-wide and irreversible.",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        yield return new("ComputersWithoutLaps", "DH-CMP-005", 5,
+            "Enabled computers (no DCs) without a LAPS password expiry attribute — LAPS does not manage their local admin password. DirHealth never reads the password itself.",
+            "These machines likely share or never change their local administrator password.",
+            "Link the LAPS GPO to the OUs of these computers and verify the expiry attribute gets set.",
+            [new("Microsoft: Windows LAPS overview", "https://learn.microsoft.com/en-us/windows-server/identity/laps/laps-overview")],
+            $"{Ps}\nGet-ADComputer -LDAPFilter \"{CheckFilters.ComputersWithoutLaps(Checks.CheckLogic.LapsExpiryAttributes)}\" | Select-Object Name, DistinguishedName   # read-only list — fix by GPO\n" +
+            "# Remove the attribute names from the filter that your schema does not have (DirHealth does this automatically).",
+            "None from this list.",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        yield return new("MachinePasswordNotRotated", "DH-CMP-006", 4,
+            $"Active computers whose machine password is older than {CheckFilters.MachinePasswordMaxDays} days (domain controllers: {CheckFilters.DcPasswordMaxDays} days) — normally it rotates every 30 days.",
+            "Rotation was disabled (DisablePasswordChange) or broken; a stolen machine hash stays usable indefinitely.",
+            "Re-enable machine password rotation (GPO \"Domain member: Disable machine account password changes\" = Disabled) and reset the machine password.",
+            [MsSecuringAd],
+            $"{Ps}\n$pwd = (Get-Date).AddDays(-{CheckFilters.MachinePasswordMaxDays}).ToFileTimeUtc(); $logon = $pwd\n" +
+            "Get-ADComputer -LDAPFilter \"" + CheckFilters.StaleMachinePasswords("$pwd", "$logon") + "\" -Properties PasswordLastSet |\n" +
+            "    Select-Object Name, PasswordLastSet   # read-only list — on each machine: Test-ComputerSecureChannel -Repair",
+            "None from this list; resetting the secure channel briefly interrupts domain authentication of that machine.",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        yield return new("DuplicateObjects", "DH-GRP-003", 2,
+            "Replication-conflict objects (\"CNF:\" in the name) or duplicate sAMAccountNames ($DUPLICATE-).",
+            "Duplicates confuse permissions and logons; a conflict object may silently hold rights the original lost.",
+            "Compare each conflict object with its original, move needed attributes over, then delete the conflict object.",
+            [MsSecuringAd],
+            $"{Ps}\nGet-ADObject -LDAPFilter \"{CheckFilters.ConflictObjects}\" -Properties whenCreated | Select-Object Name, DistinguishedName, whenCreated   # read-only list",
+            "None from this list; deleting the wrong copy loses its group memberships.",
+            "# Read-only listing — nothing to undo.",
+            CheckFilters.ConflictObjects);
+
+        yield return new("AnonymousLdapAllowed", "DH-DOM-008", 7,
+            "dSHeuristics allows anonymous LDAP operations (7th character = 2).",
+            "Anyone on the network can read directory data without an account.",
+            "Reset the 7th character of dSHeuristics to 0 (or clear dSHeuristics if nothing else is set).",
+            [MsSecuringAd],
+            $"{Ps}\n$ds = \"CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).configurationNamingContext)\"\n" +
+            "Get-ADObject $ds -Properties dSHeuristics | Select-Object dSHeuristics | Export-Csv .\\dirhealth-DH-DOM-008-backup.csv -NoTypeInformation\n" +
+            "$h = (Get-ADObject $ds -Properties dSHeuristics).dSHeuristics; $new = $h.Substring(0,6) + '0' + $h.Substring(7)\n" +
+            "Set-ADObject $ds -Replace @{dSHeuristics = $new} -WhatIf   # remove -WhatIf to apply",
+            "Applications that read AD anonymously (old printers, Unix tools) stop working.",
+            "$ds = \"CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).configurationNamingContext)\"\n" +
+            "Import-Csv .\\dirhealth-DH-DOM-008-backup.csv | ForEach-Object { Set-ADObject $ds -Replace @{dSHeuristics = $_.dSHeuristics} }",
+            null);
+
+        yield return new("AdminSdExMask", "DH-DOM-009", 6,
+            "dSHeuristics excludes operator groups from AdminSDHolder protection (AdminSDExMask, 16th character).",
+            "Members of the excluded operator groups lose the protected ACL — delegated admins can take them over.",
+            "Set the 16th character of dSHeuristics back to 0 so SDProp protects all operator groups again.",
+            [MsProtectedAccounts],
+            $"{Ps}\n$ds = \"CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).configurationNamingContext)\"\n" +
+            "Get-ADObject $ds -Properties dSHeuristics | Select-Object dSHeuristics | Export-Csv .\\dirhealth-DH-DOM-009-backup.csv -NoTypeInformation\n" +
+            "$h = (Get-ADObject $ds -Properties dSHeuristics).dSHeuristics; $new = $h.Substring(0,15) + '0' + $h.Substring(16)\n" +
+            "Set-ADObject $ds -Replace @{dSHeuristics = $new} -WhatIf   # remove -WhatIf to apply",
+            "Delegations that relied on editing operator-group members stop working after SDProp runs.",
+            "$ds = \"CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).configurationNamingContext)\"\n" +
+            "Import-Csv .\\dirhealth-DH-DOM-009-backup.csv | ForEach-Object { Set-ADObject $ds -Replace @{dSHeuristics = $_.dSHeuristics} }",
+            null);
+
+        yield return new("SmartcardOldPassword", "DH-USR-006", 5,
+            $"Enabled smart-card-required accounts whose password hash is older than {CheckFilters.SmartcardPasswordMaxDays} days.",
+            "With smart-card logon the NTLM hash never changes by itself — a hash stolen years ago still works for pass-the-hash.",
+            "Toggle \"Smart card is required\" off and on (rotates the hash) or enable automatic rolling of NTLM secrets (domain level 2016).",
+            [Mitre("T1550.002", "Use Alternate Authentication Material: Pass the Hash")],
+            ObjectFix("DH-USR-006", "Get-ADUser", CheckFilters.SmartcardOldPassword("$cutoff"), "Set-ADUser -SmartcardLogonRequired $false",
+                Cutoff(CheckFilters.SmartcardPasswordMaxDays)) +
+            "\n$targets | Set-ADUser -SmartcardLogonRequired $true -WhatIf   # second step: re-enable → new random hash",
+            "Between the two steps the account can log on with a password; run both steps together.",
+            ObjectRevert("DH-USR-006", "Set-ADUser -Identity $_.DistinguishedName -SmartcardLogonRequired $true"),
+            CheckFilters.SmartcardOldPassword("$cutoff"));
     }
 }

@@ -85,6 +85,31 @@ public static class CheckLogic
     public static bool LacksAes(int? supportedEncryptionTypes) =>
         supportedEncryptionTypes is not { } v || (v & (EncAes128 | EncAes256)) == 0;
 
+    // ── S20-2 dSHeuristics (MS-ADTS 6.1.1.2.4.1.2) ────────────────────────────
+    /// <summary>7th character "2": anonymous LDAP operations allowed (fLDAPBlockAnonOps off).</summary>
+    public static bool AnonymousLdapAllowed(string? dsHeuristics) =>
+        dsHeuristics is { Length: >= 7 } h && h[6] == '2';
+
+    /// <summary>16th character (dwAdminSDExMask): non-zero hex digit excludes operator groups from AdminSDHolder protection.</summary>
+    public static bool AdminSdExMaskSet(string? dsHeuristics) =>
+        dsHeuristics is { Length: >= 16 } h && h[15] != '0' && Uri.IsHexDigit(h[15]);
+
+    /// <summary>Which groups the AdminSDExMask removes from SDProp (bit 1 Account, 2 Server, 4 Print, 8 Backup Operators).</summary>
+    public static IReadOnlyList<string> AdminSdExMaskGroups(string? dsHeuristics)
+    {
+        if (!AdminSdExMaskSet(dsHeuristics)) return [];
+        int mask = Convert.ToInt32(dsHeuristics![15].ToString(), 16);
+        var list = new List<string>();
+        if ((mask & 1) != 0) list.Add("Account Operators");
+        if ((mask & 2) != 0) list.Add("Server Operators");
+        if ((mask & 4) != 0) list.Add("Print Operators");
+        if ((mask & 8) != 0) list.Add("Backup Operators");
+        return list;
+    }
+
+    /// <summary>LAPS expiry attributes DirHealth knows (legacy and Windows LAPS); the password attributes are never read.</summary>
+    public static readonly IReadOnlyList<string> LapsExpiryAttributes = ["ms-Mcs-AdmPwdExpirationTime", "msLAPS-PasswordExpirationTime"];
+
     // ── S19-5 delegation and trusts ───────────────────────────────────────────
     /// <summary>"cifs/dc01.corp.com:445" → "dc01.corp.com" (lower case).</summary>
     public static string SpnHost(string spn)

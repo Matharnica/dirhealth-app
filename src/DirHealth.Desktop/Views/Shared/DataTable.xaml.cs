@@ -23,10 +23,17 @@ public partial class DataTable : UserControl
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.OldValue is TableViewModel old) old.DisplayOrder = null;
+        if (e.OldValue is TableViewModel old)
+        {
+            old.DisplayOrder   = null;
+            old.ColumnsChanged -= ApplyColumnVisibility;
+        }
         if (e.NewValue is not TableViewModel vm) return;
 
         BuildColumns(vm.Columns);
+        vm.ColumnsChanged += ApplyColumnVisibility;
+        ApplyColumnVisibility();
+        AttachHeaderMenu();
         if (vm.MutedPath is { } muted && TryFindResource("DataTableRow") is Style rowBase)
         {
             // Greyed, not hidden (S17-2)
@@ -77,6 +84,42 @@ public partial class DataTable : UserControl
             if (element is not null) col.ElementStyle = element;
             TableGrid.Columns.Add(col);
         }
+    }
+
+    // ── S20-1: right-click on a column header shows/hides columns ────────────
+    private void ApplyColumnVisibility()
+    {
+        if (DataContext is not TableViewModel vm) return;
+        foreach (var col in TableGrid.Columns)
+            col.Visibility = vm.IsColumnHidden(col.Header?.ToString() ?? "") ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void AttachHeaderMenu()
+    {
+        if (TryFindResource("DataTableHeader") is not Style baseStyle) return;
+        var menu = new ContextMenu();
+        menu.Opened += (_, _) => FillHeaderMenu(menu);
+        var style = new Style(typeof(DataGridColumnHeader), baseStyle);
+        style.Setters.Add(new Setter(ContextMenuProperty, menu));
+        TableGrid.ColumnHeaderStyle = style;
+    }
+
+    private void FillHeaderMenu(ContextMenu menu)
+    {
+        if (DataContext is not TableViewModel vm) return;
+        menu.Items.Clear();
+        foreach (var col in TableGrid.Columns)
+        {
+            var header = col.Header?.ToString() ?? "";
+            var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = !vm.IsColumnHidden(header), StaysOpenOnClick = true };
+            item.Click += (_, _) => vm.SetColumnHidden(header, !item.IsChecked);
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = vm.HiddenLabel, IsEnabled = false });
+        var reset = new MenuItem { Header = "Reset to default" };
+        reset.Click += (_, _) => vm.ResetColumns();
+        menu.Items.Add(reset);
     }
 
     private void ExportButton_Click(object sender, RoutedEventArgs e)
