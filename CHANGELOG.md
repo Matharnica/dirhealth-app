@@ -14,6 +14,13 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Changed — Sprint 17 (Exceptions and score) — ⚠ the score changes without any change in your AD
+- **Exceptions per object** (S17-1/S17-2) — instead of acknowledging a whole category, add an exception for one object of one rule, with a required reason and an expiry date (default 90 days, max. 365). Excepted objects stay visible (greyed), a filter can hide them, and expired exceptions count again. Exceptions are stored locally in `%APPDATA%\DirHealth\exceptions.json`; nothing is written to AD.
+- **Old acknowledgements no longer hide findings.** Findings of categories you acknowledged in earlier versions show up again; your old note is displayed on the finding card. Add exceptions per object where they still apply. `acknowledged.json` is left untouched (downgrading stays safe).
+- **New score model** (S17-3/S17-4) — score = 100 minus 2.5 × rule weight × how widespread a finding is. Exploitable findings (unconstrained delegation, AS-REP, Kerberoast, …) now weigh much more than hygiene: one computer with unconstrained delegation costs 25 points (was 6). Each finding card shows "+X points if fixed", and the dashboard lists where the points go. Checks that could not run never raise the score: it is then shown as an upper bound ("≤ 74"), or "n/a" when too much is missing. The trend marks the formula change instead of reporting a score drop.
+- Fixed: the "score dropped" notice compared against the scan before the previous one.
+- Deferred: "Fix first" list (S17-5) — needs an effort estimate per rule first.
+
 ### Added — Sprint 16 (Finding card and fix block)
 - **Rule catalog** (S16-1) — every finding has a stable rule id (e.g. `DH-KRB-002`), a weight (1–10; exploitable issues weigh more than hygiene) and references (Microsoft Learn, MITRE ATT&CK). Affected objects are stored with name, DN, SID and type. Scan caches from earlier versions still load.
 - **Finding card** (S16-2) — fixed layout: title with count, rule id · severity · weight, "What is it · Why it matters · How to fix", references, and the affected objects as a sortable, exportable table. Double-click an object to open its detail.
