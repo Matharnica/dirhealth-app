@@ -28,6 +28,8 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="CsvHelper" Version="33.0.1" />
+    <!-- ADR 0003: XLSX export. Pinned exactly; 2.x is a breaking preview line. -->
+    <PackageReference Include="MiniExcel" Version="1.46.0" />
     <PackageReference Include="PdfSharp" Version="6.1.1" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="System.Management" Version="8.0.0" />
