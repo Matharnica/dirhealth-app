@@ -27,7 +27,8 @@ public partial class AdScanner
         List<AdUser>      InactiveUsers,
         List<AdUser>      ExpiringPasswords,
         List<string>      DomainAdmins,
-        List<CheckResult> Checks);
+        List<CheckResult> Checks,
+        ScanTotals        Totals);
 
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
@@ -294,34 +295,11 @@ public partial class AdScanner
                 Objects         = sidHistoryAccounts.Select(AffectedObject.FromUser).ToList()
             });
 
-        // ── Compute score (all arithmetic lives in ScoreCalculator — pure & tested) ──
-        var eolDcCount = eolComputers.Count(c => c.IsDomainController);
-        var eolPcCount = eolComputers.Count(c => !c.IsDomainController);
-        int score = ScoreCalculator.Compute(new ScoreInputs
-        {
-            TotalUsers              = totalUsers,
-            TotalGroups             = totalGroups,
-            TotalComputers          = totalComputers,
-            InactiveUsers           = inactiveUsers.Count,
-            NeverExpires            = neverExpires.Count,
-            ExpiredPwd              = expiredPwd.Count,
-            EmptyGroups             = emptyGroups.Count,
-            SingleMember            = singleMember.Count,
-            InactiveComputers       = inactiveComps.Count,
-            NoOs                    = noOs.Count,
-            Kerberoastable          = kerberoastable.Count,
-            PolicyHighCount         = policyFindings.Count(f => f.Severity == FindingSeverity.High),
-            PolicyOtherCount        = policyFindings.Count(f => f.Severity != FindingSeverity.High),
-            EolDcCount              = eolDcCount,
-            EolPcCount              = eolPcCount,
-            AsRepRoastable          = asRepRoastable.Count,
-            UnconstrainedDelegation = undelComputers.Count + undelUsers.Count,
-            PasswordNotRequired     = passwdNotRequired.Count,
-            StaleDomainAdmins       = staleDomainAdmins.Count,
-            FgppHighCount           = fgppFindings.Count(f => f.Severity == FindingSeverity.High),
-            FgppOtherCount          = fgppFindings.Count(f => f.Severity != FindingSeverity.High),
-            SidHistory              = sidHistoryAccounts.Count,
-        });
+        // ── Raw score: model v2 without exceptions (ADR 0002). The dashboard recomputes the
+        //    displayed score with the user's exceptions; the raw inputs are cached for that. ──
+        var totals = new ScanTotals(totalUsers, totalGroups, totalComputers);
+        var checks = ScanGuard.Evaluate(FindingCatalog.All, findings, failures, notApplicable);
+        int score  = ScoreModel.Compute(FindingCatalog.All, findings, checks, totals).Score;
 
         // ── Expiring passwords (from already-loaded allUsers) ─────────────────────
         var expiringPasswords = allUsersTask.Result
@@ -331,8 +309,7 @@ public partial class AdScanner
 
         var domainAdmins = domainAdminsTask.Result?.Members?.Select(m => m.Name).ToList() ?? [];
 
-        var checks = ScanGuard.Evaluate(FindingCatalog.All, findings, failures, notApplicable);
-        return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins, checks);
+        return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins, checks, totals);
     }
 
     public async Task<List<AdUser>> GetInactiveUsersAsync(int daysThreshold = CheckFilters.InactiveUserDays)
@@ -1023,7 +1000,7 @@ public partial class AdScanner
         var groups = new List<AdGroup>();
         using var root     = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
-            "cn", "description", "member", "distinguishedName", "groupType");
+            "cn", "description", "member", "distinguishedName", "groupType", "objectSid");
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
@@ -1035,6 +1012,7 @@ public partial class AdScanner
                 Description       = GetString(props, "description"),
                 MemberCount       = props["member"].Count,
                 DistinguishedName = GetString(props, "distinguishedName"),
+                Sid               = SidOf(props),
             });
         }
         return groups;
@@ -1046,7 +1024,7 @@ public partial class AdScanner
         using var root     = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
             "cn", "operatingSystem", "operatingSystemVersion",
-            "lastLogonTimestamp", "userAccountControl", "distinguishedName");
+            "lastLogonTimestamp", "userAccountControl", "distinguishedName", "objectSid");
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
@@ -1062,10 +1040,14 @@ public partial class AdScanner
                 IsEnabled           = UacFlags.IsEnabled(uac),
                 IsDomainController  = UacFlags.IsDomainController(uac),
                 DistinguishedName   = GetString(props, "distinguishedName"),
+                Sid                 = SidOf(props),
             });
         }
         return computers;
     }
+
+    private static string SidOf(ResultPropertyCollection props) =>
+        props["objectSid"].Count > 0 && props["objectSid"][0] is byte[] sid ? WellKnownGroups.SidBytesToString(sid) : "";
 
     private static string GetString(ResultPropertyCollection props, string name)
         => props[name].Count > 0 ? props[name][0]?.ToString() ?? "" : "";

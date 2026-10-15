@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Export;
 using DirHealth.Desktop.Core.Storage;
-
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.ViewModels.Tables;
 
@@ -11,7 +10,8 @@ namespace DirHealth.Desktop.ViewModels;
 
 public partial class FindingsViewModel : BaseViewModel
 {
-    private readonly AcknowledgeStore _store       = new();
+    private readonly AcknowledgeStore _legacy;      // read-only hints from v2.9 (ADR 0001)
+    private readonly ExceptionStore   _exceptions;  // per-object exceptions (ADR 0001)
     private readonly CsvExporter      _csvExporter = new();
     private readonly PdfExporter      _pdfExporter = new();
 
@@ -22,6 +22,26 @@ public partial class FindingsViewModel : BaseViewModel
     [ObservableProperty] private string          _acknowledgeNote = "";
     [ObservableProperty] private bool            _showAcknowledged = false;
     [ObservableProperty] private int             _score;
+
+    // ── S17-2: per-object exceptions ─────────────────────────────────────────
+    [ObservableProperty] private string   _exceptionReason = "";
+    [ObservableProperty] private DateTime _exceptionExpiry = DateTime.Today.AddDays(ExceptionStore.DefaultDays);
+    [ObservableProperty] private bool     _hideExceptions;
+
+    /// <summary>Raised after an exception was added or removed — the dashboard recomputes the score.</summary>
+    public event Action? ExceptionsChanged;
+
+    /// <summary>"+X points if fixed" per category (set by the main VM from the dashboard's score, S17-4).</summary>
+    public Func<string, int>? PointsFor { get; set; }
+
+    public int SelectedPoints => SelectedFinding is { } f ? PointsFor?.Invoke(f.Category) ?? 0 : 0;
+
+    /// <summary>Note of a pre-v2.10 category acknowledgement — shown as a hint only (ADR 0001).</summary>
+    public string LegacyNote => SelectedFinding is { } f && _legacy.Legacy(f.Category) is { } e
+        ? $"Acknowledged before v2.10 ({e.AcknowledgedAt:yyyy-MM-dd}): \"{e.Note}\". Acknowledgements no longer hide findings — add an exception per object instead."
+        : "";
+
+    partial void OnHideExceptionsChanged(bool value) => ObjectsTable.SetFilter(value ? o => !o.IsExcepted : null);
 
     public List<string> SeverityOptions { get; } = ["All", "High", "Medium", "Low"];
 
@@ -38,9 +58,14 @@ public partial class FindingsViewModel : BaseViewModel
 
     public FindingRule? SelectedRule => SelectedFinding?.Rule;
 
-    public FindingsViewModel()
+    public FindingsViewModel(ExceptionStore? exceptions = null, AcknowledgeStore? legacy = null)
     {
-        ObjectsTable.Activated += row => { if (row is AffectedObject o) OpenObject(o); };
+        _exceptions = exceptions ?? new ExceptionStore();
+        _legacy     = legacy ?? new AcknowledgeStore();
+        if (_exceptions.LoadError is { } err) StatusMessage = err;
+        ObjectsTable.Activated        += row => { if (row is AffectedObject o) OpenObject(o); };
+        ObjectsTable.SelectionChanged += _ => { AddExceptionCommand.NotifyCanExecuteChanged(); RemoveExceptionCommand.NotifyCanExecuteChanged(); };
+        ObjectsTable.MutedPath = nameof(AffectedObject.IsExcepted);
     }
 
     /// <summary>Findings not acknowledged — drives the sidebar badge (S9-8; A6 fix in S14-6).</summary>
@@ -93,8 +118,13 @@ public partial class FindingsViewModel : BaseViewModel
     partial void OnSelectedFindingChanged(AdFinding? value)
     {
         ObjectsTable.SetRows(value?.Objects ?? []);
+        if (HideExceptions) ObjectsTable.SetFilter(o => !o.IsExcepted);
         ObjectsTable.FilterDescription = () => $"finding={value?.RuleId} {value?.Category}";
         OnPropertyChanged(nameof(SelectedRule));
+        OnPropertyChanged(nameof(SelectedPoints));
+        OnPropertyChanged(nameof(LegacyNote));
+        AddExceptionCommand.NotifyCanExecuteChanged();
+        RemoveExceptionCommand.NotifyCanExecuteChanged();
         CopyFixCommand.NotifyCanExecuteChanged();
         CopyRevertCommand.NotifyCanExecuteChanged();
         // A8 (S14-6): the list binds SelectedItem straight to SelectedFinding, so the
@@ -116,10 +146,8 @@ public partial class FindingsViewModel : BaseViewModel
     public void LoadFindings(List<AdFinding> findings, int score = 0)
     {
         foreach (var f in findings)
-        {
-            f.IsAcknowledged  = _store.IsAcknowledged(f.Category);
-            f.AcknowledgeNote = _store.GetNote(f.Category);
-        }
+            f.AcknowledgeNote = _legacy.Legacy(f.Category)?.Note ?? "";
+        _exceptions.Apply(findings, DateTime.UtcNow);   // sets IsAcknowledged = all objects excepted
         Findings = findings;
         Score    = score;
         SelectedFinding = null;
@@ -175,43 +203,61 @@ public partial class FindingsViewModel : BaseViewModel
         AcknowledgeNote = finding?.AcknowledgeNote ?? "";
     }
 
-    [RelayCommand]
-    public void Acknowledge()
+    // ── S17-2: add / remove an exception for the selected object ───────────────
+    private AffectedObject? SelectedObject => ObjectsTable.Selected;
+
+    private bool CanAddException() => SelectedObject is not null && SelectedRule is not null;
+    private bool CanRemoveException() => SelectedObject is { Exception: not ExceptionState.None };
+
+    [RelayCommand(CanExecute = nameof(CanAddException))]
+    public void AddException()
     {
-        if (SelectedFinding is null) return;
+        if (SelectedObject is not { } obj || SelectedRule is not { } rule) return;
+        var key = ExceptionKey.For(rule, obj);
+        if (key is null)
+        {
+            StatusMessage = $"{obj.Name} has no SID in this scan (scan from an older DirHealth) — run a new scan, then add the exception.";
+            return;
+        }
+        var now     = DateTime.UtcNow;
+        var expires = DateTime.SpecifyKind(ExceptionExpiry.Date.AddDays(1).AddSeconds(-1), DateTimeKind.Local).ToUniversalTime();
+        if (ExceptionStore.Validate(ExceptionReason, expires, now) is { } invalid) { StatusMessage = invalid; return; }
         try
         {
-            _store.Acknowledge(SelectedFinding.Category, AcknowledgeNote);
-            SelectedFinding.IsAcknowledged  = true;
-            SelectedFinding.AcknowledgeNote = AcknowledgeNote;
-            OnPropertyChanged(nameof(FilteredFindings));
-        OnPropertyChanged(nameof(OpenFindingsCount));
-            OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
-            StatusMessage   = "Finding acknowledged.";
-            AcknowledgeNote = "";
+            _exceptions.Add(rule.RuleId, key, obj.Name, ExceptionReason, expires,
+                            $"{Environment.UserDomainName}\\{Environment.UserName}", now);
+            StatusMessage   = $"Exception added for {obj.Name} until {ExceptionExpiry:yyyy-MM-dd}.";
+            ExceptionReason = "";
+            AfterExceptionChange();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to acknowledge: {ex.Message}"; }
-        SelectedFinding = null;
+        catch (Exception ex) { StatusMessage = $"Could not save the exception: {ex.Message}"; }
     }
 
-    [RelayCommand]
-    public void Unacknowledge()
+    [RelayCommand(CanExecute = nameof(CanRemoveException))]
+    public void RemoveException()
     {
-        if (SelectedFinding is null) return;
+        if (SelectedObject is not { } obj || SelectedRule is not { } rule || ExceptionKey.For(rule, obj) is not { } key) return;
         try
         {
-            _store.Unacknowledge(SelectedFinding.Category);
-            SelectedFinding.IsAcknowledged  = false;
-            SelectedFinding.AcknowledgeNote = "";
-            OnPropertyChanged(nameof(FilteredFindings));
-        OnPropertyChanged(nameof(OpenFindingsCount));
-            OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
-            StatusMessage   = "Acknowledgement removed.";
-            AcknowledgeNote = "";
+            if (_exceptions.Remove(rule.RuleId, key)) StatusMessage = $"Exception for {obj.Name} removed.";
+            AfterExceptionChange();
         }
-        catch (Exception ex) { StatusMessage = $"Failed to unacknowledge: {ex.Message}"; }
-        SelectedFinding = null;
+        catch (Exception ex) { StatusMessage = $"Could not save: {ex.Message}"; }
     }
+
+    private void AfterExceptionChange()
+    {
+        _exceptions.Apply(Findings, DateTime.UtcNow);
+        ObjectsTable.SetRows(SelectedFinding?.Objects ?? []);    // rows show the new state
+        OnPropertyChanged(nameof(FilteredFindings));
+        OnPropertyChanged(nameof(OpenFindingsCount));
+        OnPropertyChanged(nameof(SelectedFindingIsAcknowledged));
+        ExceptionsChanged?.Invoke();
+        OnPropertyChanged(nameof(SelectedPoints));
+    }
+
+    /// <summary>Call after the dashboard recomputed the score so the card's "+X" refreshes.</summary>
+    public void RefreshPoints() => OnPropertyChanged(nameof(SelectedPoints));
 
     [RelayCommand(CanExecute = nameof(HasFilteredFindings))]
     public void ExportCsv()

@@ -16,6 +16,10 @@ public class ScanCache
     public int  GroupIssuesCount          { get; set; }
     /// <summary>Per-check status of the scan (S16-4). Absent in caches written before S16 → empty.</summary>
     public List<DirHealth.Desktop.Core.AD.CheckResult> Checks { get; set; } = [];
+    /// <summary>Populations for the score's Share rules (ADR 0002). Null in caches before S17.</summary>
+    public DirHealth.Desktop.Core.AD.ScanTotals? Totals { get; set; }
+    /// <summary>Score formula of ComplianceScore. Caches before S17 → 1.</summary>
+    public int FormulaVersion { get; set; } = 1;
 }
 
 public class ScanCacheStore

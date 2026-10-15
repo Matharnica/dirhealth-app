@@ -17,7 +17,22 @@ public record FindingRule(
     string What, string Why, string HowToFix,
     IReadOnlyList<FindingReference> References,
     string Fix, string FixRisk, string Revert,
-    string? CheckFilter);
+    string? CheckFilter)
+{
+    /// <summary>How the rule feeds the score (ADR 0002). Set from <see cref="FindingCatalog"/>'s scoring table.</summary>
+    public ScoreMeasure Measure    { get; init; } = ScoreMeasure.Count;
+    /// <summary>Count: objects at which the rule is fully present. Share: fraction of the population.</summary>
+    public double       Saturation { get; init; } = 1;
+    public ScorePopulation Population { get; init; } = ScorePopulation.None;
+    /// <summary>Exception key type (ADR 0001): object rules by SID, policy rules by name.</summary>
+    public bool KeyedBySid => Measure != ScoreMeasure.Presence;
+}
+
+/// <summary>Score measure of a rule (ADR 0002).</summary>
+public enum ScoreMeasure { Count, Share, Presence, Informational }
+
+/// <summary>Population a Share rule is measured against.</summary>
+public enum ScorePopulation { None, Users, Groups, Computers }
 
 /// <summary>Rule catalog — single source for ids, weights, texts and fix blocks.</summary>
 public static class FindingCatalog
@@ -79,7 +94,39 @@ public static class FindingCatalog
     private static readonly string EolExemptRegex =
         "Windows 10.*(" + string.Join("|", EolMatcher.Windows10Exemptions) + ")";
 
-    private static readonly IReadOnlyDictionary<string, FindingRule> Rules = Build().ToDictionary(r => r.Category);
+    /// <summary>
+    /// Scoring table (ADR 0002) — saturations taken over from the v1 formula so typical domains
+    /// keep their relative order. Changing a value changes the score: bump ScoreModel.FormulaVersion.
+    /// </summary>
+    private static readonly Dictionary<string, (ScoreMeasure M, double Sat, ScorePopulation Pop)> Scoring = new()
+    {
+        ["InactiveUsers"]                    = (ScoreMeasure.Share, 0.30, ScorePopulation.Users),
+        ["PasswordNeverExpires"]             = (ScoreMeasure.Share, 0.50, ScorePopulation.Users),
+        ["ExpiredPasswords"]                 = (ScoreMeasure.Share, 0.30, ScorePopulation.Users),
+        ["EmptyGroups"]                      = (ScoreMeasure.Share, 0.35, ScorePopulation.Groups),
+        ["SingleMemberGroups"]               = (ScoreMeasure.Share, 0.35, ScorePopulation.Groups),
+        ["InactiveComputers"]                = (ScoreMeasure.Share, 0.40, ScorePopulation.Computers),
+        ["ComputersWithoutOS"]               = (ScoreMeasure.Count, 5,    ScorePopulation.None),
+        ["EolOperatingSystems"]              = (ScoreMeasure.Count, 5,    ScorePopulation.None),   // a DC counts 3×
+        ["KerberoastableAccounts"]           = (ScoreMeasure.Count, 3,    ScorePopulation.None),
+        ["AsRepRoasting"]                    = (ScoreMeasure.Count, 5,    ScorePopulation.None),
+        ["UnconstrainedDelegationComputers"] = (ScoreMeasure.Count, 1,    ScorePopulation.None),
+        ["UnconstrainedDelegationUsers"]     = (ScoreMeasure.Count, 1,    ScorePopulation.None),
+        ["PasswordNotRequired"]              = (ScoreMeasure.Count, 5,    ScorePopulation.None),
+        ["StaleDomainAdmins"]                = (ScoreMeasure.Count, 4,    ScorePopulation.None),
+        ["SidHistory"]                       = (ScoreMeasure.Count, 4,    ScorePopulation.None),
+        ["AdminSdHolderAccounts"]            = (ScoreMeasure.Informational, 1, ScorePopulation.None),
+        ["WeakPasswordLength"]               = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["WeakPasswordHistory"]              = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["NoAccountLockout"]                 = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["FineGrainedPasswordPolicy"]        = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+    };
+
+    private static readonly IReadOnlyDictionary<string, FindingRule> Rules = Build()
+        .Select(r => Scoring.TryGetValue(r.Category, out var s)
+            ? r with { Measure = s.M, Saturation = s.Sat, Population = s.Pop }
+            : r)
+        .ToDictionary(r => r.Category);
 
     public static IReadOnlyCollection<FindingRule> All => (IReadOnlyCollection<FindingRule>)Rules.Values;
 

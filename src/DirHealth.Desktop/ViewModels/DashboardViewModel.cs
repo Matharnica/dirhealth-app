@@ -12,8 +12,11 @@ public partial class DashboardViewModel : BaseViewModel
 {
     private readonly AdScanner _scanner;
     private readonly PdfExporter _pdfExporter = new();
-    private readonly ScoreHistoryStore _historyStore = new();
+    private readonly ScoreHistoryStore _historyStore;
     private readonly ScanCacheStore _cacheStore = new();
+    private readonly ExceptionStore _exceptions;
+    private ScanTotals? _totals;
+    private int _cachedFormulaVersion = ScoreModel.FormulaVersion;
 
     private List<AdUser> _cachedInactiveUsers     = [];
     private List<AdUser> _cachedExpiringPasswords = [];
@@ -69,17 +72,49 @@ public partial class DashboardViewModel : BaseViewModel
         get
         {
             if (ScoreHistory.Count < 2) return "";
+            if (!ScoreHistoryStore.Comparable(ScoreHistory)) return "new score model";
             var delta = ScoreHistory[^1].Score - ScoreHistory[^2].Score;
             return delta > 0 ? $"▲ +{delta}" : delta < 0 ? $"▼ {delta}" : "= no change";
         }
     }
 
-    public bool ScoreTrendIsPositive => ScoreHistory.Count >= 2 && ScoreHistory[^1].Score > ScoreHistory[^2].Score;
-    public bool ScoreTrendIsNegative => ScoreHistory.Count >= 2 && ScoreHistory[^1].Score < ScoreHistory[^2].Score;
+    public bool ScoreTrendIsPositive => ScoreHistoryStore.Comparable(ScoreHistory) && ScoreHistory[^1].Score > ScoreHistory[^2].Score;
+    public bool ScoreTrendIsNegative => ScoreHistoryStore.Comparable(ScoreHistory) && ScoreHistory[^1].Score < ScoreHistory[^2].Score;
 
-    public DashboardViewModel(AdScanner scanner)
+    // ── Score v2 (ADR 0002), recomputed from raw scan data + exceptions ────────
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScoreDisplay), nameof(ScoreCoverageText), nameof(ScoreBreakdown), nameof(ScoreNote))]
+    private ScoreResult? _scoreResult;
+
+    /// <summary>"74", "≤ 74" (some checks failed) or "n/a"; old caches show their stored number.</summary>
+    public string ScoreDisplay => ScoreResult?.Display ?? ComplianceScore.ToString();
+    public string ScoreCoverageText => ScoreResult?.CoverageText ?? "";
+    /// <summary>Per-rule "+X if fixed", largest first (S17-4 dashboard breakdown).</summary>
+    public List<RuleScore> ScoreBreakdown => ScoreResult?.Rules.Where(r => r.PointsIfFixed > 0).ToList() ?? [];
+    public string ScoreNote => ScoreResult is null && LastScanTime != "Never"
+        ? "Score from an older DirHealth version — run a scan to use the new score model."
+        : ScoreResult is { Available: false } ? "Too many checks failed to compute a score."
+        : ScoreResult is { IsUpperBound: true } ? "Upper bound: failed checks could only lower it."
+        : "";
+
+    /// <summary>Recomputes the displayed score after a scan or when exceptions change (ADR 0001/0002).</summary>
+    public void RecomputeScore()
     {
-        _scanner = scanner;
+        _exceptions.Apply(Findings, DateTime.UtcNow);
+        if (_totals is null || _cachedFormulaVersion != ScoreModel.FormulaVersion)
+        {
+            ScoreResult = null;   // old cache: keep its stored number, say so
+            return;
+        }
+        ScoreResult     = ScoreModel.Compute(FindingCatalog.All, Findings, Checks, _totals);
+        ComplianceScore = ScoreResult.Score;
+    }
+
+    public DashboardViewModel(AdScanner scanner, ExceptionStore? exceptions = null, ScoreHistoryStore? history = null)
+    {
+        _scanner      = scanner;
+        _exceptions   = exceptions ?? new ExceptionStore();
+        _historyStore = history ?? new ScoreHistoryStore();
         LoadCachedResults();
         PropertyChanged += (_, e) =>
         {
@@ -113,6 +148,9 @@ public partial class DashboardViewModel : BaseViewModel
         GroupIssuesCount    = cache.GroupIssuesCount;
         LastScanTime        = cache.LastScanTime;
         Checks              = cache.Checks ?? [];
+        _totals               = cache.Totals;
+        _cachedFormulaVersion = cache.FormulaVersion;
+        RecomputeScore();
         StatusMessage       = $"Last scan: {cache.LastScanTime} — {cache.FindingsCount} finding(s)";
     }
 
@@ -135,6 +173,9 @@ public partial class DashboardViewModel : BaseViewModel
             Findings            = result.Findings;
             ComplianceScore     = result.Score;
             Checks              = result.Checks;
+            _totals               = result.Totals;
+            _cachedFormulaVersion = ScoreModel.FormulaVersion;
+            RecomputeScore();
             FindingsCount       = Findings.Count;
             InactiveUsersCount  = Findings.FirstOrDefault(f => f.Category == "InactiveUsers")?.Count ?? 0;
             PasswordIssuesCount = Findings.Where(f => f.Category is "PasswordNeverExpires" or "ExpiredPasswords").Sum(f => f.Count);
@@ -160,6 +201,8 @@ public partial class DashboardViewModel : BaseViewModel
                 GroupIssuesCount    = GroupIssuesCount,
                 LastScanTime        = LastScanTime,
                 Checks              = Checks,
+                Totals              = _totals,
+                FormulaVersion      = ScoreModel.FormulaVersion,
             };
 
             if (previousCache != null)
@@ -170,8 +213,8 @@ public partial class DashboardViewModel : BaseViewModel
 
             _cacheStore.Save(newCache);
 
-            var previous = _historyStore.PreviousScore();
-            _historyStore.Add(ComplianceScore);
+            var previous = _historyStore.PreviousComparableScore(ScoreModel.FormulaVersion);
+            _historyStore.Add(ComplianceScore, ScoreModel.FormulaVersion);
             OnPropertyChanged(nameof(ScoreHistory));
             OnPropertyChanged(nameof(ScoreTrendText));
             OnPropertyChanged(nameof(ScoreTrendIsPositive));
@@ -204,9 +247,9 @@ public partial class DashboardViewModel : BaseViewModel
         StatusMessage = "Building full report…";
         try
         {
-            int? scoreDelta = ScoreHistory.Count >= 2
+            int? scoreDelta = ScoreHistoryStore.Comparable(ScoreHistory)
                 ? ScoreHistory[^1].Score - ScoreHistory[^2].Score
-                : null;
+                : null;   // no delta across a formula change (ADR 0002)
 
             var data = new FullReportData(
                 Domain:            _scanner.DomainName,

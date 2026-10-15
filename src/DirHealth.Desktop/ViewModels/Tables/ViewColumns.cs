@@ -127,6 +127,7 @@ public static class ViewColumns
         new("Name",   o => o.Name,   nameof(AffectedObject.Name)),
         new("Type",   o => o.Type,   nameof(AffectedObject.Type)),
         new("Detail", o => o.Detail, nameof(AffectedObject.Detail)),
+        new("Exception", o => o.ExceptionLabel, nameof(AffectedObject.ExceptionLabel)),
         new("Distinguished Name", o => o.DistinguishedName, nameof(AffectedObject.DistinguishedName), monospace: true),
         new("SID",    o => o.Sid),
     ];

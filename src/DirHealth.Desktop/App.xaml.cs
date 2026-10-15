@@ -128,8 +128,10 @@ public partial class App : Application
         var scanner          = new Core.AD.AdScanner(connector);
         var wmi              = new Core.AD.AdWmiClient();
         var searcher         = new Core.AD.AdSearcher(connector);
-        var dashboard        = new DashboardViewModel(scanner);
-        var findings         = new FindingsViewModel();
+        // One exception store for dashboard (score) and findings (card) — ADR 0001/0002
+        var exceptions       = new Core.Storage.ExceptionStore();
+        var dashboard        = new DashboardViewModel(scanner, exceptions);
+        var findings         = new FindingsViewModel(exceptions);
         var appSettings      = new SettingsViewModel(connector);
         var computerDetailVm = new ComputerDetailViewModel(wmi);
         // Search has its own detail VMs so opening a result does not disturb the browsers (S15-2)

@@ -8,6 +8,8 @@ public record ScanChange(AdFinding Finding, int Delta);
 public class ScanDiff
 {
     public int ScoreDelta { get; init; }
+    /// <summary>False when the two scans used different score formulas — the delta is then 0 and meaningless.</summary>
+    public bool ScoreComparable { get; init; } = true;
     public List<AdFinding>  NewFindings      { get; init; } = [];
     public List<AdFinding>  ResolvedFindings { get; init; } = [];
     public List<ScanChange> ChangedFindings  { get; init; } = [];
@@ -38,7 +40,9 @@ public static class ScanDiffCalculator
 
         return new ScanDiff
         {
-            ScoreDelta       = current.ComplianceScore - previous.ComplianceScore,
+            ScoreComparable  = current.FormulaVersion == previous.FormulaVersion,
+            ScoreDelta       = current.FormulaVersion == previous.FormulaVersion
+                                 ? current.ComplianceScore - previous.ComplianceScore : 0,
             NewFindings      = newFindings,
             ResolvedFindings = resolved,
             ChangedFindings  = changed

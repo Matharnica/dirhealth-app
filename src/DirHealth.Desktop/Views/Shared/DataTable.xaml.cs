@@ -27,6 +27,15 @@ public partial class DataTable : UserControl
         if (e.NewValue is not TableViewModel vm) return;
 
         BuildColumns(vm.Columns);
+        if (vm.MutedPath is { } muted && TryFindResource("DataTableRow") is Style rowBase)
+        {
+            // Greyed, not hidden (S17-2)
+            var rowStyle = new Style(typeof(DataGridRow), rowBase);
+            var trigger  = new DataTrigger { Binding = new Binding(muted), Value = true };
+            trigger.Setters.Add(new Setter(OpacityProperty, 0.45));
+            rowStyle.Triggers.Add(trigger);
+            TableGrid.RowStyle = rowStyle;
+        }
         // Export "filtered" in the order the user sees after clicking a header
         vm.DisplayOrder = () => TableGrid.Items.Cast<object>().ToList();
     }
