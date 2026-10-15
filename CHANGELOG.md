@@ -14,6 +14,13 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 18 (Reports and Excel)
+- **Two report levels** (S18-1) — "Export report" asks for **Summary** (1–2 pages for management: score with "higher is better", coverage, fix-first list by score gain, overview by category, changes since the last scan) or **Full** (summary plus every finding card with what/why/how, fix and undo commands, affected objects, and appendix tables).
+- **Print discipline** (S18-2) — sections flow instead of starting a new page each; object lists stop at 25 with "N more — see the CSV export"; every page has a footer with domain, creation time and "Page x of y"; column headers repeat after a page break; wide tables (6+ columns) print in landscape.
+- **Exceptions and failed checks in the report** (S18-3) — own sections for active exceptions (object, reason, expiry, creator) and for checks that could not run (with reason).
+- **Redact user names** (S18-4) — option in the export dialog: user names, sAMAccountNames, e-mail addresses and DNs become stable aliases (user-001 …); counts, scores and computer names stay.
+- **Excel export** (S18-5) — every table's Export menu offers "Excel (filtered)" / "Excel (all)": frozen header row, autofilter, text cells for text (formula payloads stay inert text), typed numbers and dates so sorting and number filters work, and an "Info" sheet with the export metadata. The `.meta.txt` with the SHA-256 is written as for CSV. New dependency: MiniExcel 1.46.0 (Apache-2.0, no further packages).
+
 ### Changed — Sprint 17 (Exceptions and score) — ⚠ the score changes without any change in your AD
 - **Exceptions per object** (S17-1/S17-2) — instead of acknowledging a whole category, add an exception for one object of one rule, with a required reason and an expiry date (default 90 days, max. 365). Excepted objects stay visible (greyed), a filter can hide them, and expired exceptions count again. Exceptions are stored locally in `%APPDATA%\DirHealth\exceptions.json`; nothing is written to AD.
 - **Old acknowledgements no longer hide findings.** Findings of categories you acknowledged in earlier versions show up again; your old note is displayed on the finding card. Add exceptions per object where they still apply. `acknowledged.json` is left untouched (downgrading stays safe).
