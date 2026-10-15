@@ -62,6 +62,13 @@ public partial class AdScanner
         var sidHistoryTask     = Timed("SidHistory",               () => GetSidHistoryAccountsAsync(),              scanLog);
         var allUsersTask       = Timed("AllUsers",                 () => GetAllUsersAsync(),                        scanLog);
         var domainAdminsTask   = Timed("DomainAdmins",             () => GetDomainAdminsAsync(),                    scanLog);
+        // Sprint 19 checks — each query yields its findings; a failing one is marked Failed (S16-4)
+        var hiddenPgTask       = Timed("HiddenPrimaryGroup",       () => GetHiddenPrimaryGroupFindingsAsync(),      scanLog);
+        var adminHardenTask    = Timed("AdminHardening",           () => GetAdminHardeningFindingsAsync(),          scanLog);
+        var operatorsTask      = Timed("OperatorGroups",           () => GetOperatorGroupFindingsAsync(),           scanLog);
+        var domainBasicsTask   = Timed("DomainBasics",             () => GetDomainBasicsFindingsAsync(),            scanLog);
+        var kerbEncTask        = Timed("KerberosEncryption",       () => GetKerberosEncryptionFindingsAsync(),      scanLog);
+        var delegTrustTask     = Timed("DelegationTrusts",         () => GetDelegationTrustFindingsAsync(),         scanLog);
 
         try
         {
@@ -72,7 +79,8 @@ public partial class AdScanner
                 noOsTask, securityTask, adminSdTask, policyTask, eolTask,
                 asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
                 staleDAsTask, fgppTask, sidHistoryTask,
-                allUsersTask, domainAdminsTask);
+                allUsersTask, domainAdminsTask,
+                hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask);
         }
         finally
         {
@@ -294,6 +302,9 @@ public partial class AdScanner
                 Count           = sidHistoryAccounts.Count,
                 Objects         = sidHistoryAccounts.Select(AffectedObject.FromUser).ToList()
             });
+
+        foreach (var t in new[] { hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask })
+            findings.AddRange(t.Result);
 
         // ── Raw score: model v2 without exceptions (ADR 0002). The dashboard recomputes the
         //    displayed score with the user's exceptions; the raw inputs are cached for that. ──
@@ -917,6 +928,15 @@ public partial class AdScanner
         });
     }
 
+    /// <summary>Strict variant for checks (S19): a missing attribute is an error ("Failed"), not 0.</summary>
+    private static int RequireRootInt(DirectoryEntry root, string attr)
+    {
+        var props = root.Properties[attr];
+        if (props is null || props.Count == 0 || props[0] is not int i)
+            throw new InvalidOperationException($"Attribute {attr} could not be read on the domain object.");
+        return i;
+    }
+
     private static int GetRootInt(DirectoryEntry root, string attr)
     {
         try
@@ -959,7 +979,7 @@ public partial class AdScanner
             // S14-4: ADRecon-style export + Copy SID
             "objectSid", "whenCreated", "accountExpires", "department", "title",
             "manager", "description", "adminCount", "servicePrincipalName",
-            "msDS-AllowedToDelegateTo");
+            "msDS-AllowedToDelegateTo", "msDS-SupportedEncryptionTypes");
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
@@ -990,6 +1010,7 @@ public partial class AdScanner
                 HasSpn              = props["servicePrincipalName"].Count > 0,
                 Spns                = props["servicePrincipalName"].Cast<object>().Select(v => v?.ToString() ?? "").ToList(),
                 Delegation          = AdTime.DelegationKind(uac, props["msDS-AllowedToDelegateTo"].Count > 0),
+                SupportedEncryptionTypes = props["msDS-SupportedEncryptionTypes"].Count > 0 ? (int?)GetLong(props, "msDS-SupportedEncryptionTypes") : null,
             });
         }
         return users;

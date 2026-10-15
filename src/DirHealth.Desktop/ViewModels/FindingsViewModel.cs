@@ -43,7 +43,8 @@ public partial class FindingsViewModel : BaseViewModel
 
     partial void OnHideExceptionsChanged(bool value) => ObjectsTable.SetFilter(value ? o => !o.IsExcepted : null);
 
-    public List<string> SeverityOptions { get; } = ["All", "High", "Medium", "Low"];
+    /// <summary>A4 (S19-6): Critical is a filter option — several checks report Critical.</summary>
+    public List<string> SeverityOptions { get; } = ["All", "Critical", "High", "Medium", "Low"];
 
     /// <summary>Affected objects of the selected finding as the shared table (S16-2).</summary>
     public TableViewModel<AffectedObject> ObjectsTable { get; } = new("Affected Objects", ViewColumns.AffectedObjects)

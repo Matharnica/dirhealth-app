@@ -10,6 +10,9 @@ public static class UacFlags
     public const int TrustedForDelegation  = 0x80000;     // 524288  TRUSTED_FOR_DELEGATION (unconstrained)
     public const int DontRequirePreauth    = 0x400000;    // 4194304 DONT_REQ_PREAUTH (AS-REP roastable)
     public const int TrustedToAuthForDelegation = 0x1000000; // 16777216 TRUSTED_TO_AUTH_FOR_DELEGATION (protocol transition)
+    public const int EncryptedTextPwdAllowed = 0x0080;     // 128     reversible encryption
+    public const int NotDelegated           = 0x100000;    // 1048576 "sensitive and cannot be delegated"
+    public const int UseDesKeyOnly          = 0x200000;    // 2097152 USE_DES_KEY_ONLY
 
     /// <summary>
     /// Flags actually stored in userAccountControl, in documentation order (S14-4 export

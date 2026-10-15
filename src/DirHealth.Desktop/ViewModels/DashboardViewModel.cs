@@ -91,6 +91,15 @@ public partial class DashboardViewModel : BaseViewModel
     public string ScoreCoverageText => ScoreResult?.CoverageText ?? "";
     /// <summary>Per-rule "+X if fixed", largest first (S17-4 dashboard breakdown).</summary>
     public List<RuleScore> ScoreBreakdown => ScoreResult?.Rules.Where(r => r.PointsIfFixed > 0).ToList() ?? [];
+    /// <summary>
+    /// One-time release notice (S19): shown after the first scan with a new score formula — i.e. while
+    /// the last two history entries use different formulas — and gone after the next scan.
+    /// </summary>
+    public string ScoreModelNotice => ScoreHistory.Count >= 2 && !ScoreHistoryStore.Comparable(ScoreHistory)
+        ? "This version checks more and scores differently (new checks, exploitable issues weigh more). " +
+          "Your score changed without any change in your Active Directory — compare from the next scan on."
+        : "";
+
     public string ScoreNote => ScoreResult is null && LastScanTime != "Never"
         ? "Score from an older DirHealth version — run a scan to use the new score model."
         : ScoreResult is { Available: false } ? "Too many checks failed to compute a score."
@@ -219,6 +228,7 @@ public partial class DashboardViewModel : BaseViewModel
             OnPropertyChanged(nameof(ScoreTrendText));
             OnPropertyChanged(nameof(ScoreTrendIsPositive));
             OnPropertyChanged(nameof(ScoreTrendIsNegative));
+            OnPropertyChanged(nameof(ScoreModelNotice));
             if (previous.HasValue && ComplianceScore < previous.Value)
                 OnScoreDrop?.Invoke(previous.Value, ComplianceScore);
         }

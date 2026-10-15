@@ -33,6 +33,10 @@ public static class WellKnownGroups
     public const int EnterpriseAdminsRid      = 519;
     public const int KeyAdminsRid             = 526;
     public const int EnterpriseKeyAdminsRid   = 527;
+    public const int CertPublishersRid        = 517;
+    public const int ProtectedUsersRid        = 525;
+    public const int GuestRid                 = 501;
+    public const int PreWindows2000Rid        = 554;
 
     public const int BuiltinAdministratorsRid = 544;
     public const int AccountOperatorsRid      = 548;
@@ -45,6 +49,26 @@ public static class WellKnownGroups
 
     public static readonly WellKnownGroupDef DomainAdmins =
         new("Domain Admins", "Full domain control", GroupSidSource.Domain, DomainAdminsRid);
+
+    /// <summary>
+    /// Tier 0 groups after the BloodHound "high value" model (S19-1): control of the domain. DnsAdmins has no
+    /// fixed RID and is looked up by name.
+    /// </summary>
+    public static IReadOnlyList<WellKnownGroupDef> Tier0 => _tier0 ??=
+    [
+        .. Privileged.Where(d => d.Rid is not RemoteDesktopUsersRid),
+        new("Cert Publishers", "Can publish certificates to AD (PKI trust anchor)", GroupSidSource.Domain, CertPublishersRid),
+    ];
+    private static IReadOnlyList<WellKnownGroupDef>? _tier0;
+
+    public static readonly WellKnownGroupDef ProtectedUsers =
+        new("Protected Users", "Hardened credential handling", GroupSidSource.Domain, ProtectedUsersRid);
+
+    public static IReadOnlyList<WellKnownGroupDef> OperatorGroups => Privileged
+        .Where(d => d.Rid is AccountOperatorsRid or ServerOperatorsRid or PrintOperatorsRid or BackupOperatorsRid).ToList();
+
+    public static readonly WellKnownGroupDef PreWindows2000 =
+        new("Pre-Windows 2000 Compatible Access", "Read access to users and groups", GroupSidSource.Builtin, PreWindows2000Rid);
 
     /// <summary>Groups shown in the Privileged Groups view. Order = display order.</summary>
     public static readonly IReadOnlyList<WellKnownGroupDef> Privileged =
@@ -66,7 +90,7 @@ public static class WellKnownGroups
     // Tier 0 by SID (S15-4): domain-relative RIDs in any domain, plus BUILTIN operators.
     // DnsAdmins (no fixed RID) and Cert Publishers follow in S19-1.
     private static readonly HashSet<int> Tier0DomainRids =
-        [DomainAdminsRid, SchemaAdminsRid, EnterpriseAdminsRid, KeyAdminsRid, EnterpriseKeyAdminsRid];
+        [DomainAdminsRid, SchemaAdminsRid, EnterpriseAdminsRid, KeyAdminsRid, EnterpriseKeyAdminsRid, CertPublishersRid];
 
     private static readonly HashSet<string> Tier0BuiltinSids =
     [

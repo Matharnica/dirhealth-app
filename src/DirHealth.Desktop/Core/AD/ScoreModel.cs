@@ -28,7 +28,8 @@ public record ScoreResult(
 /// </summary>
 public static class ScoreModel
 {
-    public const int    FormulaVersion  = 2;
+    /// <summary>2 = ADR 0002 (S17). 3 = 23 new rules from Sprint 19 — scores drop without any AD change.</summary>
+    public const int    FormulaVersion  = 3;
     public const double PointsPerWeight = 2.5;
     /// <summary>Below this share of the catalog weight evaluated, no number is shown.</summary>
     public const double MinCoverage     = 0.5;
