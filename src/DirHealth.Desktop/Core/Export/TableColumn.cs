@@ -25,6 +25,8 @@ public interface ITableColumn
     string? ToolTipPath { get; }
     /// <summary>Cell value as text for export (not yet formula-escaped).</summary>
     string  ExportValue(object row);
+    /// <summary>Typed cell value for XLSX (ADR 0003): numbers/dates stay typed, everything else text.</summary>
+    object? ExportTyped(object row);
 }
 
 public sealed class TableColumn<T> : ITableColumn where T : class
@@ -62,6 +64,14 @@ public sealed class TableColumn<T> : ITableColumn where T : class
     public string? ToolTipPath { get; }
 
     public string ExportValue(object row) => FormatValue(_value((T)row), _exportFormat);
+
+    public object? ExportTyped(object row) => _value((T)row) switch
+    {
+        null                                   => null,
+        DateTime d                             => d,
+        int or long or double or decimal or float or short => _value((T)row),
+        var other                              => FormatValue(other, _exportFormat),   // bool → TRUE/FALSE, enum/string → text
+    };
 
     /// <summary>
     /// Export text for a value. Null → empty (never "Never" in a date column — that breaks

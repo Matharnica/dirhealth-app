@@ -55,13 +55,13 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 📜 GPO Browser | Every Group Policy Object with its link status — orphaned (unlinked) and disabled GPOs flagged |
 | 📋 AD Data Quality | Completeness of user master data (email, phone, department, title, manager, office) |
 
-Every finding reduces your **Hygiene Score (0–100)**. Fix issues, watch the number climb. Each finding now ships a **concrete remediation step**, shown in the app and in the exported PDF report — which also includes the score delta and what changed since your last scan.
+Every finding reduces your **Hygiene Score (0–100, higher is better)** — exploitable issues weigh more than hygiene, and each finding shows how many points fixing it is worth. Each finding ships a plain-language explanation, a **copyable PowerShell fix with an undo command** (DirHealth never runs it — it only reads AD), and its affected objects. Document accepted risks as **per-object exceptions** with a reason and an expiry date.
 
 ## Getting started
 
 1. **Download** the latest `.exe` from [Releases](https://github.com/matharnica/dirhealth-app/releases/latest) — single file, no runtime needed
 2. **Log in** with your domain admin credentials
-3. **Scan & fix** — review findings, drill into categories, export a full PDF report
+3. **Scan & fix** — review findings, drill into categories, export a management summary or a full PDF report (optionally with user names redacted), and any table as CSV or Excel with an audit side-file (SHA-256)
 
 ## Download
 

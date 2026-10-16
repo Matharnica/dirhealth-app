@@ -1,0 +1,24 @@
+<Window x:Class="DirHealth.Desktop.Views.Dashboard.ReportExportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export report" Width="400" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{DynamicResource BackgroundBrush}" ShowInTaskbar="False">
+    <!-- S18-1 Summary / Full, S18-4 redaction -->
+    <StackPanel Margin="20">
+        <TextBlock Text="Export PDF report" FontSize="16" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
+        <RadioButton x:Name="SummaryRadio" GroupName="Kind" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}"
+                     Content="Summary — 1–2 pages for management: score, fix first, categories, changes" />
+        <RadioButton x:Name="FullRadio" GroupName="Kind" IsChecked="True" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}"
+                     Content="Full — summary plus every finding with fix, undo, objects, exceptions" />
+        <CheckBox x:Name="RedactBox" Margin="0,14,0,0" Foreground="{DynamicResource TextPrimaryBrush}"
+                  Content="Redact user names (user-001, user-002 …)" />
+        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="22,2,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                   Text="Names, sAMAccountNames, e-mail addresses and DNs of users are replaced by stable aliases. Counts and scores stay." />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Padding="14,5" Margin="0,0,8,0" IsCancel="True" />
+            <Button Content="Export…" Style="{StaticResource PrimaryButton}" Padding="14,5" IsDefault="True" Click="Export_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

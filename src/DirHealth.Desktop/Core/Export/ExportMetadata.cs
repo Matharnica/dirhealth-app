@@ -31,21 +31,31 @@ public static class ExportMetadata
         ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
         ?? "unknown";
 
+    /// <summary>The metadata fields without the hash — also the XLSX "Info" sheet (ADR 0003: a file
+    /// cannot contain its own SHA-256, so that stays in the .meta.txt).</summary>
+    public static List<(string Key, string Value)> Fields(ExportContext ctx, string view, string filter, int rowCount,
+                                                          string fileName, DateTime utcNow, string version) =>
+    [
+        ("File",              fileName),
+        ("Rows",              rowCount.ToString(CultureInfo.InvariantCulture)),
+        ("View",              view),
+        ("Filter",            string.IsNullOrWhiteSpace(filter) ? "(none)" : filter),
+        ("Domain",            ctx.Domain),
+        ("Domain controller", ctx.DomainController),
+        ("Run by",            ctx.User),
+        ("Created (UTC)",     utcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)),
+        ("Tool",              $"DirHealth {version}"),
+    ];
+
     public static string Build(ExportContext ctx, string view, string filter, int rowCount,
                                string fileName, string sha256, DateTime utcNow, string version)
     {
         var sb = new StringBuilder();
         void Line(string key, string value) => sb.Append(key.PadRight(18)).Append(": ").Append(value).Append("\r\n");
-        Line("File",              fileName);
-        Line("SHA-256",           sha256);
-        Line("Rows",              rowCount.ToString(CultureInfo.InvariantCulture));
-        Line("View",              view);
-        Line("Filter",            string.IsNullOrWhiteSpace(filter) ? "(none)" : filter);
-        Line("Domain",            ctx.Domain);
-        Line("Domain controller", ctx.DomainController);
-        Line("Run by",            ctx.User);
-        Line("Created (UTC)",     utcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
-        Line("Tool",              $"DirHealth {version}");
+        var fields = Fields(ctx, view, filter, rowCount, fileName, utcNow, version);
+        Line(fields[0].Key, fields[0].Value);
+        Line("SHA-256", sha256);
+        foreach (var (k, v) in fields.Skip(1)) Line(k, v);
         return sb.ToString();
     }
 

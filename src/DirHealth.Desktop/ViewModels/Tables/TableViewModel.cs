@@ -7,6 +7,9 @@ using DirHealth.Desktop.Core.Export;
 
 namespace DirHealth.Desktop.ViewModels.Tables;
 
+/// <summary>Export file format (S18-5).</summary>
+public enum ExportFormat { Csv, Xlsx }
+
 /// <summary>
 /// Shared table state for every list view (S14-1): rows after the local filter, the
 /// "37 of 1,204" counter, CSV export of the filtered or the full set (with a .meta.txt
@@ -15,8 +18,16 @@ namespace DirHealth.Desktop.ViewModels.Tables;
 /// </summary>
 public abstract partial class TableViewModel : ObservableObject
 {
-    /// <summary>Save dialog; replaced in tests. Args: suggested file name. Returns path or null.</summary>
-    public static Func<string, string?> PickSavePath { get; set; } = DefaultPickSavePath;
+    /// <summary>Save dialog; replaced in tests. Args: suggested file name (without extension) and the
+    /// format. Returns the path or null.</summary>
+    public static Func<string, ExportFormat, string?> PickSavePathFor { get; set; } = DefaultPickSavePath;
+
+    /// <summary>CSV-only shortcut kept for existing callers/tests.</summary>
+    public static Func<string, string?> PickSavePath
+    {
+        get => name => PickSavePathFor(name, ExportFormat.Csv);
+        set => PickSavePathFor = (name, _) => value(name);
+    }
 
     /// <summary>Clipboard writer; replaced in tests.</summary>
     public static Action<string> SetClipboardText { get; set; } = text => System.Windows.Clipboard.SetText(text);
@@ -72,8 +83,10 @@ public abstract partial class TableViewModel : ObservableObject
         ? $"{N(TotalCount)} {(TotalCount == 1 ? "item" : "items")}"
         : $"{N(FilteredCount)} of {N(TotalCount)}";
 
-    public string ExportFilteredLabel => $"CSV ({N(FilteredCount)} filtered)";
-    public string ExportAllLabel      => $"CSV (all {N(TotalCount)})";
+    public string ExportFilteredLabel     => $"CSV ({N(FilteredCount)} filtered)";
+    public string ExportAllLabel          => $"CSV (all {N(TotalCount)})";
+    public string ExportXlsxFilteredLabel => $"Excel ({N(FilteredCount)} filtered)";
+    public string ExportXlsxAllLabel      => $"Excel (all {N(TotalCount)})";
 
     public bool HasRows    => FilteredCount > 0;
     public bool HasAnyRows => TotalCount > 0;
@@ -90,6 +103,10 @@ public abstract partial class TableViewModel : ObservableObject
         OnPropertyChanged(nameof(CountLabel));
         OnPropertyChanged(nameof(ExportFilteredLabel));
         OnPropertyChanged(nameof(ExportAllLabel));
+        OnPropertyChanged(nameof(ExportXlsxFilteredLabel));
+        OnPropertyChanged(nameof(ExportXlsxAllLabel));
+        ExportXlsxFilteredCommand.NotifyCanExecuteChanged();
+        ExportXlsxAllCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(HasRows));
         OnPropertyChanged(nameof(HasAnyRows));
         ExportFilteredCommand.NotifyCanExecuteChanged();
@@ -114,16 +131,26 @@ public abstract partial class TableViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(HasAnyRows))]
     private void ExportAll() => Export(RowsForFullExport(), "(none — all rows)", "all");
 
-    /// <summary>Writes CSV + metadata. Returns the CSV path, or null when cancelled/failed.</summary>
-    public string? Export(IReadOnlyList<object> rows, string filter, string scope)
+    [RelayCommand(CanExecute = nameof(HasRows))]
+    private void ExportXlsxFiltered() =>
+        Export(RowsForFilteredExport(), FilterDescription?.Invoke() ?? "", "filtered", ExportFormat.Xlsx);
+
+    [RelayCommand(CanExecute = nameof(HasAnyRows))]
+    private void ExportXlsxAll() => Export(RowsForFullExport(), "(none — all rows)", "all", ExportFormat.Xlsx);
+
+    /// <summary>Writes CSV or XLSX + .meta.txt. Returns the file path, or null when cancelled/failed.</summary>
+    public string? Export(IReadOnlyList<object> rows, string filter, string scope, ExportFormat format = ExportFormat.Csv)
     {
         var suggested = $"DirHealth-{ViewName.Replace(' ', '-')}-{scope}-{DateTime.Now:yyyyMMdd-HHmm}";
-        var path = PickSavePath(suggested);
+        var path = PickSavePathFor(suggested, format);
         if (path is null) return null;
         try
         {
-            int written = new CsvExporter().ExportTable(rows, Columns, path);
             var ctx = SafeContext();
+            int written = format == ExportFormat.Xlsx
+                ? new XlsxExporter().Export(rows, Columns, path,
+                    ExportMetadata.Fields(ctx, ViewName, filter, rows.Count, Path.GetFileName(path), DateTime.UtcNow, ExportMetadata.AppVersion))
+                : new CsvExporter().ExportTable(rows, Columns, path);
             ExportMetadata.WriteFor(path, ctx, ViewName, filter, written);
             StatusMessage = $"Exported {N(written)} rows: {Path.GetFileName(path)} (+ .meta.txt)";
             return path;
@@ -144,13 +171,13 @@ public abstract partial class TableViewModel : ObservableObject
 
     private static readonly ExportContext Unknown = new("unknown", "unknown", Environment.UserName);
 
-    private static string? DefaultPickSavePath(string suggestedName)
+    private static string? DefaultPickSavePath(string suggestedName, ExportFormat format)
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             FileName   = suggestedName,
-            DefaultExt = ".csv",
-            Filter     = "CSV files|*.csv",
+            DefaultExt = format == ExportFormat.Xlsx ? ".xlsx" : ".csv",
+            Filter     = format == ExportFormat.Xlsx ? "Excel workbook|*.xlsx" : "CSV files|*.csv",
         };
         return dlg.ShowDialog() == true ? dlg.FileName : null;
     }

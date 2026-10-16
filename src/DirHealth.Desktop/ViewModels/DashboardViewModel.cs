@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Export;
+using DirHealth.Desktop.Core.Export.Reports;
 using DirHealth.Desktop.Core.Services;
 using DirHealth.Desktop.Core.Storage;
 
@@ -11,7 +12,6 @@ namespace DirHealth.Desktop.ViewModels;
 public partial class DashboardViewModel : BaseViewModel
 {
     private readonly AdScanner _scanner;
-    private readonly PdfExporter _pdfExporter = new();
     private readonly ScoreHistoryStore _historyStore;
     private readonly ScanCacheStore _cacheStore = new();
     private readonly ExceptionStore _exceptions;
@@ -235,35 +235,21 @@ public partial class DashboardViewModel : BaseViewModel
     [RelayCommand(CanExecute = nameof(HasScanData))]
     public async Task ExportFullReportAsync()
     {
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            FileName   = $"DirHealth-FullReport-{DateTime.Now:yyyyMMdd}",
-            DefaultExt = ".pdf",
-            Filter     = "PDF files|*.pdf"
-        };
-        if (dlg.ShowDialog() != true) return;
+        // S18-1/S18-4: Summary or Full, optionally with redacted user names
+        var options = AskReportOptions();
+        if (options is null) return;
+        var path = PickReportPath($"DirHealth-{(options.Kind == ReportKind.Summary ? "Summary" : "FullReport")}-{DateTime.Now:yyyyMMdd}");
+        if (path is null) return;
 
         IsBusy = true;
-        StatusMessage = "Building full report…";
+        StatusMessage = "Building report…";
         try
         {
-            int? scoreDelta = ScoreHistoryStore.Comparable(ScoreHistory)
-                ? ScoreHistory[^1].Score - ScoreHistory[^2].Score
-                : null;   // no delta across a formula change (ADR 0002)
-
-            var data = new FullReportData(
-                Domain:            _scanner.DomainName,
-                Score:             ComplianceScore,
-                Findings:          Findings,
-                InactiveUsers:     _cachedInactiveUsers,
-                ExpiringPasswords: _cachedExpiringPasswords,
-                DomainAdmins:      _cachedDomainAdmins,
-                ScoreDelta:        scoreDelta,
-                Diff:              LastDiff
-            );
-
-            _pdfExporter.ExportFullReport(data, dlg.FileName);
-            StatusMessage = $"Full report saved: {System.IO.Path.GetFileName(dlg.FileName)}";
+            var model = BuildReportModel(options, DateTime.Now);
+            await Task.Run(() => ReportPdfRenderer.Render(model, path));
+            ExportMetadata.WriteFor(path, SafeExportContext(), $"Report ({options.Kind})",
+                options.RedactUserNames ? "user names redacted" : "", model.Findings.Count);
+            StatusMessage = $"Report saved: {System.IO.Path.GetFileName(path)} (+ .meta.txt)";
         }
         catch (Exception ex)
         {
@@ -273,6 +259,42 @@ public partial class DashboardViewModel : BaseViewModel
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>Export dialog hook; replaced in tests.</summary>
+    public static Func<ReportOptions?> AskReportOptions { get; set; } = () =>
+    {
+        var dlg = new Views.Dashboard.ReportExportDialog { Owner = System.Windows.Application.Current?.MainWindow };
+        return dlg.ShowDialog() == true ? dlg.Result : null;
+    };
+
+    /// <summary>PDF save dialog hook; replaced in tests.</summary>
+    public static Func<string, string?> PickReportPath { get; set; } = name =>
+    {
+        var dlg = new Microsoft.Win32.SaveFileDialog { FileName = name, DefaultExt = ".pdf", Filter = "PDF files|*.pdf" };
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
+    };
+
+    private Core.Export.ExportContext SafeExportContext()
+    {
+        try { return _scanner.GetExportContext(); }
+        catch { return new Core.Export.ExportContext(ConnectedDomain, "unknown", Environment.UserName); }
+    }
+
+    /// <summary>The report model for the current scan (pure inputs, testable).</summary>
+    public ReportModel BuildReportModel(ReportOptions options, DateTime nowLocal)
+    {
+        int? scoreDelta = ScoreHistoryStore.Comparable(ScoreHistory)
+            ? ScoreHistory[^1].Score - ScoreHistory[^2].Score
+            : null;   // no delta across a formula change (ADR 0002)
+        _exceptions.Apply(Findings, DateTime.UtcNow);
+        var input = new ReportInput(
+            Domain: string.IsNullOrEmpty(ConnectedDomain) ? _scanner?.DomainName ?? "" : ConnectedDomain,
+            Findings: Findings, Score: ScoreResult, StoredScore: ComplianceScore, Checks: Checks,
+            Exceptions: _exceptions.All, Diff: LastDiff, ScoreDelta: scoreDelta,
+            InactiveUsers: _cachedInactiveUsers, ExpiringPasswords: _cachedExpiringPasswords, DomainAdmins: _cachedDomainAdmins,
+            CreatedLocal: nowLocal, Version: ExportMetadata.AppVersion);
+        return ReportBuilder.Build(input, options);
     }
 
     private bool HasScanData() => _liveScanCompleted && !IsBusy;

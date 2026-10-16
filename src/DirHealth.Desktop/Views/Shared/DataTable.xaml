@@ -25,6 +25,9 @@
                     <ContextMenu>
                         <MenuItem Header="{Binding ExportFilteredLabel, Mode=OneWay}" Command="{Binding ExportFilteredCommand}" />
                         <MenuItem Header="{Binding ExportAllLabel, Mode=OneWay}"      Command="{Binding ExportAllCommand}" />
+                        <Separator />
+                        <MenuItem Header="{Binding ExportXlsxFilteredLabel, Mode=OneWay}" Command="{Binding ExportXlsxFilteredCommand}" />
+                        <MenuItem Header="{Binding ExportXlsxAllLabel, Mode=OneWay}"      Command="{Binding ExportXlsxAllCommand}" />
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>
