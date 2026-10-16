@@ -39,11 +39,34 @@ public class AdSearcherValidationTests
     [InlineData("OU=Finance,DC=corp,DC=com")]
     [InlineData("CN=Users,DC=corp,DC=com")]
     [InlineData("DC=corp,DC=com")]
-    public async Task SearchByOu_ValidOuPath_PassesValidationGate(string ou)
+    public async Task SearchByOu_ValidOuPath_PassesValidationGateAndReachesLdap(string ou)
     {
-        // Valid paths pass the guard; the subsequent LDAP call fails silently (no AD in test env).
-        // This confirms the validation gate does not reject legitimate DN inputs.
+        // Valid paths pass the guard and reach LDAP. There is no AD in the test environment,
+        // so the bind fails — and since S13-4 that failure surfaces instead of being swallowed
+        // into an empty result. An exception here proves the gate let the input through.
         var ex = await Record.ExceptionAsync(() => MakeSearcher().SearchAsync(ou, SearchMode.Ou));
-        Assert.Null(ex);
+        Assert.NotNull(ex);
+        Assert.IsNotType<ArgumentException>(ex);
+    }
+
+    // ── S13-4: errors are visible ──────────────────────────────────────────────
+    [Fact]
+    public async Task SearchByName_LdapFailure_Throws()
+    {
+        var ex = await Record.ExceptionAsync(() => MakeSearcher().SearchAsync("jdoe", SearchMode.Name));
+        Assert.NotNull(ex);
+    }
+
+    [Fact]
+    public async Task ViewModel_LdapFailure_ShowsErrorNotEmptyState()
+    {
+        var vm = new DirHealth.Desktop.ViewModels.AdSearchViewModel(MakeSearcher()) { Query = "jdoe" };
+        await vm.SearchAsync();
+
+        Assert.True(vm.HasError);
+        Assert.False(vm.HasSearched);   // drives the "No results found." empty state
+        Assert.False(string.IsNullOrEmpty(vm.ErrorMessage));
+        Assert.StartsWith("Search failed:", vm.StatusMessage);
+        Assert.Empty(vm.Results);
     }
 }

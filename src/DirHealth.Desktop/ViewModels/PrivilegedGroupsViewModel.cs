@@ -13,7 +13,7 @@ public partial class PrivilegedGroupsViewModel : BaseViewModel
     [ObservableProperty] private List<PrivilegedGroupSummary>? _groups;
 
     public int TotalMembers => Groups?.Sum(g => g.MemberCount) ?? 0;
-    public int EmptyGroups  => Groups?.Count(g => g.MemberCount == 0) ?? 0;
+    public int EmptyGroups  => Groups?.Count(g => g.MemberCount == 0 && !g.IsNotFound) ?? 0;
 
     public PrivilegedGroupsViewModel(AdScanner scanner) { _scanner = scanner; }
 

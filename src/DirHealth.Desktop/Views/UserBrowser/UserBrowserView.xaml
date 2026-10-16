@@ -178,13 +178,34 @@
                 <!-- Group memberships -->
                 <TextBlock Text="GROUP MEMBERSHIPS" FontSize="10"
                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                <!-- S13-2: a failed lookup is shown as an error, not as an empty list -->
+                <TextBlock Text="{Binding Detail.GroupsError, Mode=OneWay}" TextWrapping="Wrap"
+                           Foreground="#FCA5A5" FontSize="12" Margin="0,0,0,6">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Detail.GroupsError}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 <ItemsControl ItemsSource="{Binding Detail.Groups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Background="{DynamicResource SurfaceBrush}"
                                     CornerRadius="4" Padding="8,4" Margin="0,2">
-                                <TextBlock Text="{Binding}"
-                                           Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name, Mode=OneWay}" ToolTip="{Binding DistinguishedName, Mode=OneWay}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Column="1" Text="{Binding KindLabel, Mode=OneWay}" Margin="8,0,0,0"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

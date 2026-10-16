@@ -17,6 +17,9 @@ public partial class AdSearchViewModel : BaseViewModel
     [ObservableProperty] private bool           _isLoading;
     [ObservableProperty] private string         _statusMessage = "";
     [ObservableProperty] private bool           _hasSearched;
+    /// <summary>Search threw — shown instead of the "No results" empty state (S13-4).</summary>
+    [ObservableProperty] private bool           _hasError;
+    [ObservableProperty] private string         _errorMessage = "";
 
     public bool IsLdapMode => SelectedMode.Mode == SearchMode.Ldap;
 
@@ -49,6 +52,9 @@ public partial class AdSearchViewModel : BaseViewModel
         if (string.IsNullOrWhiteSpace(Query) || _searcher is null) return;
         IsLoading     = true;
         StatusMessage = "";
+        HasError      = false;
+        ErrorMessage  = "";
+        HasSearched   = false;
         Results.Clear();
         try
         {
@@ -61,7 +67,9 @@ public partial class AdSearchViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error: {ex.Message}";
+            HasError      = true;
+            ErrorMessage  = ex.Message;
+            StatusMessage = $"Search failed: {ex.Message}";
         }
         finally
         {

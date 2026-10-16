@@ -166,22 +166,16 @@ public partial class AdScanner
 
     public async Task<AdGroupDetail> GetDomainAdminsAsync()
     {
-        var dn = await Task.Run(() =>
+        // By SID, not by name — the group is localized on non-English domains (S13-1)
+        var group = await Task.Run(() =>
         {
-            try
-            {
-                using var root     = _connector.GetRootEntry();
-                using var searcher = _connector.CreateSearcher(root,
-                    "(&(objectClass=group)(cn=Domain Admins))", "distinguishedName");
-                var result = searcher.FindOne();
-                return result is not null ? GetString(result.Properties, "distinguishedName") : "";
-            }
-            catch { return ""; }
+            using var root = _connector.GetRootEntry();
+            return _connector.ResolveGroup(root, WellKnownGroups.DomainAdmins);
         });
 
-        if (string.IsNullOrEmpty(dn))
-            return new AdGroupDetail { Name = "Domain Admins", Description = "Group not found." };
+        if (!group.Found)
+            return new AdGroupDetail { Name = group.Name, Description = group.Error ?? "Group not found." };
 
-        return await GetGroupDetailAsync(dn);
+        return await GetGroupDetailAsync(group.DistinguishedName!);
     }
 }

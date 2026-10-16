@@ -41,7 +41,8 @@ public class AdFinding
         "NoAccountLockout" =>
             "Configure an account-lockout threshold (e.g. 10 attempts / 15 min) to blunt online brute-force attacks.",
         "EolOperatingSystems" =>
-            "Upgrade or replace end-of-life systems immediately; isolate any that cannot be upgraded, and prioritise domain controllers.",
+            "Upgrade or replace end-of-life systems immediately; isolate any that cannot be upgraded, and prioritise domain controllers. " +
+            "Systems covered by paid Extended Security Updates (ESU) still receive patches — DirHealth cannot see ESU enrolment in AD, so verify those manually.",
         "AsRepRoasting" =>
             "Re-enable Kerberos pre-authentication (clear DONT_REQUIRE_PREAUTH) on these accounts and give them strong passwords.",
         "UnconstrainedDelegationComputers" =>

@@ -93,13 +93,16 @@ public partial class App : Application
             connector.Password = saved.Password;
         }
 
-        if (connector.IsDomainAdmin())
+        var check = connector.CheckDomainAdmin();
+        if (check.IsAdmin)
         {
             Log("Admin check passed (current context)");
             return true;
         }
 
-        Log("Admin check failed — showing login window");
+        Log(check.Status == AdminCheckStatus.Failed
+            ? $"Admin check could not run ({check.Error}) — showing login window"
+            : "Admin check: not a member — showing login window");
         var loginVm     = new LoginViewModel(connector);
         var loginWindow = new LoginWindow(loginVm);
         bool success    = false;

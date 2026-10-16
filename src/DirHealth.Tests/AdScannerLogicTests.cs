@@ -81,11 +81,29 @@ public class AdScannerLogicTests
         Assert.Equal(new DateTime(2020, 1, 14), client);
     }
 
+    // S13-3: Windows 10 / 2000 / NT. "Windows 10 Enterprise" moved here from the NoMatch list
+    // when Windows 10 reached end of support (2025-10-14).
+    [Theory]
+    [InlineData("Windows 10 Enterprise", 2025, 10, 14)]
+    [InlineData("Windows 10 Pro",        2025, 10, 14)]
+    [InlineData("Windows 2000 Server",   2010,  7, 13)]
+    [InlineData("Windows 2000 Professional", 2010, 7, 13)]
+    [InlineData("Windows NT",            2004, 12, 31)]
+    public void Eol_S13_3_NewEntries_AreMatched(string os, int y, int m, int d)
+    {
+        Assert.True(EolMatcher.TryGetEolDate(os, out var date));
+        Assert.Equal(new DateTime(y, m, d), date);
+    }
+
     [Theory]
     [InlineData("Windows 11 Pro")]
-    [InlineData("Windows 10 Enterprise")]
+    [InlineData("Windows 11 Enterprise")]
+    [InlineData("Windows Server 2016 Standard")]
     [InlineData("Windows Server 2022 Standard")]
     [InlineData("Windows Server 2019 Datacenter")]
+    [InlineData("Windows Server 2025 Datacenter")]
+    [InlineData("Windows 10 Enterprise LTSC")]   // own, later support end — see EolMatcher
+    [InlineData("Windows 10 Enterprise 2016 LTSB")]
     public void Eol_CurrentOs_NoMatch(string os)
     {
         Assert.False(EolMatcher.TryGetEolDate(os, out _));

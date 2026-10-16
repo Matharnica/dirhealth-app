@@ -59,10 +59,14 @@ public partial class LoginViewModel : BaseViewModel
             _connector.Username = Username;
             _connector.Password = Password;
 
-            var isAdmin = await Task.Run(() => _connector.IsDomainAdmin());
-            if (!isAdmin)
+            var check = await Task.Run(() => _connector.CheckDomainAdmin());
+            if (!check.IsAdmin)
             {
-                ErrorMessage = $"{Domain}\\{Username} is not a member of Domain Admins.";
+                // "Could not check" and "not an admin" are different answers (S13-1) —
+                // both refuse the login, but only the second one is about the account.
+                ErrorMessage = check.Status == AdminCheckStatus.Failed
+                    ? $"Could not verify {check.GroupName} membership: {check.Error}"
+                    : $"{Domain}\\{Username} is not a member of {check.GroupName}.";
                 _connector.Username = null;
                 _connector.Password = null;
                 return;
