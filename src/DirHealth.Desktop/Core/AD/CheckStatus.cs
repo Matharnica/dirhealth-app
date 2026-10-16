@@ -115,6 +115,14 @@ public static class ScanGuard
         ["TrustWithoutSidFiltering"]         = "DelegationTrusts",
         ["TrustTgtDelegation"]               = "DelegationTrusts",
         ["TrustInactive"]                    = "DelegationTrusts",
+        // Sprint 20
+        ["LapsNotDeployed"]                  = "RemainingChecks",
+        ["ComputersWithoutLaps"]             = "RemainingChecks",
+        ["MachinePasswordNotRotated"]        = "RemainingChecks",
+        ["DuplicateObjects"]                 = "RemainingChecks",
+        ["AnonymousLdapAllowed"]             = "RemainingChecks",
+        ["AdminSdExMask"]                    = "RemainingChecks",
+        ["SmartcardOldPassword"]             = "RemainingChecks",
     };
 
     /// <summary>

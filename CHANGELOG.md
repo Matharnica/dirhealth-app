@@ -14,6 +14,11 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 20 (Column chooser, remaining checks)
+- **Column chooser** (S20-1) — right-click a column header to show or hide columns; the menu shows how many are hidden and offers "Reset to default". The choice is remembered per view. The Export menu has a "Visible columns only" switch (default: all columns).
+- **7 more read-only checks** (S20-2) — LAPS not deployed / computers without a LAPS-managed password (only expiry attributes are read — never a LAPS password), machine or DC passwords that stopped rotating, replication-conflict and duplicate objects, dSHeuristics allowing anonymous LDAP or excluding operator groups from AdminSDHolder, smart-card accounts with an old password hash. Score model version 4.
+- Internal: proof of concept for evaluating DCSync rights from a security descriptor (not shown in the app yet); the read-only guard now also blocks ACL-writing APIs.
+
 ### Added — Sprint 19 (New checks) — ⚠ your score will drop without any change in AD
 23 new read-only LDAP checks, each with rule id, weight, explanation, copyable fix and undo:
 - **Tier 0 and hidden memberships** (S19-1) — Tier 0 now follows the BloodHound "high value" model (by SID, incl. Key Admins, Enterprise Key Admins, Cert Publishers; DnsAdmins by name). New: accounts with a non-standard primary group (a membership that does not show up in the group's member list).

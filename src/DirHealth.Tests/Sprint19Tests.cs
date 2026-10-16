@@ -78,7 +78,7 @@ public class Sprint19Tests
     [Fact]
     public void ScoreFormulaVersion_WasBumped()
     {
-        Assert.Equal(3, ScoreModel.FormulaVersion);
+        Assert.True(ScoreModel.FormulaVersion >= 3);   // bumped again by later sprints
     }
 
     // ── S19-1 hidden primary group ───────────────────────────────────────────

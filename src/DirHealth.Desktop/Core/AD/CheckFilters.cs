@@ -94,4 +94,32 @@ public static class CheckFilters
     public const string DomainControllers = "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))";
 
     public const string Trusts = "(objectClass=trustedDomain)";
+
+    // ── Sprint 20 ────────────────────────────────────────────────────────────
+    public const int MachinePasswordMaxDays = 45;
+    public const int DcPasswordMaxDays      = 90;
+    public const int SmartcardPasswordMaxDays = 365;
+
+    /// <summary>
+    /// Enabled computers without any LAPS expiry attribute — only attributes that exist in the schema may be
+    /// passed (an unknown attribute makes AD return nothing, which would look like "all covered"). The LAPS
+    /// password itself is never requested.
+    /// </summary>
+    public static string ComputersWithoutLaps(IEnumerable<string> lapsExpiryAttributes) =>
+        "(&(objectClass=computer)" + NotDisabled + "(!(userAccountControl:1.2.840.113556.1.4.803:=8192))" +
+        string.Concat(lapsExpiryAttributes.Select(a => $"(!({a}=*))")) + ")";
+
+    /// <summary>Active (recent logon) non-DC computers whose machine password stopped rotating.</summary>
+    public static string StaleMachinePasswords(string pwdCutoff, string logonCutoff) =>
+        "(&(objectClass=computer)" + NotDisabled + "(!(userAccountControl:1.2.840.113556.1.4.803:=8192))" +
+        $"(pwdLastSet<={pwdCutoff})(lastLogonTimestamp>={logonCutoff}))";
+
+    public static string StaleDcPasswords(string pwdCutoff) =>
+        $"(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192)(pwdLastSet<={pwdCutoff}))";
+
+    /// <summary>Replication-conflict objects ("CNF:" in the name) and duplicate sAMAccountNames.</summary>
+    public const string ConflictObjects = "(|(cn=*CNF:*)(sAMAccountName=$DUPLICATE-*))";
+
+    public static string SmartcardOldPassword(string cutoff) =>
+        "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=262144)" + $"(pwdLastSet<={cutoff}))";
 }

@@ -32,11 +32,57 @@ public abstract partial class TableViewModel : ObservableObject
     /// <summary>Clipboard writer; replaced in tests.</summary>
     public static Action<string> SetClipboardText { get; set; } = text => System.Windows.Clipboard.SetText(text);
 
+    /// <summary>Per-view column layout (S20-1); replaced in tests.</summary>
+    public static Core.Storage.ColumnLayoutStore LayoutStore { get; set; } = new();
+
     protected TableViewModel(string viewName, IReadOnlyList<ITableColumn> columns)
     {
         ViewName = viewName;
         Columns  = columns;
+        _hidden  = new HashSet<string>(LayoutStore.HiddenFor(viewName)
+            .Where(h => columns.Any(c => c.BindingPath is not null && c.Header == h)), StringComparer.OrdinalIgnoreCase);
     }
+
+    // ── S20-1 column chooser ─────────────────────────────────────────────────
+    private readonly HashSet<string> _hidden;
+
+    /// <summary>Raised when a column was shown/hidden — the grid control updates its columns.</summary>
+    public event Action? ColumnsChanged;
+
+    public bool IsColumnHidden(string header) => _hidden.Contains(header);
+
+    public int HiddenCount => _hidden.Count;
+    public string HiddenLabel => _hidden.Count == 0 ? "All columns visible" : $"{_hidden.Count} hidden";
+
+    /// <summary>Export only the columns currently visible in the grid (default: all columns).</summary>
+    [ObservableProperty] private bool _exportVisibleOnly;
+
+    public void SetColumnHidden(string header, bool hidden)
+    {
+        if (!Columns.Any(c => c.BindingPath is not null && c.Header == header)) return;
+        var visible = Columns.Count(c => c.BindingPath is not null) - _hidden.Count;
+        if (hidden && visible <= 1 && !_hidden.Contains(header)) return;    // keep at least one column
+        if (hidden ? _hidden.Add(header) : _hidden.Remove(header)) SaveLayout();
+    }
+
+    public void ResetColumns()
+    {
+        if (_hidden.Count == 0) return;
+        _hidden.Clear();
+        SaveLayout();
+    }
+
+    private void SaveLayout()
+    {
+        LayoutStore.SetHidden(ViewName, _hidden);
+        OnPropertyChanged(nameof(HiddenCount));
+        OnPropertyChanged(nameof(HiddenLabel));
+        ColumnsChanged?.Invoke();
+    }
+
+    /// <summary>Columns an export writes: all (default) or only the visible grid columns.</summary>
+    public IReadOnlyList<ITableColumn> ExportColumns =>
+        ExportVisibleOnly ? Columns.Where(c => c.BindingPath is not null && !_hidden.Contains(c.Header)).ToList() : Columns;
 
     /// <summary>Name used in the export file name and the metadata ("Users", "Computers" …).</summary>
     public string ViewName { get; }
@@ -147,11 +193,13 @@ public abstract partial class TableViewModel : ObservableObject
         try
         {
             var ctx = SafeContext();
+            var cols = ExportColumns;
             int written = format == ExportFormat.Xlsx
-                ? new XlsxExporter().Export(rows, Columns, path,
+                ? new XlsxExporter().Export(rows, cols, path,
                     ExportMetadata.Fields(ctx, ViewName, filter, rows.Count, Path.GetFileName(path), DateTime.UtcNow, ExportMetadata.AppVersion))
-                : new CsvExporter().ExportTable(rows, Columns, path);
-            ExportMetadata.WriteFor(path, ctx, ViewName, filter, written);
+                : new CsvExporter().ExportTable(rows, cols, path);
+            ExportMetadata.WriteFor(path, ctx, ViewName,
+                ExportVisibleOnly ? $"{filter}; columns: visible only" : filter, written);
             StatusMessage = $"Exported {N(written)} rows: {Path.GetFileName(path)} (+ .meta.txt)";
             return path;
         }

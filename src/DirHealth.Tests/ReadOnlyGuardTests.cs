@@ -12,7 +12,8 @@ namespace DirHealth.Tests;
 ///   everywhere            CommitChanges, DeleteTree, SetPassword, InvokeSet,
 ///                         Add/Modify/ModifyDN/DeleteRequest (System.DirectoryServices.Protocols)
 ///   in files that mention MoveTo(, Rename(, Children.Add/Remove, Properties[...] = …,
-///   System.DirectoryServices  Properties[...].Add/AddRange/Clear/Remove/Insert/Value =
+///   System.DirectoryServices  Properties[...].Add/AddRange/Clear/Remove/Insert/Value =,
+///                         ObjectSecurity =, *AccessRule*( , SetOwner( (ACL writes, S20-3)
 ///   (scoped there because WPF panels have Children.Add and System.IO has MoveTo)
 ///
 /// What it does NOT find:
@@ -47,6 +48,10 @@ public class ReadOnlyGuardTests
         new(@"\bChildren\s*\.\s*(Add|Remove)\s*\("),
         new(@"\bProperties\s*\[[^\]]+\]\s*(\.Value\s*)?=(?!=)"),
         new(@"\bProperties\s*\[[^\]]+\]\s*\.\s*(Add|AddRange|Clear|Remove|RemoveAt|Insert)\s*\("),
+        // ACL write paths (S20-3 gate): reading nTSecurityDescriptor is fine, changing it is not
+        new(@"\.ObjectSecurity\s*=(?!=)"),
+        new(@"\b(Add|Set|Remove|Purge|Modify|Reset)AccessRule\w*\s*\("),
+        new(@"\bSetOwner\s*\("),
     ];
 
     public record Hit(string File, int Line, string Text);
@@ -138,6 +143,10 @@ public class ReadOnlyGuardTests
     [InlineData("entry.Children.Add(\"CN=x\", \"user\");")]
     [InlineData("entry.MoveTo(newParent);")]
     [InlineData("entry.Rename(\"CN=y\");")]
+    [InlineData("entry.ObjectSecurity = sd;")]
+    [InlineData("entry.ObjectSecurity.AddAccessRule(rule);")]
+    [InlineData("sd.SetAccessRuleProtection(true, false);")]
+    [InlineData("sd.SetOwner(sid);")]
     public void Scan_FlagsDirectoryMutation_InDirectoryFile(string line)
     {
         var src = "using System.DirectoryServices;\nclass X {\n" + line + "\n}";

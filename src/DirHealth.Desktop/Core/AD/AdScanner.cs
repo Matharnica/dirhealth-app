@@ -69,6 +69,7 @@ public partial class AdScanner
         var domainBasicsTask   = Timed("DomainBasics",             () => GetDomainBasicsFindingsAsync(),            scanLog);
         var kerbEncTask        = Timed("KerberosEncryption",       () => GetKerberosEncryptionFindingsAsync(),      scanLog);
         var delegTrustTask     = Timed("DelegationTrusts",         () => GetDelegationTrustFindingsAsync(),         scanLog);
+        var remainingTask      = Timed("RemainingChecks",          () => GetRemainingCheckFindingsAsync(),          scanLog);   // S20-2
 
         try
         {
@@ -80,7 +81,7 @@ public partial class AdScanner
                 asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
                 staleDAsTask, fgppTask, sidHistoryTask,
                 allUsersTask, domainAdminsTask,
-                hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask);
+                hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask, remainingTask);
         }
         finally
         {
@@ -303,7 +304,7 @@ public partial class AdScanner
                 Objects         = sidHistoryAccounts.Select(AffectedObject.FromUser).ToList()
             });
 
-        foreach (var t in new[] { hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask })
+        foreach (var t in new[] { hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask, remainingTask })
             findings.AddRange(t.Result);
 
         // ── Raw score: model v2 without exceptions (ADR 0002). The dashboard recomputes the

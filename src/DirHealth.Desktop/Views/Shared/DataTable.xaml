@@ -28,6 +28,9 @@
                         <Separator />
                         <MenuItem Header="{Binding ExportXlsxFilteredLabel, Mode=OneWay}" Command="{Binding ExportXlsxFilteredCommand}" />
                         <MenuItem Header="{Binding ExportXlsxAllLabel, Mode=OneWay}"      Command="{Binding ExportXlsxAllCommand}" />
+                        <Separator />
+                        <!-- S20-1: export the visible grid columns only, or all columns -->
+                        <MenuItem Header="Visible columns only" IsCheckable="True" IsChecked="{Binding ExportVisibleOnly}" StaysOpenOnClick="True" />
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>
