@@ -163,7 +163,11 @@ public class PdfExporter
     /// membership path, affected findings with remediation, and audit metadata. Page breaks
     /// re-draw header/footer and the section title ("continued").
     /// </summary>
-    public void ExportUserDossier(UserDossier d, string filePath)
+    public void ExportUserDossier(UserDossier d, string filePath) => ExportUserDossier(d, filePath, null);
+
+    /// <param name="textSink">Receives every body text line exactly as drawn — lets tests check the
+    /// PDF's content without parsing PDF streams.</param>
+    internal void ExportUserDossier(UserDossier d, string filePath, Action<string>? textSink)
     {
         var doc = new PdfDocument();
         doc.Info.Title = $"DirHealth — User dossier: {d.User.SamAccountName}";
@@ -187,9 +191,14 @@ public class PdfExporter
             y = ui.ContentTop + 24;
             if (section.Length > 0)
             {
-                gfx.DrawString(section + " (continued)", PdfPageBuilder.F9B, label, x, y);
+                Draw(section + " (continued)", PdfPageBuilder.F9B, label, x, y);
                 y += 16;
             }
+        }
+        void Draw(string text, XFont font, XBrush brush, double px, double py)
+        {
+            textSink?.Invoke(text);
+            gfx.DrawString(text, font, brush, px, py);
         }
         void Ensure(double h) { if (y + h > ui.ContentBottom(page) - 10) NewPage(); }
         void Section(string title)
@@ -197,7 +206,7 @@ public class PdfExporter
             section = "";
             Ensure(40);
             y += 8;
-            gfx.DrawString(title, PdfPageBuilder.F11B, body, x, y);
+            Draw(title, PdfPageBuilder.F11B, body, x, y);
             y += 6;
             gfx.DrawLine(new XPen(PdfPageBuilder.ColBorder, 1), x, y, x + ui.ContentWidth(page), y);
             y += 14;
@@ -208,7 +217,7 @@ public class PdfExporter
             foreach (var line in PdfPageBuilder.WrapText(gfx, text, font, ui.ContentWidth(page) - indent))
             {
                 Ensure(lineH);
-                gfx.DrawString(line, font, brush, x + indent, y);
+                Draw(line, font, brush, x + indent, y);
                 y += lineH;
             }
         }
@@ -224,10 +233,10 @@ public class PdfExporter
         {
             var lines = PdfPageBuilder.WrapText(gfx, row.Value, PdfPageBuilder.F9, ui.ContentWidth(page) - valueX);
             Ensure(13 * Math.Max(1, lines.Count) + 2);
-            gfx.DrawString(row.Label, PdfPageBuilder.F9B, label, x, y);
+            Draw(row.Label, PdfPageBuilder.F9B, label, x, y);
             foreach (var line in lines.DefaultIfEmpty(""))
             {
-                gfx.DrawString(line, PdfPageBuilder.F9, row.Warn ? warn : body, x + valueX, y);
+                Draw(line, PdfPageBuilder.F9, row.Warn ? warn : body, x + valueX, y);
                 y += 13;
             }
             y += 2;
@@ -239,8 +248,8 @@ public class PdfExporter
         {
             Ensure(28);
             var tag = g.KindLabel + (g.IsTier0 ? " · TIER 0" : "");
-            gfx.DrawString(g.Name, PdfPageBuilder.F10B, g.IsTier0 ? warn : body, x, y);
-            gfx.DrawString(tag, PdfPageBuilder.F9, label, x + ui.ContentWidth(page) - gfx.MeasureString(tag, PdfPageBuilder.F9).Width, y);
+            Draw(g.Name, PdfPageBuilder.F10B, g.IsTier0 ? warn : body, x, y);
+            Draw(tag, PdfPageBuilder.F9, label, x + ui.ContentWidth(page) - gfx.MeasureString(tag, PdfPageBuilder.F9).Width, y);
             y += 13;
             Wrapped(g.Path, PdfPageBuilder.Mono9, label, 10, 12);
             y += 4;
@@ -253,7 +262,7 @@ public class PdfExporter
             Ensure(30);
             var (_, border, text) = ui.SeverityStyle(f.Severity);
             gfx.DrawRectangle(new XSolidBrush(border), x, y - 9, 3, 12);
-            gfx.DrawString($"{f.Severity.ToString().ToUpperInvariant()}  {f.Title}", PdfPageBuilder.F10B, text, x + 8, y);
+            Draw($"{f.Severity.ToString().ToUpperInvariant()}  {f.Title}", PdfPageBuilder.F10B, text, x + 8, y);
             y += 14;
             if (!string.IsNullOrEmpty(f.Remediation))
                 Wrapped("→ Fix: " + f.Remediation, PdfPageBuilder.F9, new XSolidBrush(PdfPageBuilder.ColGradEnd), 8, 12);
@@ -273,8 +282,8 @@ public class PdfExporter
         })
         {
             Ensure(14);
-            gfx.DrawString(k, PdfPageBuilder.F9B, label, x, y);
-            gfx.DrawString(v, PdfPageBuilder.F9, body, x + valueX, y);
+            Draw(k, PdfPageBuilder.F9B, label, x, y);
+            Draw(v, PdfPageBuilder.F9, body, x + valueX, y);
             y += 13;
         }
 

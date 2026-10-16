@@ -46,22 +46,31 @@ public class RestBugTests
         Assert.Equal(hex, SeverityPalette.Hex(s));
     }
 
-    [Fact]
-    public void A9_StylesXaml_TakesSeverityColoursFromPalette()
+    // A9 at runtime (follow-up 2026-10-16): the PDF's severity colours are the palette values.
+    // The app side is checked with the real resources in ViewSmokeTests.SeverityBrushes_ComeFromPalette.
+    [Theory]
+    [InlineData(FindingSeverity.Critical)] [InlineData(FindingSeverity.High)]
+    [InlineData(FindingSeverity.Medium)]   [InlineData(FindingSeverity.Low)]
+    public void A9_PdfSeverityAccent_IsPaletteColour(FindingSeverity s)
     {
-        var styles = File.ReadAllText(Path.Combine(DesktopDir(), "Resources", "Styles.xaml"));
-        foreach (var level in new[] { "Critical", "High", "Medium", "Low" })
-            Assert.Contains($"Member=\"core:SeverityPalette.{level}Color\"", styles);
-        // the old hard-coded app values must not come back
-        Assert.DoesNotContain("<Color x:Key=\"HighSeverityColor\">", styles);
+        var (_, border, _) = new PdfPageBuilder().SeverityStyle(s);
+        Assert.Equal(SeverityPalette.Rgb(s), (border.R, border.G, border.B));
     }
 
+    // Invariant "never hard-code a severity hex in a view": no palette value appears as a literal in
+    // Views/ or Resources/. (Not checked: Core/ — e.g. the PDF label grey is #6B7280 by coincidence.)
     [Fact]
-    public void A9_PdfExporter_TakesSeverityColoursFromPalette()
+    public void A9_NoSeverityHexInViewsOrResources()
     {
-        var pdf = File.ReadAllText(Path.Combine(DesktopDir(), "Core", "Export", "PdfExporter.cs"));
-        Assert.Contains("ColHigh        = FromRgb(SeverityPalette.HighRgb)", pdf);
-        Assert.DoesNotContain("XColor.FromArgb(217, 119,   6)", pdf);
+        var hexes = Enum.GetValues<FindingSeverity>().Select(SeverityPalette.Hex).ToList();
+        var hits = new[] { "Views", "Resources" }
+            .SelectMany(d => Directory.EnumerateFiles(Path.Combine(DesktopDir(), d), "*.*", SearchOption.AllDirectories))
+            .Where(f => f.EndsWith(".xaml") || f.EndsWith(".cs"))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.EndsWith("SeverityPalette.cs"))
+            .SelectMany(f => File.ReadLines(f).Select((l, i) => (f, i, l)))
+            .Where(x => hexes.Any(h => x.l.Contains(h, StringComparison.OrdinalIgnoreCase)))
+            .Select(x => $"{Path.GetFileName(x.f)}:{x.i + 1}").ToList();
+        Assert.True(hits.Count == 0, string.Join(", ", hits));
     }
 
     // ── A10: no "Never" in a CSV date column ────────────────────────────────

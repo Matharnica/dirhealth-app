@@ -243,6 +243,35 @@ public class Sprint15Tests
         finally { dir.Delete(recursive: true); }
     }
 
+    // Follow-up 2026-10-16: the dossier PDF's content, not just its existence (S15-5 AC)
+    [Fact]
+    public void Dossier_Pdf_ContainsPathsFixesMetadata_AndContinuesAcrossPages()
+    {
+        var dir = Directory.CreateTempSubdirectory("dh-dossier-");
+        try
+        {
+            var d = Dossier(40, 0) with
+            {
+                Findings = [new AdFinding { Title = "Kerberoastable account", Category = "KerberoastableAccounts",
+                                            Severity = FindingSeverity.High }],
+            };
+            var lines = new List<string>();
+            var pdf = Path.Combine(dir.FullName, "jdoe.pdf");
+            new PdfExporter().ExportUserDossier(d, pdf, lines.Add);
+
+            Assert.Contains("jdoe → G39", lines);                                   // membership path of the last group
+            Assert.Contains(lines, l => l.StartsWith("GROUP MEMBERSHIPS (40)"));
+            Assert.Contains(lines, l => l.EndsWith("(continued)"));                 // section title repeated after a page break
+            Assert.Contains("HIGH  Kerberoastable account", lines);
+            var fix = FindingCatalog.Get("KerberoastableAccounts")!.HowToFix;     // remediation comes from the catalog
+            Assert.Contains(lines, l => l.Length > "→ Fix: ".Length && ("→ Fix: " + fix).StartsWith(l.TrimEnd()));   // first wrapped line
+            foreach (var meta in new[] { "corp.com", "DC1", "CORP\\a", "2026-10-13", "DirHealth test" })
+                Assert.Contains(meta, lines);
+            Assert.Contains("Last Logon (this DC)", lines);                         // attributes section
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
     // ── S15-6 quick filters ──────────────────────────────────────────────────
     [Fact]
     public void QuickFilters_CombineWithAnd()

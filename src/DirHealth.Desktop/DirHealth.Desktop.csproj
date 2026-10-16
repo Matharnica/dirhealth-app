@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Tests check internal render details (severity colours, dossier text) without widening the API -->
+    <InternalsVisibleTo Include="DirHealth.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="CsvHelper" Version="33.0.1" />
     <!-- ADR 0003: XLSX export. Pinned exactly; 2.x is a breaking preview line. -->
