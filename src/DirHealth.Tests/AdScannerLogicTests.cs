@@ -3,58 +3,10 @@ using Xunit;
 
 namespace DirHealth.Tests;
 
-// Pure scan-core logic (ScoreCalculator / EolMatcher / UacFlags) — no AD or Windows dependency.
+// Pure scan-core logic (EolMatcher / UacFlags) — no AD or Windows dependency.
 public class AdScannerLogicTests
 {
-    // ── ScoreCalculator ───────────────────────────────────────────────────────
-    [Fact]
-    public void Score_NoFindings_Is100()
-    {
-        Assert.Equal(100, ScoreCalculator.Compute(new ScoreInputs()));
-    }
-
-    [Fact]
-    public void Score_MixedFindings_SubtractsExpected()
-    {
-        // NoOs: min(5,3)=3, Kerberoastable: min(12,1*4)=4  →  100 - 3 - 4 = 93
-        var score = ScoreCalculator.Compute(new ScoreInputs { NoOs = 3, Kerberoastable = 1 });
-        Assert.Equal(93, score);
-    }
-
-    [Fact]
-    public void Score_ProportionalPenalty_ScalesWithRatio()
-    {
-        // 30 of 100 inactive users saturates the 20-point penalty at 30% → 80
-        var score = ScoreCalculator.Compute(new ScoreInputs { TotalUsers = 100, InactiveUsers = 30 });
-        Assert.Equal(80, score);
-    }
-
-    [Fact]
-    public void Score_ClampsAtMinimum10()
-    {
-        var score = ScoreCalculator.Compute(new ScoreInputs
-        {
-            StaleDomainAdmins       = 100,
-            UnconstrainedDelegation = 100,
-            EolDcCount              = 100,
-            AsRepRoastable          = 100,
-            Kerberoastable          = 100,
-            PasswordNotRequired     = 100,
-            SidHistory              = 100,
-        });
-        Assert.Equal(ScoreCalculator.Min, score);
-        Assert.Equal(10, score);
-    }
-
-    [Theory]
-    [InlineData(0, 100, 0)]    // no affected → no penalty
-    [InlineData(50, 0, 0)]     // no population → no penalty (divide-by-zero guard)
-    [InlineData(30, 100, 20)]  // 30% saturates the 20-point cap
-    [InlineData(15, 100, 10)]  // 15% is half of the 30% saturation point → 10
-    public void Score_PctPenalty_Cases(int count, int total, int expected)
-    {
-        Assert.Equal(expected, ScoreCalculator.PctPenalty(count, total, maxPenalty: 20, fullAtPct: 30));
-    }
+    // Score tests moved to ScoreModelTests (ADR 0002, S17-4) — ScoreCalculator v1 was removed.
 
     // ── EolMatcher ────────────────────────────────────────────────────────────
     [Fact]

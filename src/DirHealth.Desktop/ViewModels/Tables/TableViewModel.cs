@@ -48,6 +48,9 @@ public abstract partial class TableViewModel : ObservableObject
     /// header-click sorting). Null → collection order.</summary>
     public Func<IEnumerable<object>>? DisplayOrder { get; set; }
 
+    /// <summary>Bool property of a row that greys it out (S17-2: excepted objects stay visible).</summary>
+    public string? MutedPath { get; set; }
+
     /// <summary>Raised on double-click / Enter on a row (S15-2 opens the detail).</summary>
     public event Action<object>? Activated;
 

@@ -7,4 +7,6 @@ public class AdGroup
     public int MemberCount       { get; set; }
     public string DistinguishedName { get; set; } = "";
     public string GroupScope     { get; set; } = "";
+    /// <summary>objectSid — exception key (ADR 0001).</summary>
+    public string Sid            { get; set; } = "";
 }

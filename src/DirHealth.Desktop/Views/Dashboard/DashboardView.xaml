@@ -28,10 +28,10 @@
                     <TextBlock Text="HEALTH SCORE" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,4" />
-                    <TextBlock Text="{Binding ComplianceScore}" FontSize="52" FontWeight="Black"
+                    <TextBlock Text="{Binding ScoreDisplay, Mode=OneWay}" FontSize="52" FontWeight="Black"
                                Foreground="{Binding ComplianceScore, Converter={StaticResource ScoreColor}}"
                                LineHeight="52"
-                               ToolTip="Health score 0–100. ≥80 = healthy, ≥60 = review recommended, &lt;60 = critical issues found." />
+                               ToolTip="Health score 0–100, higher is better. Each finding deducts 2.5 × its rule weight × how widespread it is. ≥80 = healthy, ≥60 = review recommended, &lt;60 = critical issues found." />
                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                         <TextBlock Text="/ 100" FontSize="12"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -52,6 +52,28 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </StackPanel>
+
+                    <!-- ADR 0002: coverage, upper bound / n/a note, and where the points go -->
+                    <TextBlock Text="{Binding ScoreCoverageText, Mode=OneWay}" FontSize="11" Margin="0,6,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Visibility="{Binding ScoreCoverageText, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Text="{Binding ScoreNote, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Foreground="#FCD34D"
+                               Visibility="{Binding ScoreNote, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Text="POINTS IF FIXED" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,4"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Visibility="{Binding ScoreBreakdown.Count, Converter={StaticResource NonZeroToVisibility}, Mode=OneWay}" />
+                    <ItemsControl ItemsSource="{Binding ScoreBreakdown, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,1"
+                                           TextTrimming="CharacterEllipsis">
+                                    <Run Text="+" Foreground="#4ADE80" /><Run Text="{Binding PointsIfFixed, Mode=OneWay}" Foreground="#4ADE80" FontWeight="SemiBold" />
+                                    <Run Text="  " /><Run Text="{Binding Category, Mode=OneWay}" />
+                                </TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <!-- S16-4: status of every check — a failed check is never shown as passed -->
                     <TextBlock Text="{Binding CheckSummary, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
@@ -339,6 +361,11 @@
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding LastDiff.ScoreDelta}" Value="0">
                                             <Setter Property="Text" Value="Score: unchanged"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                        </DataTrigger>
+                                        <!-- ADR 0002: no delta across a formula change -->
+                                        <DataTrigger Binding="{Binding LastDiff.ScoreComparable}" Value="False">
+                                            <Setter Property="Text" Value="Score: new formula — not comparable"/>
                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                         </DataTrigger>
                                     </Style.Triggers>

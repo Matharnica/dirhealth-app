@@ -107,6 +107,14 @@ public partial class MainViewModel : BaseViewModel
         if (Dashboard.Findings.Count > 0)
             Findings.LoadFindings(Dashboard.Findings, Dashboard.ComplianceScore);
 
+        // S17: exceptions change the displayed score; the card shows "+X points if fixed"
+        Findings.PointsFor          = category => Dashboard.ScoreResult?.PointsFor(category) ?? 0;
+        Findings.ExceptionsChanged += () => Dashboard.RecomputeScore();
+        Dashboard.PropertyChanged  += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DashboardViewModel.ScoreResult)) Findings.RefreshPoints();
+        };
+
         // S16-2: double-click on an affected object opens it in the search detail (S15-2)
         Findings.NavigateToObject = obj =>
         {
