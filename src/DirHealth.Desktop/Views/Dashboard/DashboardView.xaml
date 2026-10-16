@@ -178,6 +178,11 @@
 
             <!-- Header -->
             <StackPanel Grid.Row="0">
+            <!-- S19: one-time notice after a score-model change -->
+            <Border Background="#3D2A00" BorderBrush="#92400E" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12"
+                    Visibility="{Binding ScoreModelNotice, Converter={StaticResource StringToVisibility}}">
+                <TextBlock Text="{Binding ScoreModelNotice, Mode=OneWay}" FontSize="12" Foreground="#FDE68A" TextWrapping="Wrap" />
+            </Border>
             <!-- S16-4: failed checks are visible, with their reason -->
             <Border Background="#7F1D1D" CornerRadius="8" Padding="14,10" Margin="0,0,0,12"
                     Visibility="{Binding HasFailedChecks, Converter={StaticResource BoolToVisibility}}">
@@ -239,8 +244,11 @@
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="#374151" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Severity}" Value="High">
+                                                            <DataTrigger Binding="{Binding Severity}" Value="Critical">
                                                                 <Setter Property="Background" Value="#7F1D1D" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Severity}" Value="High">
+                                                                <Setter Property="Background" Value="#78350F" />
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Severity}" Value="Medium">
                                                                 <Setter Property="Background" Value="#78350F" />
@@ -253,6 +261,11 @@
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                             <Style.Triggers>
+                                                                <!-- A5 (S19-6): Critical is red, not grey -->
+                                                                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                                    <Setter Property="Foreground" Value="#FCA5A5" />
+                                                                    <Setter Property="FontWeight" Value="Bold" />
+                                                                </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Severity}" Value="High">
                                                                     <Setter Property="Foreground" Value="{StaticResource HighSeverityBrush}" />
                                                                 </DataTrigger>

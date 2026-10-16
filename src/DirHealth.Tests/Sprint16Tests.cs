@@ -22,7 +22,7 @@ public class Sprint16Tests
         Assert.Equal(ScanGuard.QueryOf.Keys.OrderBy(k => k), FindingCatalog.All.Select(r => r.Category).OrderBy(c => c));
         foreach (var rule in FindingCatalog.All)
         {
-            Assert.Matches(@"^DH-(USR|GRP|CMP|KRB|PRV|POL)-\d{3}$", rule.RuleId);
+            Assert.Matches(@"^DH-(USR|GRP|CMP|KRB|PRV|POL|DOM|TRU)-\d{3}$", rule.RuleId);
             Assert.InRange(rule.Weight, 1, 10);
             Assert.False(string.IsNullOrWhiteSpace(rule.What));
             Assert.False(string.IsNullOrWhiteSpace(rule.Why));

@@ -34,6 +34,8 @@ public class AdUser
     public List<string> Spns            { get; set; } = [];
     /// <summary>"Unconstrained", "Constrained (any protocol)", "Constrained" or "".</summary>
     public string    Delegation         { get; set; } = "";
+    /// <summary>msDS-SupportedEncryptionTypes; null = not set (RC4 default) (S19-4).</summary>
+    public int?      SupportedEncryptionTypes { get; set; }
 
     public string Ou              => DnHelper.OuFromDn(DistinguishedName);
     public bool   NeverLoggedOn   => LastLogon is null;

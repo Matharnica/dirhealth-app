@@ -65,4 +65,33 @@ public static class CheckFilters
     public static string StaleDomainAdmins(string escapedGroupDn, string cutoff) =>
         $"(&{EnabledUser}{WellKnownGroups.MembershipClause(escapedGroupDn, WellKnownGroups.DomainAdminsRid)}" +
         $"(|(lastLogonTimestamp<={cutoff})(!(lastLogonTimestamp=*))))";
+
+    // ── Sprint 19 ────────────────────────────────────────────────────────────
+    /// <summary>Enabled users whose primary group is not Domain Users/Guests (hidden membership).</summary>
+    public const string HiddenPrimaryGroupUsers =
+        "(&" + EnabledUser + "(!(primaryGroupID=513))(!(primaryGroupID=514)))";
+
+    /// <summary>Enabled computers whose primary group is not Domain Computers/Controllers/RODCs.</summary>
+    public const string HiddenPrimaryGroupComputers =
+        "(&(objectClass=computer)" + NotDisabled + "(!(primaryGroupID=515))(!(primaryGroupID=516))(!(primaryGroupID=521)))";
+
+    public const string DesOnlyUsers     = "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=2097152))";
+    public const string DesOnlyComputers = "(&(objectClass=computer)" + NotDisabled + "(userAccountControl:1.2.840.113556.1.4.803:=2097152))";
+
+    public const string ReversibleUsers     = "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=128))";
+    public const string ReversibleComputers = "(&(objectClass=computer)" + NotDisabled + "(userAccountControl:1.2.840.113556.1.4.803:=128))";
+
+    /// <summary>Presence only — the attribute values are never requested (S19-4).</summary>
+    public const string UserPasswordAttribute =
+        "(&(|(objectClass=user)(objectClass=computer))(|(userPassword=*)(unixUserPassword=*)))";
+
+    public const string ConstrainedDelegationSources = "(msDS-AllowedToDelegateTo=*)";
+
+    /// <summary>Resource-based constrained delegation set on a DC or on krbtgt (presence only).</summary>
+    public const string RbcdOnDcOrKrbtgt =
+        "(&(|(userAccountControl:1.2.840.113556.1.4.803:=8192)(sAMAccountName=krbtgt))(msDS-AllowedToActOnBehalfOfOtherIdentity=*))";
+
+    public const string DomainControllers = "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))";
+
+    public const string Trusts = "(objectClass=trustedDomain)";
 }

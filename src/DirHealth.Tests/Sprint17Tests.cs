@@ -234,7 +234,9 @@ public class Sprint17Tests : IDisposable
     [Fact]
     public void TooManyFailedChecks_ScoreNotAvailable()
     {
-        var checks = FindingCatalog.All.Take(15)
+        // fail rules until more than half of the catalog weight is not evaluated
+        double half = FindingCatalog.All.Sum(r => r.Weight) / 2.0, acc = 0;
+        var checks = FindingCatalog.All.OrderByDescending(r => r.Weight).TakeWhile(r => (acc += r.Weight) - r.Weight <= half)
             .Select(r => new CheckResult(r.Category, r.RuleId, CheckStatus.Failed, "x", 0)).ToList();
         var r = Score([], checks);
         Assert.False(r.Available);

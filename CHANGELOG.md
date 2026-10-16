@@ -14,6 +14,17 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 19 (New checks) — ⚠ your score will drop without any change in AD
+23 new read-only LDAP checks, each with rule id, weight, explanation, copyable fix and undo:
+- **Tier 0 and hidden memberships** (S19-1) — Tier 0 now follows the BloodHound "high value" model (by SID, incl. Key Admins, Enterprise Key Admins, Cert Publishers; DnsAdmins by name). New: accounts with a non-standard primary group (a membership that does not show up in the group's member list).
+- **Admin account hardening** (S19-2) — Tier 0 accounts that are not "sensitive and cannot be delegated" nor in Protected Users, that have an SPN (Kerberoastable), no Kerberos pre-authentication, an old or never-expiring password, or a mailbox; members in Account/Server/Print/Backup Operators.
+- **Domain basics** (S19-3) — krbtgt password older than 180 days, Guest enabled, ms-DS-MachineAccountQuota above 0, Pre-Windows 2000 Compatible Access with Authenticated Users/Anonymous/Everyone, AD Recycle Bin disabled, domain functional level below 2016, fewer than two DCs.
+- **Kerberos encryption** (S19-4) — DES-only accounts, service accounts without AES, reversible password encryption, userPassword/unixUserPassword set (DirHealth only checks that a value exists — it never reads it).
+- **Delegation and trusts** (S19-5) — delegation to domain controllers or krbtgt (constrained and resource-based), delegation to services that no longer exist, trusts without SID filtering, with TGT delegation, or inactive.
+- **Critical severity** (S19-6) — the severity filter offers "Critical" and the dashboard shows Critical in red.
+- The score model version changes (3): more checks mean a lower score for the same AD. The dashboard shows a one-time notice, and the trend/report do not compare across the change.
+- A check that cannot read a required domain attribute now reports "Failed" instead of producing a wrong finding.
+
 ### Added — Sprint 18 (Reports and Excel)
 - **Two report levels** (S18-1) — "Export report" asks for **Summary** (1–2 pages for management: score with "higher is better", coverage, fix-first list by score gain, overview by category, changes since the last scan) or **Full** (summary plus every finding card with what/why/how, fix and undo commands, affected objects, and appendix tables).
 - **Print discipline** (S18-2) — sections flow instead of starting a new page each; object lists stop at 25 with "N more — see the CSV export"; every page has a footer with domain, creation time and "Page x of y"; column headers repeat after a page break; wide tables (6+ columns) print in landscape.

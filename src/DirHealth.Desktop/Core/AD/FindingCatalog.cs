@@ -25,7 +25,7 @@ public record FindingRule(
     public double       Saturation { get; init; } = 1;
     public ScorePopulation Population { get; init; } = ScorePopulation.None;
     /// <summary>Exception key type (ADR 0001): object rules by SID, policy rules by name.</summary>
-    public bool KeyedBySid => Measure != ScoreMeasure.Presence;
+    public bool KeyedBySid => Measure != ScoreMeasure.Presence && !FindingCatalog.NameKeyed.Contains(Category);
 }
 
 /// <summary>Score measure of a rule (ADR 0002).</summary>
@@ -61,6 +61,21 @@ public static class FindingCatalog
         new($"MITRE ATT&CK {id} — {name}", $"https://attack.mitre.org/techniques/{id.Replace('.', '/')}/");
 
     // ── Script builders ───────────────────────────────────────────────────────
+    /// <summary>
+    /// PowerShell that computes the same "admin" set as the scanner: enabled, nested members of the Tier 0
+    /// groups (by SID, plus DnsAdmins by name) and accounts whose primary group is Domain Admins.
+    /// </summary>
+    private const string Tier0Preamble =
+        "Import-Module ActiveDirectory\n" +
+        "$sid = (Get-ADDomain).DomainSID.Value   # Enterprise/Schema/Enterprise Key Admins: use the forest root SID in child domains\n" +
+        "$t0 = \"$sid-512\",\"$sid-518\",\"$sid-519\",\"$sid-526\",\"$sid-527\",\"$sid-517\",'S-1-5-32-544','S-1-5-32-548','S-1-5-32-549','S-1-5-32-550','S-1-5-32-551' |\n" +
+        "    ForEach-Object { Get-ADGroup -Identity $_ -ErrorAction SilentlyContinue }\n" +
+        "$t0 += Get-ADGroup -Filter \"Name -eq 'DnsAdmins'\" -ErrorAction SilentlyContinue\n" +
+        "$members = $t0 | Get-ADGroupMember -Recursive | Where-Object objectClass -eq 'user'\n" +
+        "$members += Get-ADUser -LDAPFilter '(primaryGroupID=512)'\n" +
+        "$admins = $members | Sort-Object DistinguishedName -Unique |\n" +
+        "    Get-ADUser -Properties userAccountControl, servicePrincipalName, PasswordLastSet, PasswordNeverExpires | Where-Object Enabled\n";
+
     private static string Cutoff(int days) => $"$cutoff = (Get-Date).AddDays(-{days}).ToFileTimeUtc()";
 
     /// <summary>Back up the targets, then apply with -WhatIf (remove it to really change AD).</summary>
@@ -120,7 +135,35 @@ public static class FindingCatalog
         ["WeakPasswordHistory"]              = (ScoreMeasure.Presence, 1, ScorePopulation.None),
         ["NoAccountLockout"]                 = (ScoreMeasure.Presence, 1, ScorePopulation.None),
         ["FineGrainedPasswordPolicy"]        = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        // Sprint 19 (formula v3)
+        ["HiddenPrimaryGroup"]               = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminNotProtected"]                = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        ["AdminKerberoastable"]              = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminNoPreauth"]                   = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminOldPassword"]                 = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        ["AdminWithMailbox"]                 = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        ["OperatorGroupsNotEmpty"]           = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        ["KrbtgtPasswordOld"]                = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["GuestEnabled"]                     = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["MachineAccountQuota"]              = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["PreWindows2000Access"]             = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["RecycleBinDisabled"]               = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["FunctionalLevelOld"]               = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["SingleDomainController"]           = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["DesOnly"]                          = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["ServiceAccountsWithoutAes"]        = (ScoreMeasure.Count, 5, ScorePopulation.None),
+        ["ReversibleEncryption"]             = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["UserPasswordAttribute"]            = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["DelegationToDomainControllers"]    = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["DelegationToMissingAccounts"]      = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        ["TrustWithoutSidFiltering"]         = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["TrustTgtDelegation"]               = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["TrustInactive"]                    = (ScoreMeasure.Count, 3, ScorePopulation.None),
     };
+
+    /// <summary>Object rules whose objects have no SID (trusts) — keyed by name like policy rules (ADR 0001).</summary>
+    public static readonly IReadOnlySet<string> NameKeyed = new HashSet<string>
+        { "TrustWithoutSidFiltering", "TrustTgtDelegation", "TrustInactive" };
 
     private static readonly IReadOnlyDictionary<string, FindingRule> Rules = Build()
         .Select(r => Scoring.TryGetValue(r.Category, out var s)
@@ -369,6 +412,302 @@ public static class FindingCatalog
             $"{Ps}\nImport-Clixml .\\dirhealth-DH-POL-004-backup.xml | ForEach-Object {{\n" +
             "    Set-ADFineGrainedPasswordPolicy -Identity $_.DistinguishedName -ReversibleEncryptionEnabled $_.ReversibleEncryptionEnabled `\n" +
             "        -MinPasswordLength $_.MinPasswordLength -LockoutThreshold $_.LockoutThreshold }",
+            null);
+
+        // ══ Sprint 19 — new LDAP checks ══════════════════════════════════════
+
+        // ── S19-1 Tier 0 / hidden primary group ──────────────────────────────
+        yield return new("HiddenPrimaryGroup", "DH-PRV-003", 8,
+            "Enabled accounts whose primary group is not the default (Domain Users/Guests for users; Domain Computers/Controllers/RODCs for computers).",
+            "Primary-group membership is not stored in member/memberOf — an account can sit in Domain Admins without appearing in the group's member list.",
+            "Set the primary group back to the default and, if the account really needs the group, add it as a visible regular member.",
+            [MsProtectedAccounts],
+            ObjectFix("DH-PRV-003", "Get-ADUser", CheckFilters.HiddenPrimaryGroupUsers, "Set-ADUser -Replace @{primaryGroupID = 513}",
+                properties: "primaryGroupID", backupColumns: "DistinguishedName, SamAccountName, primaryGroupID") +
+            "\n# Computers (same rule, default 515):\n" +
+            $"Get-ADComputer -LDAPFilter \"{CheckFilters.HiddenPrimaryGroupComputers}\" -Properties primaryGroupID | Select-Object DistinguishedName, primaryGroupID | Export-Csv .\\dirhealth-DH-PRV-003-computers-backup.csv -NoTypeInformation\n" +
+            $"Get-ADComputer -LDAPFilter \"{CheckFilters.HiddenPrimaryGroupComputers}\" | Set-ADComputer -Replace @{{primaryGroupID = 515}} -WhatIf",
+            "The account must be a member of Domain Users (or Domain Computers) for the change to succeed; it loses the rights it got through the hidden group.",
+            ObjectRevert("DH-PRV-003", "Set-ADObject -Identity $_.DistinguishedName -Replace @{primaryGroupID = [int]$_.primaryGroupID}") +
+            "\nImport-Csv .\\dirhealth-DH-PRV-003-computers-backup.csv | ForEach-Object { Set-ADObject -Identity $_.DistinguishedName -Replace @{primaryGroupID = [int]$_.primaryGroupID} }",
+            CheckFilters.HiddenPrimaryGroupUsers);
+
+        // ── S19-2 admin accounts (Tier 0 = BloodHound high value; by SID) ────
+        yield return new("AdminNotProtected", "DH-PRV-004", 7,
+            "Enabled Tier 0 accounts that are neither \"sensitive and cannot be delegated\" nor members of Protected Users.",
+            "Their credentials can be forwarded by any server they log on to — one compromised server with delegation becomes a domain admin.",
+            "Mark admin accounts as \"Account is sensitive and cannot be delegated\" and add them to Protected Users after testing.",
+            [MsProtectedAccounts, Mitre("T1558", "Steal or Forge Kerberos Tickets")],
+            Tier0Preamble +
+            "$pu = Get-ADGroupMember -Identity \"$sid-525\" -Recursive | ForEach-Object DistinguishedName   # Protected Users\n" +
+            "$targets = $admins | Where-Object { -not ($_.userAccountControl -band 0x100000) -and $pu -notcontains $_.DistinguishedName }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName | Export-Csv .\\dirhealth-DH-PRV-004-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADAccountControl -AccountNotDelegated $true -WhatIf   # review the output, then remove -WhatIf",
+            "Delegation-dependent admin tasks (e.g. double-hop remoting) stop working for these accounts; Protected Users additionally disables NTLM and cached logons.",
+            ObjectRevert("DH-PRV-004", "Set-ADAccountControl -Identity $_.DistinguishedName -AccountNotDelegated $false"),
+            null);
+
+        yield return new("AdminKerberoastable", "DH-PRV-005", 10,
+            "Enabled Tier 0 accounts with a servicePrincipalName.",
+            "Any domain user can request a ticket for them and crack the password offline — a direct path to domain admin.",
+            "Never run services as a Tier 0 account: move the service to a gMSA or a dedicated, unprivileged account and remove the SPN.",
+            [MsGmsa, Mitre("T1558.003", "Steal or Forge Kerberos Tickets: Kerberoasting")],
+            Tier0Preamble +
+            "$targets = $admins | Where-Object { $_.servicePrincipalName -and $_.SamAccountName -ne 'krbtgt' }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName, @{n='SPNs';e={$_.servicePrincipalName -join ';'}} | Export-Csv .\\dirhealth-DH-PRV-005-backup.csv -NoTypeInformation\n" +
+            "$targets | ForEach-Object { Set-ADUser $_ -ServicePrincipalNames @{Remove = [string[]]$_.servicePrincipalName} -WhatIf }   # remove -WhatIf to apply",
+            "The service that used these SPNs stops authenticating with Kerberos until it runs under another account.",
+            ObjectRevert("DH-PRV-005", "Set-ADUser -Identity $_.DistinguishedName -ServicePrincipalNames @{Add = $_.SPNs -split ';'}"),
+            null);
+
+        yield return new("AdminNoPreauth", "DH-PRV-006", 10,
+            "Enabled Tier 0 accounts with Kerberos pre-authentication disabled.",
+            "Anyone on the network can request crackable material for a domain admin password — without any credentials.",
+            "Re-enable Kerberos pre-authentication on these accounts immediately and reset their passwords.",
+            [Mitre("T1558.004", "Steal or Forge Kerberos Tickets: AS-REP Roasting")],
+            Tier0Preamble +
+            "$targets = $admins | Where-Object { $_.userAccountControl -band 0x400000 }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName | Export-Csv .\\dirhealth-DH-PRV-006-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADAccountControl -DoesNotRequirePreAuth $false -WhatIf   # remove -WhatIf to apply",
+            "Legacy Kerberos clients that cannot pre-authenticate fail to log on with these accounts.",
+            ObjectRevert("DH-PRV-006", "Set-ADAccountControl -Identity $_.DistinguishedName -DoesNotRequirePreAuth $true"),
+            null);
+
+        yield return new("AdminOldPassword", "DH-PRV-007", 6,
+            $"Enabled Tier 0 accounts whose password is older than {Checks.CheckLogic.AdminPasswordMaxDays} days or never expires.",
+            "An admin password that has been valid for years has had years to leak.",
+            "Rotate admin passwords at least yearly and remove \"password never expires\" from admin accounts.",
+            [MsPasswordPolicy, Mitre("T1078.002", "Valid Accounts: Domain Accounts")],
+            Tier0Preamble +
+            $"$limit = (Get-Date).AddDays(-{Checks.CheckLogic.AdminPasswordMaxDays})\n" +
+            "$targets = $admins | Where-Object { $_.PasswordNeverExpires -or -not $_.PasswordLastSet -or $_.PasswordLastSet -lt $limit }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName, PasswordNeverExpires | Export-Csv .\\dirhealth-DH-PRV-007-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADUser -PasswordNeverExpires $false -ChangePasswordAtLogon $true -WhatIf   # remove -WhatIf to apply",
+            "Admins must set a new password at next logon; scheduled tasks or services running as these accounts break until updated.",
+            ObjectRevert("DH-PRV-007", "Set-ADUser -Identity $_.DistinguishedName -ChangePasswordAtLogon $false -PasswordNeverExpires ([bool]::Parse($_.PasswordNeverExpires))"),
+            null);
+
+        yield return new("AdminWithMailbox", "DH-PRV-008", 4,
+            "Enabled Tier 0 accounts that have an Exchange mailbox.",
+            "Mail is the most common way in for attackers — a phishing mail opened by a domain admin account compromises the domain.",
+            "Give admins a separate, unprivileged account for mail and browsing; remove the mailbox from the admin account (in Exchange).",
+            [MsSecuringAd],
+            Tier0Preamble +
+            "$admins | Get-ADUser -Properties msExchMailboxGuid, homeMDB | Where-Object { $_.msExchMailboxGuid -or $_.homeMDB } |\n" +
+            "    Select-Object SamAccountName, DistinguishedName   # read-only list — remove the mailbox in Exchange (Disable-Mailbox)",
+            "None from this list; disabling a mailbox in Exchange disconnects it (recoverable within the retention period).",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        yield return new("OperatorGroupsNotEmpty", "DH-PRV-009", 6,
+            "Members of Account, Server, Print or Backup Operators.",
+            "These built-in groups can log on to domain controllers, load drivers or read the AD database — each is a path to domain admin.",
+            "Empty the operator groups; delegate the specific tasks with least privilege instead.",
+            [MsProtectedAccounts],
+            $"{Ps}\n$ops = 'S-1-5-32-548','S-1-5-32-549','S-1-5-32-550','S-1-5-32-551'\n" +
+            "$rows = foreach ($g in $ops) { Get-ADGroupMember -Identity $g | Select-Object @{n='Group';e={$g}}, distinguishedName }\n" +
+            "$rows | Export-Csv .\\dirhealth-DH-PRV-009-backup.csv -NoTypeInformation\n" +
+            "$rows | ForEach-Object { Remove-ADGroupMember -Identity $_.Group -Members $_.distinguishedName -Confirm:$false -WhatIf }   # remove -WhatIf to apply",
+            "Whoever relied on the operator rights (backup software, print admins) loses them until a delegated replacement exists.",
+            ObjectRevert("DH-PRV-009", "Add-ADGroupMember -Identity $_.Group -Members $_.distinguishedName"),
+            null);
+
+        // ── S19-3 krbtgt and domain basics ───────────────────────────────────
+        yield return new("KrbtgtPasswordOld", "DH-DOM-001", 8,
+            $"The krbtgt account password is older than {Checks.CheckLogic.KrbtgtMaxDays} days.",
+            "Anyone who ever stole the krbtgt hash can forge tickets (golden tickets) until the password is reset twice.",
+            "Reset the krbtgt password twice, with at least the maximum ticket lifetime (10 hours by default) in between — e.g. with Microsoft's New-KrbtgtKeys.ps1.",
+            [Mitre("T1558.001", "Steal or Forge Kerberos Tickets: Golden Ticket")],
+            $"{Ps}\nGet-ADUser krbtgt -Properties PasswordLastSet | Select-Object DistinguishedName, PasswordLastSet | Export-Csv .\\dirhealth-DH-DOM-001-backup.csv -NoTypeInformation   # record only\n" +
+            "$pw = ConvertTo-SecureString ([guid]::NewGuid().ToString() + [guid]::NewGuid().ToString()) -AsPlainText -Force\n" +
+            "Set-ADAccountPassword -Identity krbtgt -Reset -NewPassword $pw -WhatIf   # first reset; repeat after replication and >10 h",
+            "Resetting twice within the ticket lifetime invalidates all Kerberos tickets in the domain (mass logon failures). Wait for replication between resets.",
+            "# A password reset cannot be undone. Do not do the second reset before all DCs replicated and the ticket lifetime passed.",
+            null);
+
+        yield return new("GuestEnabled", "DH-DOM-002", 7,
+            "The built-in Guest account (RID 501) is enabled.",
+            "Guest allows anonymous-like access to shares and resources granted to Everyone.",
+            "Disable the built-in Guest account.",
+            [MsSecuringAd],
+            $"{Ps}\n$guest = Get-ADUser -Identity \"$((Get-ADDomain).DomainSID.Value)-501\"   # by SID — the name is localized\n" +
+            "$guest | Select-Object DistinguishedName, Enabled | Export-Csv .\\dirhealth-DH-DOM-002-backup.csv -NoTypeInformation\n" +
+            "$guest | Disable-ADAccount -WhatIf   # remove -WhatIf to apply",
+            "Applications that (unusually) rely on guest access stop working.",
+            ObjectRevert("DH-DOM-002", "Enable-ADAccount -Identity $_.DistinguishedName"),
+            null);
+
+        yield return new("MachineAccountQuota", "DH-DOM-003", 5,
+            "ms-DS-MachineAccountQuota is above 0: every user can join computers to the domain.",
+            "A self-created computer account is the starting point of several escalation techniques (e.g. resource-based delegation attacks).",
+            "Set ms-DS-MachineAccountQuota to 0 and delegate domain joins to a dedicated group.",
+            [MsSecuringAd],
+            $"{Ps}\nGet-ADDomain | Get-ADObject -Properties ms-DS-MachineAccountQuota | Select-Object DistinguishedName, ms-DS-MachineAccountQuota | Export-Csv .\\dirhealth-DH-DOM-003-backup.csv -NoTypeInformation\n" +
+            "Set-ADDomain -Identity (Get-ADDomain) -Replace @{'ms-DS-MachineAccountQuota' = 0} -WhatIf   # remove -WhatIf to apply",
+            "Users without delegated rights can no longer join computers; helpdesk staff need a delegation on the target OUs.",
+            ObjectRevert("DH-DOM-003", "Set-ADDomain -Identity (Get-ADDomain) -Replace @{'ms-DS-MachineAccountQuota' = [int]$_.'ms-DS-MachineAccountQuota'}"),
+            null);
+
+        yield return new("PreWindows2000Access", "DH-DOM-004", 6,
+            "Pre-Windows 2000 Compatible Access contains Authenticated Users, Anonymous Logon or Everyone.",
+            "Lets every account — or anonymous sessions — read all user and group attributes, which helps attackers map the domain.",
+            "Remove Authenticated Users, Anonymous Logon and Everyone from Pre-Windows 2000 Compatible Access (test legacy NT4/RAS applications first).",
+            [MsSecuringAd],
+            $"{Ps}\n$group = Get-ADGroup -Identity 'S-1-5-32-554'\n" +
+            "$risky = Get-ADGroupMember $group | Where-Object { $_.SID.Value -in 'S-1-5-11','S-1-5-7','S-1-1-0' }\n" +
+            "$risky | Select-Object @{n='SID';e={$_.SID.Value}} | Export-Csv .\\dirhealth-DH-DOM-004-backup.csv -NoTypeInformation\n" +
+            "$risky | ForEach-Object { Remove-ADGroupMember $group -Members $_ -Confirm:$false -WhatIf }   # remove -WhatIf to apply",
+            "Very old applications (NT4-era, some RAS/NAS appliances) that query AD anonymously stop working.",
+            $"{Ps}\nImport-Csv .\\dirhealth-DH-DOM-004-backup.csv | ForEach-Object {{ Add-ADGroupMember -Identity 'S-1-5-32-554' -Members ([System.Security.Principal.SecurityIdentifier]$_.SID) }}",
+            null);
+
+        yield return new("RecycleBinDisabled", "DH-DOM-005", 3,
+            "The AD Recycle Bin is not enabled.",
+            "Deleted objects (accidentally or by an attacker) cannot be restored with their attributes and group memberships.",
+            "Enable the AD Recycle Bin (forest-wide; requires forest functional level 2008 R2).",
+            [MsRecycleBin],
+            $"{Ps}\nGet-ADOptionalFeature -Filter * | Export-Clixml .\\dirhealth-DH-DOM-005-backup.xml   # record only\n" +
+            "Enable-ADOptionalFeature -Identity 'Recycle Bin Feature' -Scope ForestOrConfigurationSet -Target (Get-ADForest).Name -WhatIf",
+            "Irreversible: the Recycle Bin cannot be disabled again. Objects deleted before enabling stay non-restorable.",
+            "# Cannot be undone — the AD Recycle Bin stays enabled once turned on.",
+            null);
+
+        yield return new("FunctionalLevelOld", "DH-DOM-006", 3,
+            "The domain functional level is below Windows Server 2016.",
+            "Newer security features (e.g. Protected Users protections, automatic NTLM secret rolling for smart-card users) are not available.",
+            "Upgrade all DCs to supported versions, then raise the domain (and forest) functional level.",
+            [MsLifecycle],
+            $"{Ps}\nGet-ADDomain | Select-Object DNSRoot, DomainMode | Export-Csv .\\dirhealth-DH-DOM-006-backup.csv -NoTypeInformation   # record only\n" +
+            "Set-ADDomainMode -Identity (Get-ADDomain) -DomainMode Windows2016Domain -WhatIf   # only after every DC runs 2016 or later",
+            "Raising the level is effectively one-way and fails while older DCs exist.",
+            "# Lowering the functional level is only possible in narrow cases — treat this as irreversible.",
+            null);
+
+        yield return new("SingleDomainController", "DH-DOM-007", 5,
+            "The domain has fewer than two domain controllers.",
+            "A single DC is a single point of failure — its loss stops logons and, without a tested backup, loses the domain.",
+            "Add a second domain controller (ideally in another location) and test system-state backups.",
+            [MsSecuringAd],
+            $"{Ps}\nGet-ADDomainController -Filter * | Select-Object HostName, Site, OperatingSystem   # read-only list — add a DC with Install-ADDSDomainController",
+            "None from this list.",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        // ── S19-4 Kerberos encryption ────────────────────────────────────────
+        yield return new("DesOnly", "DH-KRB-005", 8,
+            "Enabled user or computer accounts restricted to DES Kerberos encryption (USE_DES_KEY_ONLY).",
+            "DES is broken: tickets for these accounts can be decrypted and forged in practice.",
+            "Clear \"Use only DES encryption\" and reset the account password so AES keys are created.",
+            [MsDelegation, Mitre("T1558", "Steal or Forge Kerberos Tickets")],
+            ObjectFix("DH-KRB-005", "Get-ADUser", CheckFilters.DesOnlyUsers, "Set-ADAccountControl -UseDESKeyOnly $false") +
+            $"\nGet-ADComputer -LDAPFilter \"{CheckFilters.DesOnlyComputers}\" | Set-ADAccountControl -UseDESKeyOnly $false -WhatIf",
+            "Applications that only speak DES fail to authenticate against these accounts.",
+            ObjectRevert("DH-KRB-005", "Set-ADAccountControl -Identity $_.DistinguishedName -UseDESKeyOnly $true"),
+            CheckFilters.DesOnlyUsers);
+
+        yield return new("ServiceAccountsWithoutAes", "DH-KRB-006", 5,
+            "Enabled service accounts (with an SPN) whose msDS-SupportedEncryptionTypes is unset or has no AES bit.",
+            "Their tickets fall back to RC4, which cracks much faster than AES.",
+            "Enable AES128/AES256 on the account and reset its password, or move the service to a gMSA.",
+            [MsGmsa, Mitre("T1558.003", "Steal or Forge Kerberos Tickets: Kerberoasting")],
+            $"{Ps}\n$targets = Get-ADUser -LDAPFilter \"{CheckFilters.Kerberoastable}\" -Properties msDS-SupportedEncryptionTypes |\n" +
+            "    Where-Object { -not ($_.'msDS-SupportedEncryptionTypes' -band 0x18) }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName, msDS-SupportedEncryptionTypes | Export-Csv .\\dirhealth-DH-KRB-006-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADUser -KerberosEncryptionType AES128,AES256 -WhatIf   # then reset each password",
+            "RC4-only clients can no longer get tickets for these services.",
+            ObjectRevert("DH-KRB-006",
+                "if ($_.'msDS-SupportedEncryptionTypes') { Set-ADUser -Identity $_.DistinguishedName -Replace @{'msDS-SupportedEncryptionTypes' = [int]$_.'msDS-SupportedEncryptionTypes'} } " +
+                "else { Set-ADUser -Identity $_.DistinguishedName -Clear 'msDS-SupportedEncryptionTypes' }"),
+            CheckFilters.Kerberoastable);
+
+        yield return new("ReversibleEncryption", "DH-KRB-007", 8,
+            "Enabled accounts allowed to store their password with reversible encryption.",
+            "The password is stored in a form that can be turned back into plain text by anyone who reads the AD database.",
+            "Clear \"Store password using reversible encryption\" and reset the password so the reversible copy is removed.",
+            [MsPasswordPolicy],
+            ObjectFix("DH-KRB-007", "Get-ADUser", CheckFilters.ReversibleUsers, "Set-ADAccountControl -AllowReversiblePasswordEncryption $false") +
+            $"\nGet-ADComputer -LDAPFilter \"{CheckFilters.ReversibleComputers}\" | Set-ADAccountControl -AllowReversiblePasswordEncryption $false -WhatIf",
+            "Protocols that need the clear-text password (CHAP, Digest) stop working for these accounts.",
+            ObjectRevert("DH-KRB-007", "Set-ADAccountControl -Identity $_.DistinguishedName -AllowReversiblePasswordEncryption $true"),
+            CheckFilters.ReversibleUsers);
+
+        yield return new("UserPasswordAttribute", "DH-KRB-008", 7,
+            "Accounts with the userPassword or unixUserPassword attribute set (DirHealth only checks that a value exists — it never reads it).",
+            "These attributes often hold readable or weakly hashed passwords that many accounts can read.",
+            "Clear userPassword and unixUserPassword; store service secrets in a vault instead.",
+            [MsSecuringAd],
+            $"{Ps}\n$targets = Get-ADObject -LDAPFilter \"{CheckFilters.UserPasswordAttribute}\"\n" +
+            "$targets | Select-Object DistinguishedName | Export-Csv .\\dirhealth-DH-KRB-008-backup.csv -NoTypeInformation   # names only — the secret values are not backed up\n" +
+            "$targets | Set-ADObject -Clear userPassword, unixUserPassword -WhatIf   # remove -WhatIf to apply",
+            "Unix/LDAP applications that authenticate against these attributes stop working.",
+            "# Not restorable on purpose: the secret values are never exported. Clearing them is the intended end state.",
+            CheckFilters.UserPasswordAttribute);
+
+        // ── S19-5 delegation and trusts ──────────────────────────────────────
+        yield return new("DelegationToDomainControllers", "DH-KRB-009", 10,
+            "Accounts with constrained delegation to a domain controller service or krbtgt, or resource-based delegation configured on a DC or krbtgt.",
+            "Whoever controls such an account can impersonate any user — including Domain Admins — against the DC itself.",
+            "Remove delegation that targets domain controllers or krbtgt; no regular account needs it.",
+            [MsDelegation, Mitre("T1558", "Steal or Forge Kerberos Tickets")],
+            $"{Ps}\n$dcs = (Get-ADDomainController -Filter *).HostName + (Get-ADDomainController -Filter *).Name\n" +
+            $"$targets = Get-ADObject -LDAPFilter \"{CheckFilters.ConstrainedDelegationSources}\" -Properties msDS-AllowedToDelegateTo |\n" +
+            "    Where-Object { $_.'msDS-AllowedToDelegateTo' | Where-Object { $h = ($_ -split '/')[1] -split ':' | Select-Object -First 1; $_ -like 'krbtgt/*' -or $dcs -contains $h -or $dcs -contains ($h -split '\\.')[0] } }\n" +
+            "$targets | Select-Object DistinguishedName, @{n='Targets';e={$_.'msDS-AllowedToDelegateTo' -join ';'}} | Export-Csv .\\dirhealth-DH-KRB-009-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADObject -Clear msDS-AllowedToDelegateTo -WhatIf\n" +
+            $"Get-ADObject -LDAPFilter \"{CheckFilters.RbcdOnDcOrKrbtgt}\" | Set-ADObject -Clear msDS-AllowedToActOnBehalfOfOtherIdentity -WhatIf   # remove -WhatIf to apply",
+            "Services that rely on this delegation stop forwarding credentials; resource-based delegation on DCs is never needed in normal operation.",
+            ObjectRevert("DH-KRB-009", "Set-ADObject -Identity $_.DistinguishedName -Replace @{'msDS-AllowedToDelegateTo' = $_.Targets -split ';'}") +
+            "\n# Resource-based delegation on DCs/krbtgt is not restored on purpose.",
+            CheckFilters.ConstrainedDelegationSources);
+
+        yield return new("DelegationToMissingAccounts", "DH-KRB-010", 4,
+            "Accounts with constrained delegation to a service (SPN) that no account in the domain provides.",
+            "An attacker who registers that SPN on an account they control receives the delegated credentials.",
+            "Remove delegation entries that point at services that no longer exist.",
+            [MsDelegation],
+            $"{Ps}\n$targets = Get-ADObject -LDAPFilter \"{CheckFilters.ConstrainedDelegationSources}\" -Properties msDS-AllowedToDelegateTo\n" +
+            "$missing = foreach ($t in $targets) { foreach ($spn in $t.'msDS-AllowedToDelegateTo') {\n" +
+            "    $host = (($spn -split '/', 2)[1] -split ':')[0]\n" +
+            "    if (-not (Get-ADObject -LDAPFilter \"(|(servicePrincipalName=$spn)(servicePrincipalName=HOST/$host))\")) { [pscustomobject]@{ DistinguishedName = $t.DistinguishedName; SPN = $spn } } } }\n" +
+            "$missing | Export-Csv .\\dirhealth-DH-KRB-010-backup.csv -NoTypeInformation\n" +
+            "$missing | ForEach-Object { Set-ADObject -Identity $_.DistinguishedName -Remove @{'msDS-AllowedToDelegateTo' = $_.SPN} -WhatIf }   # remove -WhatIf to apply",
+            "None, if the service really no longer exists; check renamed hosts first.",
+            ObjectRevert("DH-KRB-010", "Set-ADObject -Identity $_.DistinguishedName -Add @{'msDS-AllowedToDelegateTo' = $_.SPN}"),
+            CheckFilters.ConstrainedDelegationSources);
+
+        yield return new("TrustWithoutSidFiltering", "DH-TRU-001", 8,
+            "Outgoing trusts without SID filtering: external trusts without quarantine, or forest trusts with SID history enabled.",
+            "An administrator of the other domain can grant themselves any SID of this domain — including Domain Admins — through SID history.",
+            "Enable SID filtering (quarantine) on external trusts and disable SID history on forest trusts unless a migration is running.",
+            [Mitre("T1134.005", "Access Token Manipulation: SID-History Injection")],
+            $"{Ps}\nGet-ADTrust -Filter * | Select-Object Name, Direction, TrustAttributes, SIDFilteringQuarantined, SIDFilteringForestAware | Export-Csv .\\dirhealth-DH-TRU-001-backup.csv -NoTypeInformation\n" +
+            "# External trust: netdom trust <this-domain> /domain:<other-domain> /quarantine:yes\n" +
+            "# Forest trust:   netdom trust <this-domain> /domain:<other-forest> /enablesidhistory:no\n" +
+            "# (netdom has no -WhatIf: run the Get-ADTrust line first and check the backup file)",
+            "Migrations that rely on SID history break; users of the other domain lose access granted through their old SIDs.",
+            "# Undo: netdom trust <this-domain> /domain:<other> /quarantine:no   (or /enablesidhistory:yes) — see the backup file for the previous state.",
+            null);
+
+        yield return new("TrustTgtDelegation", "DH-TRU-002", 7,
+            "Outgoing trusts that allow TGT delegation across the trust.",
+            "Unconstrained delegation in the other forest can then capture tickets of this forest's users, including admins.",
+            "Disable TGT delegation on the trust (default since 2019 updates).",
+            [MsDelegation, Mitre("T1558", "Steal or Forge Kerberos Tickets")],
+            $"{Ps}\nGet-ADTrust -Filter * | Select-Object Name, TrustAttributes | Export-Csv .\\dirhealth-DH-TRU-002-backup.csv -NoTypeInformation\n" +
+            "# netdom trust <this-domain> /domain:<other-forest> /EnableTGTDelegation:No\n" +
+            "# (netdom has no -WhatIf: check the backup file first)",
+            "Cross-forest scenarios that need unconstrained delegation stop working.",
+            "# Undo: netdom trust <this-domain> /domain:<other-forest> /EnableTGTDelegation:Yes",
+            null);
+
+        yield return new("TrustInactive", "DH-TRU-003", 2,
+            $"Trusts whose trust object has not changed for {Checks.CheckLogic.TrustInactiveDays} days (it normally updates about every 30 days while in use).",
+            "Forgotten trusts keep a door open that nobody watches.",
+            "Confirm the trust is no longer needed with its owner, then remove it.",
+            [MsSecuringAd],
+            $"{Ps}\nGet-ADTrust -Filter * | Select-Object Name, Direction, whenChanged   # read-only list — remove with Remove-ADTrust after confirming",
+            "None from this list; removing a trust that is still used breaks cross-domain access.",
+            "# Read-only listing — nothing to undo.",
             null);
     }
 }
