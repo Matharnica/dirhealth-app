@@ -16,7 +16,9 @@ public static class UserDetailRows
     private static string D(DateTime? d) => d?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "—";
     private static string YesNo(bool b) => b ? "Yes" : "No";
 
-    public static List<DetailRow> Build(AdUser u, DateTime? lastLogonThisDc)
+    /// <param name="lastLogonError">Set when lastLogon could not be read — the row then says so
+    /// instead of "No logon on this DC" (a failed read is never shown as "no value").</param>
+    public static List<DetailRow> Build(AdUser u, DateTime? lastLogonThisDc, string? lastLogonError = null)
     {
         var flags = UacFlags.StoredFlags.Where(f => UacFlags.Has(u.UserAccountControl, f.Bit)).Select(f => f.Name).ToList();
         bool kerberoastable = u.HasSpn && u.IsEnabled;
@@ -32,7 +34,9 @@ public static class UserDetailRows
             new("When Created",                    D(u.WhenCreated)),
             new("Account Expires",                 u.AccountExpires is null ? "Never" : D(u.AccountExpires)),
             new("Last Logon (replicated, ±14 d)",  u.LastLogon is null ? "No logon recorded" : D(u.LastLogon)),
-            new("Last Logon (this DC)",            lastLogonThisDc is null ? "No logon on this DC" : D(lastLogonThisDc)),
+            new("Last Logon (this DC)",            lastLogonError is not null ? $"Could not be read: {lastLogonError}"
+                                                   : lastLogonThisDc is null ? "No logon on this DC" : D(lastLogonThisDc),
+                                                   Warn: lastLogonError is not null),
             new("Password Last Set",               D(u.PasswordLastSet)),
             new("Password Age",                    u.PasswordAgeDays is { } a ? $"{a} days" : "—"),
             new("Password Never Expires",          YesNo(u.PasswordNeverExpires), Warn: u.PasswordNeverExpires),

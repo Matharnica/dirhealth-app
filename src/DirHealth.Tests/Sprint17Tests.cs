@@ -384,4 +384,23 @@ public class Sprint17Tests : IDisposable
         Assert.Contains("old app", vm.LegacyNote);
         Assert.Contains("no longer hide", vm.LegacyNote);
     }
+
+    // G6 (follow-up 2026-10-16): "hide exceptions" removes excepted objects from the card table
+    [Fact]
+    public void Vm_HideExceptions_FiltersExceptedObjects()
+    {
+        var vm = Vm(out _);
+        var a = User("svc", "S-1-5-21-1-2-3-77");
+        var b = User("app", "S-1-5-21-1-2-3-78");
+        vm.LoadFindings([Finding("AsRepRoasting", [a, b])]);
+        vm.SelectedFinding = vm.Findings[0];
+        vm.ObjectsTable.SelectedItem = a;
+        vm.ExceptionReason = "legacy client";
+        vm.AddExceptionCommand.Execute(null);
+
+        vm.HideExceptions = true;
+        Assert.Equal([b], vm.ObjectsTable.FilteredRows);
+        vm.HideExceptions = false;
+        Assert.Equal(2, vm.ObjectsTable.FilteredRows.Count);
+    }
 }

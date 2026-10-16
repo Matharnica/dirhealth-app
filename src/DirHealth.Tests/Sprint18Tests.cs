@@ -258,4 +258,16 @@ public class Sprint18Tests : IDisposable
         ReportPdfRenderer.Render(ReportBuilder.Build(Input(objects: 40), new ReportOptions(ReportKind.Summary, false)), path);
         Assert.InRange(ReportPdfRenderer.PageCount(path), 1, 2);
     }
+
+    // G8 (follow-up 2026-10-16): footer texts of every page (S18-2)
+    [Fact]
+    public void Footer_NamesDomainTimeVersion_AndPageXofY()
+    {
+        var m = ReportBuilder.Build(Input(), new ReportOptions(ReportKind.Summary, false));
+        var f = ReportPdfRenderer.FooterText(m);
+        Assert.Contains(m.Domain, f);
+        Assert.Contains(m.CreatedLocal, f);
+        Assert.Contains(m.ToolVersion, f);
+        Assert.Equal("Page 2 of 5", ReportPdfRenderer.PageLabel(2, 5));
+    }
 }

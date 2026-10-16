@@ -30,6 +30,27 @@ public partial class AdScanner
         List<CheckResult> Checks,
         ScanTotals        Totals);
 
+    /// <summary>
+    /// S19-3 / S20-2 checks as one sub-query per rule source: each reads a different object,
+    /// so one failed read marks only its own rules "Failed" (S16-4). The names are the
+    /// <see cref="ScanGuard.QueryOf"/> targets — a test checks both lists match.
+    /// </summary>
+    public IReadOnlyList<(string Query, Func<Task<List<AdFinding>>> Run)> SplitChecks() =>
+    [
+        ("DomainBasics.Krbtgt",             GetKrbtgtFindingsAsync),
+        ("DomainBasics.Guest",              GetGuestFindingsAsync),
+        ("DomainBasics.MachineAccountQuota",GetMachineAccountQuotaFindingsAsync),
+        ("DomainBasics.PreWindows2000",     GetPreWindows2000FindingsAsync),
+        ("DomainBasics.RecycleBin",         GetRecycleBinFindingsAsync),
+        ("DomainBasics.FunctionalLevel",    GetFunctionalLevelFindingsAsync),
+        ("DomainBasics.DomainControllers",  GetDomainControllerCountFindingsAsync),
+        ("Remaining.Laps",                  GetLapsFindingsAsync),
+        ("Remaining.MachinePasswords",      GetMachinePasswordFindingsAsync),
+        ("Remaining.Duplicates",            GetDuplicateObjectFindingsAsync),
+        ("Remaining.DsHeuristics",          GetDsHeuristicsFindingsAsync),
+        ("Remaining.Smartcard",             GetSmartcardFindingsAsync),
+    ];
+
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
         var scanLog       = new ConcurrentBag<ScanLogEntry>();
@@ -66,10 +87,9 @@ public partial class AdScanner
         var hiddenPgTask       = Timed("HiddenPrimaryGroup",       () => GetHiddenPrimaryGroupFindingsAsync(),      scanLog);
         var adminHardenTask    = Timed("AdminHardening",           () => GetAdminHardeningFindingsAsync(),          scanLog);
         var operatorsTask      = Timed("OperatorGroups",           () => GetOperatorGroupFindingsAsync(),           scanLog);
-        var domainBasicsTask   = Timed("DomainBasics",             () => GetDomainBasicsFindingsAsync(),            scanLog);
         var kerbEncTask        = Timed("KerberosEncryption",       () => GetKerberosEncryptionFindingsAsync(),      scanLog);
         var delegTrustTask     = Timed("DelegationTrusts",         () => GetDelegationTrustFindingsAsync(),         scanLog);
-        var remainingTask      = Timed("RemainingChecks",          () => GetRemainingCheckFindingsAsync(),          scanLog);   // S20-2
+        var splitTasks         = SplitChecks().Select(c => Timed(c.Query, c.Run, scanLog)).ToList();   // S19-3 / S20-2
 
         try
         {
@@ -81,7 +101,7 @@ public partial class AdScanner
                 asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
                 staleDAsTask, fgppTask, sidHistoryTask,
                 allUsersTask, domainAdminsTask,
-                hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask, remainingTask);
+                hiddenPgTask, adminHardenTask, operatorsTask, kerbEncTask, delegTrustTask, Task.WhenAll(splitTasks));
         }
         finally
         {
@@ -304,7 +324,7 @@ public partial class AdScanner
                 Objects         = sidHistoryAccounts.Select(AffectedObject.FromUser).ToList()
             });
 
-        foreach (var t in new[] { hiddenPgTask, adminHardenTask, operatorsTask, domainBasicsTask, kerbEncTask, delegTrustTask, remainingTask })
+        foreach (var t in new[] { hiddenPgTask, adminHardenTask, operatorsTask, kerbEncTask, delegTrustTask }.Concat(splitTasks))
             findings.AddRange(t.Result);
 
         // ── Raw score: model v2 without exceptions (ADR 0002). The dashboard recomputes the

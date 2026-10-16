@@ -87,7 +87,7 @@ public class ReadOnlyGuardTests
         return line;
     }
 
-    private static string FindDesktopSourceDir()
+    internal static string FindDesktopSourceDir()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
