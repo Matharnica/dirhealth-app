@@ -403,4 +403,36 @@ public class Sprint17Tests : IDisposable
         vm.HideExceptions = false;
         Assert.Equal(2, vm.ObjectsTable.FilteredRows.Count);
     }
+
+    // Follow-up 2026-10-16: dashboard score texts (S17-4 breakdown, S19 notice, upper-bound note)
+    [Fact]
+    public void Dashboard_Breakdown_OnlyGains_LargestFirst()
+    {
+        var r = Score([Finding("InactiveUsers", Users(30)), Finding("AsRepRoasting", Users(5))]);
+        var b = DashboardViewModel.BreakdownOf(r);
+        Assert.Equal(2, b.Count);
+        Assert.All(b, x => Assert.True(x.PointsIfFixed > 0));
+        Assert.True(b[0].PointsIfFixed >= b[1].PointsIfFixed);
+        Assert.Equal(100 - r.Score, b.Sum(x => x.PointsIfFixed));
+        Assert.Empty(DashboardViewModel.BreakdownOf(null));
+    }
+
+    [Fact]
+    public void Dashboard_ModelNotice_OnlyRightAfterAFormulaChange()
+    {
+        var t = DateTime.UtcNow;
+        Assert.Equal("", DashboardViewModel.ModelNoticeFor([new ScoreEntry(t, 80, 3)]));
+        Assert.Contains("scores differently", DashboardViewModel.ModelNoticeFor([new ScoreEntry(t, 80, 3), new ScoreEntry(t, 60, ScoreModel.FormulaVersion)]));
+        Assert.Equal("", DashboardViewModel.ModelNoticeFor([new ScoreEntry(t, 80, 3), new ScoreEntry(t, 60, 4), new ScoreEntry(t, 61, 4)]));
+    }
+
+    [Fact]
+    public void Dashboard_ScoreNote_ExplainsOldCacheUpperBoundAndUnavailable()
+    {
+        Assert.Equal("", DashboardViewModel.NoteFor(null, "Never"));
+        Assert.StartsWith("Score from an older DirHealth version", DashboardViewModel.NoteFor(null, "16.10.2026 10:00:00"));
+        var upper = Score([Finding("InactiveUsers", Users(3))], [new CheckResult("AsRepRoasting", "DH-KRB-002", CheckStatus.Failed, "timeout", 0)]);
+        Assert.StartsWith("Upper bound", DashboardViewModel.NoteFor(upper, "x"));
+        Assert.Equal("", DashboardViewModel.NoteFor(Score([]), "x"));
+    }
 }
