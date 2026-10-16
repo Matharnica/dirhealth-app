@@ -315,7 +315,7 @@
                                        Text="2.  Click Run Scan — DirHealth reads your Active Directory read-only via LDAP." />
                             <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextWrapping="Wrap"
-                                       Text="3.  Review findings, acknowledge known issues and export reports." />
+                                       Text="3.  Review findings, add exceptions for accepted risks and export reports." />
                         </StackPanel>
                     </Border>
 

@@ -37,6 +37,8 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 
 ## What it checks
 
+50 read-only checks. A check that cannot run is shown as **Failed** — never as passed.
+
 | Category | What DirHealth finds |
 |---|---|
 | 👤 Stale User Accounts | Accounts with no login for 90+ days |
@@ -54,6 +56,11 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 📅 Timeline | All AD objects created or modified in the last 7 / 30 / 90 days |
 | 📜 GPO Browser | Every Group Policy Object with its link status — orphaned (unlinked) and disabled GPOs flagged |
 | 📋 AD Data Quality | Completeness of user master data (email, phone, department, title, manager, office) |
+| 🧱 Tier 0 & Admin Hardening | Non-standard primary groups; Tier 0 accounts not protected from delegation, Kerberoastable, without pre-auth, with an old password or a mailbox; members in Account/Server/Print/Backup Operators |
+| 🏰 Domain Basics | krbtgt password older than 180 days, Guest enabled, MachineAccountQuota > 0, Pre-Windows 2000 Compatible Access, Recycle Bin off, functional level below 2016, fewer than two DCs |
+| 🔐 Kerberos Encryption | DES-only accounts, service accounts without AES, reversible password encryption, `userPassword` set (presence only — the value is never read) |
+| 🤝 Delegation & Trusts | Delegation to DCs/krbtgt or to services that no longer exist; trusts without SID filtering, with TGT delegation, or inactive |
+| 🗝️ LAPS & Machine Accounts | LAPS not deployed or computers without LAPS, machine passwords that stopped rotating, replication-conflict/duplicate objects, anonymous LDAP and AdminSDHolder exclusions in dSHeuristics, smart-card accounts with an unrotated password |
 
 Every finding reduces your **Hygiene Score (0–100, higher is better)** — exploitable issues weigh more than hygiene, and each finding shows how many points fixing it is worth. Each finding ships a plain-language explanation, a **copyable PowerShell fix with an undo command** (DirHealth never runs it — it only reads AD), and its affected objects. Document accepted risks as **per-object exceptions** with a reason and an expiry date.
 

@@ -88,7 +88,7 @@ public static class WellKnownGroups
     ];
 
     // Tier 0 by SID (S15-4): domain-relative RIDs in any domain, plus BUILTIN operators.
-    // DnsAdmins (no fixed RID) and Cert Publishers follow in S19-1.
+    // Cert Publishers (517) added in S19-1; DnsAdmins has no fixed RID and is matched by name in Tier0, not here.
     private static readonly HashSet<int> Tier0DomainRids =
         [DomainAdminsRid, SchemaAdminsRid, EnterpriseAdminsRid, KeyAdminsRid, EnterpriseKeyAdminsRid, CertPublishersRid];
 
