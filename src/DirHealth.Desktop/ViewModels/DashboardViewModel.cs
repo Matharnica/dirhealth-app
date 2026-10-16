@@ -34,6 +34,29 @@ public partial class DashboardViewModel : BaseViewModel
     [ObservableProperty] private ScanDiff? _lastDiff;
     [ObservableProperty] private bool _hasDiff;
 
+    /// <summary>Status of every check in the last scan (S16-4).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CheckSummary), nameof(FailedChecks), nameof(HasFailedChecks), nameof(FailedChecksNote))]
+    private List<CheckResult> _checks = [];
+
+    public List<CheckResult> FailedChecks => Checks.Where(c => c.Status == CheckStatus.Failed).ToList();
+    public bool HasFailedChecks => FailedChecks.Count > 0;
+
+    /// <summary>"16 passed · 3 found · 1 failed · 0 not applicable" — empty before the first S16 scan.</summary>
+    public string CheckSummary => Checks.Count == 0 ? "" : Summarize(Checks);
+
+    /// <summary>Honest note while the score model (S17) cannot yet exclude failed checks.</summary>
+    public string FailedChecksNote => HasFailedChecks
+        ? $"{FailedChecks.Count} check(s) could not run — they found nothing because they did not look. The score may be too high until they run."
+        : "";
+
+    public static string Summarize(IEnumerable<CheckResult> checks)
+    {
+        var list = checks.ToList();
+        int N(CheckStatus s) => list.Count(c => c.Status == s);
+        return $"{N(CheckStatus.Passed)} passed · {N(CheckStatus.Found)} found · {N(CheckStatus.Failed)} failed · {N(CheckStatus.NotApplicable)} not applicable";
+    }
+
     public Action<string>?    NavigateToCategory { get; set; }
     public Action<AdFinding>? NavigateToFinding  { get; set; }
     public IReadOnlyList<ScoreEntry> ScoreHistory => _historyStore.Entries;
@@ -89,6 +112,7 @@ public partial class DashboardViewModel : BaseViewModel
         PasswordIssuesCount = cache.PasswordIssuesCount;
         GroupIssuesCount    = cache.GroupIssuesCount;
         LastScanTime        = cache.LastScanTime;
+        Checks              = cache.Checks ?? [];
         StatusMessage       = $"Last scan: {cache.LastScanTime} — {cache.FindingsCount} finding(s)";
     }
 
@@ -110,13 +134,16 @@ public partial class DashboardViewModel : BaseViewModel
             var result          = await _scanner.RunCompleteScanAsync();
             Findings            = result.Findings;
             ComplianceScore     = result.Score;
+            Checks              = result.Checks;
             FindingsCount       = Findings.Count;
             InactiveUsersCount  = Findings.FirstOrDefault(f => f.Category == "InactiveUsers")?.Count ?? 0;
             PasswordIssuesCount = Findings.Where(f => f.Category is "PasswordNeverExpires" or "ExpiredPasswords").Sum(f => f.Count);
             GroupIssuesCount    = Findings.Where(f => f.Category is "EmptyGroups" or "SingleMemberGroups").Sum(f => f.Count);
             LastScanTime        = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss");
             ConnectedDomain     = _scanner.DomainName;
-            StatusMessage       = $"Scan complete — {FindingsCount} finding(s)";
+            StatusMessage       = HasFailedChecks
+                ? $"Scan complete — {FindingsCount} finding(s), {FailedChecks.Count} check(s) failed"
+                : $"Scan complete — {FindingsCount} finding(s)";
 
             _cachedInactiveUsers     = result.InactiveUsers;
             _cachedExpiringPasswords = result.ExpiringPasswords;
@@ -131,7 +158,8 @@ public partial class DashboardViewModel : BaseViewModel
                 InactiveUsersCount  = InactiveUsersCount,
                 PasswordIssuesCount = PasswordIssuesCount,
                 GroupIssuesCount    = GroupIssuesCount,
-                LastScanTime        = LastScanTime
+                LastScanTime        = LastScanTime,
+                Checks              = Checks,
             };
 
             if (previousCache != null)

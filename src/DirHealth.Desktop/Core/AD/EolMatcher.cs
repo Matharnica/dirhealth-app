@@ -29,6 +29,12 @@ public static class EolMatcher
     // "end-of-life" on a supported system; telling them apart needs operatingSystemVersion.
     private static readonly string[] LongTermServicingMarkers = ["LTSC", "LTSB"];
 
+    /// <summary>The matched OS substrings (S16-3: the fix block lists the same systems).</summary>
+    public static IEnumerable<string> Substrings => EolTable.Select(e => e.Substring);
+
+    /// <summary>Markers that exempt a Windows 10 string (see LongTermServicingMarkers).</summary>
+    public static IEnumerable<string> Windows10Exemptions => LongTermServicingMarkers;
+
     public static bool TryGetEolDate(string os, out DateTime eolDate)
     {
         eolDate = default;

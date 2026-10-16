@@ -14,6 +14,8 @@ public class ScanCache
     public int  InactiveUsersCount        { get; set; }
     public int  PasswordIssuesCount       { get; set; }
     public int  GroupIssuesCount          { get; set; }
+    /// <summary>Per-check status of the scan (S16-4). Absent in caches written before S16 → empty.</summary>
+    public List<DirHealth.Desktop.Core.AD.CheckResult> Checks { get; set; } = [];
 }
 
 public class ScanCacheStore

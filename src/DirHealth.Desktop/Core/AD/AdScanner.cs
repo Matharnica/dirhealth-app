@@ -22,15 +22,21 @@ public partial class AdScanner
     public ExportContext GetExportContext() => _connector.GetExportContext();
 
     public record CompleteScanResult(
-        List<AdFinding> Findings,
-        int             Score,
-        List<AdUser>    InactiveUsers,
-        List<AdUser>    ExpiringPasswords,
-        List<string>    DomainAdmins);
+        List<AdFinding>   Findings,
+        int               Score,
+        List<AdUser>      InactiveUsers,
+        List<AdUser>      ExpiringPasswords,
+        List<string>      DomainAdmins,
+        List<CheckResult> Checks);
 
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
-        var scanLog = new ConcurrentBag<ScanLogEntry>();
+        var scanLog       = new ConcurrentBag<ScanLogEntry>();
+        var failures      = new ConcurrentDictionary<string, string>();
+        var notApplicable = new ConcurrentDictionary<string, string>();
+        // S16-4: every sub-query runs guarded — a failure is recorded, not fatal
+        Task<T> Timed<T>(string name, Func<Task<T>> factory, ConcurrentBag<ScanLogEntry> log) =>
+            ScanGuard.Run(name, factory, log, failures, notApplicable);
 
         var totalUsersTask     = Timed("TotalUsers",     () => Task.Run(() => CountObjects("(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))")), scanLog);
         var totalGroupsTask    = Timed("TotalGroups",    () => Task.Run(() => CountObjects("(objectClass=group)")), scanLog);
@@ -106,7 +112,7 @@ public partial class AdScanner
                 Description     = "User accounts with no logon activity in the last 90 days.",
                 Severity        = inactiveUsers.Count > 20 ? FindingSeverity.High : FindingSeverity.Medium,
                 Count           = inactiveUsers.Count,
-                AffectedObjects = inactiveUsers.Select(u => u.SamAccountName).ToList()
+                Objects         = inactiveUsers.Select(AffectedObject.FromUser).ToList()
             });
 
         if (neverExpires.Count > 0)
@@ -117,7 +123,7 @@ public partial class AdScanner
                 Description     = "User accounts configured with passwords that never expire.",
                 Severity        = FindingSeverity.Medium,
                 Count           = neverExpires.Count,
-                AffectedObjects = neverExpires.Select(u => u.SamAccountName).ToList()
+                Objects         = neverExpires.Select(AffectedObject.FromUser).ToList()
             });
 
         if (expiredPwd.Count > 0)
@@ -128,7 +134,7 @@ public partial class AdScanner
                 Description     = "User accounts whose passwords have not been changed in over 365 days.",
                 Severity        = expiredPwd.Count > 10 ? FindingSeverity.High : FindingSeverity.Medium,
                 Count           = expiredPwd.Count,
-                AffectedObjects = expiredPwd.Select(u => u.SamAccountName).ToList()
+                Objects         = expiredPwd.Select(AffectedObject.FromUser).ToList()
             });
 
         if (emptyGroups.Count > 0)
@@ -139,7 +145,7 @@ public partial class AdScanner
                 Description     = "Security groups with no members.",
                 Severity        = FindingSeverity.Low,
                 Count           = emptyGroups.Count,
-                AffectedObjects = emptyGroups.Select(g => g.Name).ToList()
+                Objects         = emptyGroups.Select(AffectedObject.FromGroup).ToList()
             });
 
         if (singleMember.Count > 0)
@@ -150,7 +156,7 @@ public partial class AdScanner
                 Description     = "Security groups with only one member — may indicate unnecessary groups.",
                 Severity        = FindingSeverity.Low,
                 Count           = singleMember.Count,
-                AffectedObjects = singleMember.Select(g => g.Name).ToList()
+                Objects         = singleMember.Select(AffectedObject.FromGroup).ToList()
             });
 
         if (inactiveComps.Count > 0)
@@ -161,7 +167,7 @@ public partial class AdScanner
                 Description     = "Computer accounts with no activity in the last 90 days.",
                 Severity        = FindingSeverity.Low,
                 Count           = inactiveComps.Count,
-                AffectedObjects = inactiveComps.Select(c => c.Name).ToList()
+                Objects         = inactiveComps.Select(c => AffectedObject.FromComputer(c)).ToList()
             });
 
         if (noOs.Count > 0)
@@ -172,7 +178,7 @@ public partial class AdScanner
                 Description     = "Computer accounts with no operating system attribute set.",
                 Severity        = FindingSeverity.Low,
                 Count           = noOs.Count,
-                AffectedObjects = noOs.Select(c => c.Name).ToList()
+                Objects         = noOs.Select(c => AffectedObject.FromComputer(c)).ToList()
             });
 
         if (kerberoastable.Count > 0)
@@ -183,7 +189,7 @@ public partial class AdScanner
                 Description     = "Enabled user accounts with a Service Principal Name (SPN) set. Their password hashes can be extracted and cracked offline.",
                 Severity        = kerberoastable.Count > 3 ? FindingSeverity.High : FindingSeverity.Medium,
                 Count           = kerberoastable.Count,
-                AffectedObjects = kerberoastable.Select(u => u.SamAccountName).ToList()
+                Objects         = kerberoastable.Select(AffectedObject.FromUser).ToList()
             });
 
         if (adminSdHolder.Count > 0)
@@ -194,7 +200,7 @@ public partial class AdScanner
                 Description     = "These accounts have AdminCount=1, indicating current or past elevated privileges. Review to ensure all are expected and necessary.",
                 Severity        = FindingSeverity.Medium,
                 Count           = adminSdHolder.Count,
-                AffectedObjects = adminSdHolder.Select(u => u.SamAccountName).ToList()
+                Objects         = adminSdHolder.Select(AffectedObject.FromUser).ToList()
             });
 
         findings.AddRange(policyFindings);
@@ -205,9 +211,8 @@ public partial class AdScanner
             var sev      = dcEol.Count > 0 ? FindingSeverity.High : FindingSeverity.Medium;
             var affected = eolComputers
                 .OrderByDescending(c => c.IsDomainController)
-                .Select(c => c.IsDomainController
-                    ? $"[DC] {c.Name} — {c.OperatingSystem}"
-                    : $"{c.Name} — {c.OperatingSystem}")
+                .Select(c => AffectedObject.FromComputer(c,
+                    c.IsDomainController ? $"[DC] {c.OperatingSystem}" : c.OperatingSystem))
                 .ToList();
             findings.Add(new AdFinding
             {
@@ -217,7 +222,7 @@ public partial class AdScanner
                                   (dcEol.Count > 0 ? $" {dcEol.Count} domain controller(s) are affected — critical risk." : ""),
                 Severity        = sev,
                 Count           = eolComputers.Count,
-                AffectedObjects = affected,
+                Objects         = affected,
             });
         }
 
@@ -229,7 +234,7 @@ public partial class AdScanner
                 Description     = "These accounts have Kerberos Pre-Authentication disabled (DONT_REQUIRE_PREAUTH). An attacker can request an encrypted AS-REP ticket without any credentials and crack it offline.",
                 Severity        = FindingSeverity.High,
                 Count           = asRepRoastable.Count,
-                AffectedObjects = asRepRoastable.Select(u => u.SamAccountName).ToList()
+                Objects         = asRepRoastable.Select(AffectedObject.FromUser).ToList()
             });
 
         if (undelComputers.Count > 0)
@@ -240,7 +245,7 @@ public partial class AdScanner
                 Description     = "These non-DC computers are trusted for unconstrained Kerberos delegation. An attacker who compromises one can capture TGTs of any user authenticating to it — including Domain Admins.",
                 Severity        = FindingSeverity.Critical,
                 Count           = undelComputers.Count,
-                AffectedObjects = undelComputers.Select(c => c.Name).ToList()
+                Objects         = undelComputers.Select(c => AffectedObject.FromComputer(c)).ToList()
             });
 
         if (undelUsers.Count > 0)
@@ -251,7 +256,7 @@ public partial class AdScanner
                 Description     = "These user accounts are trusted for unconstrained Kerberos delegation. They can impersonate any user against any service in the domain.",
                 Severity        = FindingSeverity.High,
                 Count           = undelUsers.Count,
-                AffectedObjects = undelUsers.Select(u => u.SamAccountName).ToList()
+                Objects         = undelUsers.Select(AffectedObject.FromUser).ToList()
             });
 
         if (passwdNotRequired.Count > 0)
@@ -262,7 +267,7 @@ public partial class AdScanner
                 Description     = "These accounts have the PASSWD_NOTREQD flag set, allowing an empty password. Active Directory will not enforce a password for these accounts.",
                 Severity        = FindingSeverity.High,
                 Count           = passwdNotRequired.Count,
-                AffectedObjects = passwdNotRequired.Select(u => u.SamAccountName).ToList()
+                Objects         = passwdNotRequired.Select(AffectedObject.FromUser).ToList()
             });
 
         if (staleDomainAdmins.Count > 0)
@@ -273,7 +278,7 @@ public partial class AdScanner
                 Description     = "Domain Admin accounts with no logon activity in the last 30 days. Dormant admin accounts are rarely monitored and passwords are rarely rotated.",
                 Severity        = FindingSeverity.High,
                 Count           = staleDomainAdmins.Count,
-                AffectedObjects = staleDomainAdmins.Select(u => u.SamAccountName).ToList()
+                Objects         = staleDomainAdmins.Select(AffectedObject.FromUser).ToList()
             });
 
         findings.AddRange(fgppFindings);
@@ -286,7 +291,7 @@ public partial class AdScanner
                 Description     = "These accounts retain SIDs from previous AD migrations. Windows honours historical SIDs silently during access checks — a migrated account may carry elevated privileges from its old domain without appearing in any privileged group.",
                 Severity        = sidHistoryAccounts.Count > 5 ? FindingSeverity.High : FindingSeverity.Medium,
                 Count           = sidHistoryAccounts.Count,
-                AffectedObjects = sidHistoryAccounts.Select(u => u.SamAccountName).ToList()
+                Objects         = sidHistoryAccounts.Select(AffectedObject.FromUser).ToList()
             });
 
         // ── Compute score (all arithmetic lives in ScoreCalculator — pure & tested) ──
@@ -326,45 +331,17 @@ public partial class AdScanner
 
         var domainAdmins = domainAdminsTask.Result?.Members?.Select(m => m.Name).ToList() ?? [];
 
-        return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins);
+        var checks = ScanGuard.Evaluate(FindingCatalog.All, findings, failures, notApplicable);
+        return new CompleteScanResult(findings, score, inactiveUsers, expiringPasswords, domainAdmins, checks);
     }
 
-    // Wraps a sub-query so RunCompleteScanAsync can log its name, duration, result count and any error.
-    // Preserves behaviour: exceptions still propagate (they are only recorded on the way out).
-    private static async Task<T> Timed<T>(string name, Func<Task<T>> factory, ConcurrentBag<ScanLogEntry> log)
-    {
-        var sw = Stopwatch.StartNew();
-        try
-        {
-            var result = await factory();
-            sw.Stop();
-            log.Add(new ScanLogEntry(name, sw.ElapsedMilliseconds, CountOf(result), null));
-            return result;
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            log.Add(new ScanLogEntry(name, sw.ElapsedMilliseconds, 0, ex.Message));
-            throw;
-        }
-    }
-
-    private static int CountOf(object? result) => result switch
-    {
-        System.Collections.ICollection c => c.Count,
-        int i                            => i,
-        _                                => -1,
-    };
-
-    public async Task<List<AdUser>> GetInactiveUsersAsync(int daysThreshold = 90)
+    public async Task<List<AdUser>> GetInactiveUsersAsync(int daysThreshold = CheckFilters.InactiveUserDays)
     {
         return await Task.Run(() =>
         {
             var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
             var cutoffFileTime = cutoff.ToFileTimeUtc();
-            var filter = $"(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
-            return QueryUsers(filter);
+            return QueryUsers(CheckFilters.InactiveUsers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         });
     }
 
@@ -373,20 +350,17 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             // userAccountControl bit 65536 = DONT_EXPIRE_PASSWORD
-            var filter = "(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(userAccountControl:1.2.840.113556.1.4.803:=65536))";
-            return QueryUsers(filter);
+            return QueryUsers(CheckFilters.PasswordNeverExpires);
         });
     }
 
-    public async Task<List<AdUser>> GetExpiredPasswordUsersAsync(int daysThreshold = 365)
+    public async Task<List<AdUser>> GetExpiredPasswordUsersAsync(int daysThreshold = CheckFilters.OldPasswordDays)
     {
         return await Task.Run(() =>
         {
             var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
             var cutoffFileTime = cutoff.ToFileTimeUtc();
-            var filter = $"(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         $"(pwdLastSet<={cutoffFileTime})(pwdLastSet>=1))";
-            return QueryUsers(filter);
+            return QueryUsers(CheckFilters.ExpiredPasswords(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         });
     }
 
@@ -394,8 +368,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var filter = "(&(objectClass=group)(!(member=*)))";
-            return QueryGroups(filter);
+            return QueryGroups(CheckFilters.EmptyGroups);
         });
     }
 
@@ -403,20 +376,18 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var groups = QueryGroups("(objectClass=group)");
+            var groups = QueryGroups(CheckFilters.AllGroups);
             return groups.Where(g => g.MemberCount == 1).ToList();
         });
     }
 
-    public async Task<List<AdComputer>> GetInactiveComputersAsync(int daysThreshold = 90)
+    public async Task<List<AdComputer>> GetInactiveComputersAsync(int daysThreshold = CheckFilters.InactiveComputerDays)
     {
         return await Task.Run(() =>
         {
             var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
             var cutoffFileTime = cutoff.ToFileTimeUtc();
-            var filter = $"(&(objectClass=computer)(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                         $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
-            return QueryComputers(filter);
+            return QueryComputers(CheckFilters.InactiveComputers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         });
     }
 
@@ -424,7 +395,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var computers = QueryComputers("(&(objectClass=computer)(operatingSystem=*))");
+            var computers = QueryComputers(CheckFilters.ComputersWithOs);
             var eol = new List<AdComputer>();
             foreach (var c in computers)
             {
@@ -570,8 +541,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var filter = "(&(objectClass=computer)(!(operatingSystem=*)))";
-            return QueryComputers(filter);
+            return QueryComputers(CheckFilters.ComputersWithoutOs);
         });
     }
 
@@ -720,27 +690,20 @@ public partial class AdScanner
         value.Replace("\\", "\\5c").Replace("*", "\\2a")
              .Replace("(", "\\28").Replace(")", "\\29").Replace("\0", "\\00");
 
-    public async Task<List<AdUser>> GetStaleDomainAdminsAsync(int daysThreshold = 30)
+    public async Task<List<AdUser>> GetStaleDomainAdminsAsync(int daysThreshold = CheckFilters.StaleAdminDays)
     {
         return await Task.Run(() =>
         {
-            try
-            {
-                using var root = _connector.GetRootEntry();
-                // By SID, not by name — the group is localized on non-English domains (S13-1)
-                var da = _connector.ResolveGroup(root, WellKnownGroups.DomainAdmins);
-                if (!da.Found) return [];
+            using var root = _connector.GetRootEntry();
+            // By SID, not by name — the group is localized on non-English domains (S13-1)
+            var da = _connector.ResolveGroup(root, WellKnownGroups.DomainAdmins);
+            // S16-4: "group not found" is a failed check, not an empty (= passed) result
+            if (!da.Found)
+                throw new InvalidOperationException($"Domain Admins group not found: {da.Error}");
 
-                var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
-                var escaped        = EscapeDn(da.DistinguishedName!);
-                // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512
-                var filter         = $"(&(objectClass=user)(objectCategory=person)" +
-                                     $"(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                                     WellKnownGroups.MembershipClause(escaped, WellKnownGroups.DomainAdminsRid) +
-                                     $"(|(lastLogonTimestamp<={cutoffFileTime})(!(lastLogonTimestamp=*))))";
-                return QueryUsers(filter);
-            }
-            catch { return []; }
+            var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
+            // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512
+            return QueryUsers(CheckFilters.StaleDomainAdmins(EscapeDn(da.DistinguishedName!), cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         });
     }
 
@@ -775,6 +738,9 @@ public partial class AdScanner
                     "msDS-PasswordReversibleEncryptionEnabled",
                 });
                 using var results = searcher.FindAll();
+                // S16-4: no PSO at all → nothing to check (not "passed")
+                if (results.Count == 0)
+                    throw new CheckNotApplicableException("No fine-grained password policies are defined.");
 
                 foreach (SearchResult pso in results)
                 {
@@ -793,7 +759,7 @@ public partial class AdScanner
                             Description     = "This Password Settings Object stores passwords using reversible encryption — equivalent to plaintext storage.",
                             Severity        = FindingSeverity.High,
                             Count           = 1,
-                            AffectedObjects = [name],
+                            Objects         = [new AffectedObject { Name = name, Type = AffectedObjectType.PasswordPolicy }],
                         });
 
                     if (minLen >= 0 && minLen < 8)
@@ -804,7 +770,7 @@ public partial class AdScanner
                             Description     = "This PSO requires fewer than 8 characters — weaker than the domain default policy.",
                             Severity        = FindingSeverity.High,
                             Count           = 1,
-                            AffectedObjects = [name],
+                            Objects         = [new AffectedObject { Name = name, Type = AffectedObjectType.PasswordPolicy }],
                         });
                     else if (minLen >= 8 && minLen < 12)
                         findings.Add(new AdFinding
@@ -814,7 +780,7 @@ public partial class AdScanner
                             Description     = "This PSO requires fewer than 12 characters.",
                             Severity        = FindingSeverity.Medium,
                             Count           = 1,
-                            AffectedObjects = [name],
+                            Objects         = [new AffectedObject { Name = name, Type = AffectedObjectType.PasswordPolicy }],
                         });
 
                     if (lockout == 0)
@@ -825,11 +791,16 @@ public partial class AdScanner
                             Description     = "This PSO does not configure account lockout, leaving accounts vulnerable to brute-force attacks.",
                             Severity        = FindingSeverity.High,
                             Count           = 1,
-                            AffectedObjects = [name],
+                            Objects         = [new AffectedObject { Name = name, Type = AffectedObjectType.PasswordPolicy }],
                         });
                 }
             }
-            catch { }
+            // Container absent (domain functional level below 2008) → check does not apply.
+            // Every other error propagates and shows as "Failed" (S16-4).
+            catch (System.DirectoryServices.DirectoryServicesCOMException ex) when (ex.ErrorCode == unchecked((int)0x80072030))
+            {
+                throw new CheckNotApplicableException("Password Settings Container not found (domain functional level below 2008).");
+            }
             return findings;
         });
     }
@@ -916,58 +887,55 @@ public partial class AdScanner
         return await Task.Run(() =>
         {
             var findings = new List<AdFinding>();
-            try
-            {
-                using var root = _connector.GetRootEntry();
+            // S16-4: errors propagate → "Failed", never a silent pass
+            using var root = _connector.GetRootEntry();
 
-                int minPwdLength      = GetRootInt(root, "minPwdLength");
-                int pwdHistoryLength  = GetRootInt(root, "pwdHistoryLength");
-                int lockoutThreshold  = GetRootInt(root, "lockoutThreshold");
+            int minPwdLength      = GetRootInt(root, "minPwdLength");
+            int pwdHistoryLength  = GetRootInt(root, "pwdHistoryLength");
+            int lockoutThreshold  = GetRootInt(root, "lockoutThreshold");
 
-                if (minPwdLength < 8)
-                    findings.Add(new AdFinding
-                    {
-                        Category        = "WeakPasswordLength",
-                        Title           = $"Weak Minimum Password Length ({minPwdLength} characters)",
-                        Description     = "Domain policy requires fewer than 8 characters. Recommended minimum is 12.",
-                        Severity        = FindingSeverity.High,
-                        Count           = 1,
-                        AffectedObjects = [$"minPwdLength = {minPwdLength}"]
-                    });
-                else if (minPwdLength < 12)
-                    findings.Add(new AdFinding
-                    {
-                        Category        = "WeakPasswordLength",
-                        Title           = $"Low Minimum Password Length ({minPwdLength} characters)",
-                        Description     = "Domain policy requires fewer than 12 characters. Recommended minimum is 12.",
-                        Severity        = FindingSeverity.Medium,
-                        Count           = 1,
-                        AffectedObjects = [$"minPwdLength = {minPwdLength}"]
-                    });
+            if (minPwdLength < 8)
+                findings.Add(new AdFinding
+                {
+                    Category        = "WeakPasswordLength",
+                    Title           = $"Weak Minimum Password Length ({minPwdLength} characters)",
+                    Description     = "Domain policy requires fewer than 8 characters. Recommended minimum is 12.",
+                    Severity        = FindingSeverity.High,
+                    Count           = 1,
+                    Objects         = [new AffectedObject { Name = $"minPwdLength = {minPwdLength}", Type = AffectedObjectType.DomainSetting }]
+                });
+            else if (minPwdLength < 12)
+                findings.Add(new AdFinding
+                {
+                    Category        = "WeakPasswordLength",
+                    Title           = $"Low Minimum Password Length ({minPwdLength} characters)",
+                    Description     = "Domain policy requires fewer than 12 characters. Recommended minimum is 12.",
+                    Severity        = FindingSeverity.Medium,
+                    Count           = 1,
+                    Objects         = [new AffectedObject { Name = $"minPwdLength = {minPwdLength}", Type = AffectedObjectType.DomainSetting }]
+                });
 
-                if (pwdHistoryLength < 5)
-                    findings.Add(new AdFinding
-                    {
-                        Category        = "WeakPasswordHistory",
-                        Title           = $"Insufficient Password History ({pwdHistoryLength} remembered)",
-                        Description     = "Password history is too short, allowing frequent reuse. Recommended: 10 or more.",
-                        Severity        = FindingSeverity.Medium,
-                        Count           = 1,
-                        AffectedObjects = [$"pwdHistoryLength = {pwdHistoryLength}"]
-                    });
+            if (pwdHistoryLength < 5)
+                findings.Add(new AdFinding
+                {
+                    Category        = "WeakPasswordHistory",
+                    Title           = $"Insufficient Password History ({pwdHistoryLength} remembered)",
+                    Description     = "Password history is too short, allowing frequent reuse. Recommended: 10 or more.",
+                    Severity        = FindingSeverity.Medium,
+                    Count           = 1,
+                    Objects         = [new AffectedObject { Name = $"pwdHistoryLength = {pwdHistoryLength}", Type = AffectedObjectType.DomainSetting }]
+                });
 
-                if (lockoutThreshold == 0)
-                    findings.Add(new AdFinding
-                    {
-                        Category        = "NoAccountLockout",
-                        Title           = "Account Lockout Not Configured",
-                        Description     = "No lockout threshold is set. Accounts are vulnerable to brute-force password attacks.",
-                        Severity        = FindingSeverity.High,
-                        Count           = 1,
-                        AffectedObjects = ["lockoutThreshold = 0 (disabled)"]
-                    });
-            }
-            catch { }
+            if (lockoutThreshold == 0)
+                findings.Add(new AdFinding
+                {
+                    Category        = "NoAccountLockout",
+                    Title           = "Account Lockout Not Configured",
+                    Description     = "No lockout threshold is set. Accounts are vulnerable to brute-force password attacks.",
+                    Severity        = FindingSeverity.High,
+                    Count           = 1,
+                    Objects         = [new AffectedObject { Name = "lockoutThreshold = 0 (disabled)", Type = AffectedObjectType.DomainSetting }]
+                });
             return findings;
         });
     }
