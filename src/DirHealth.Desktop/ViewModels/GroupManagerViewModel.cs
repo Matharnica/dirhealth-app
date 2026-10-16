@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
-using System.Collections.ObjectModel;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -14,7 +14,15 @@ public partial class GroupManagerViewModel : ListBrowserViewModel
     [ObservableProperty] private string        _filterText = "";
     [ObservableProperty] private AdGroupDetail? _selectedGroup;
 
-    public ObservableCollection<AdGroup> Groups { get; } = new();
+    /// <summary>Group list (S14-2).</summary>
+    public TableViewModel<AdGroup> Table { get; } = new("Groups", ViewColumns.Groups) { Dn = g => g.DistinguishedName };
+
+    /// <summary>Members of the selected group (S14-2).</summary>
+    public TableViewModel<AdGroupMember> MembersTable { get; } = new("Group Members", ViewColumns.GroupMembers)
+    {
+        Dn  = m => m.DistinguishedName,
+        Sam = m => m.SamAccountName,
+    };
     private List<AdGroup> _allGroups = new();
     private DateTime _lastLoaded = DateTime.MinValue;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
@@ -22,7 +30,20 @@ public partial class GroupManagerViewModel : ListBrowserViewModel
     protected override bool IsEmpty => _allGroups.Count == 0;
     public override string EmptyMessage => "No groups found.";
 
-    public GroupManagerViewModel(AdScanner scanner) { _scanner = scanner; }
+    public GroupManagerViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        Table.FilterDescription = () => $"text='{FilterText}'";
+        if (scanner is not null)
+        {
+            Table.ContextProvider        = scanner.GetExportContext;
+            MembersTable.ContextProvider = scanner.GetExportContext;
+        }
+        MembersTable.FilterDescription = () => $"group={SelectedGroup?.Name}";
+        Table.SelectionChanged += row => { if (row is AdGroup g) _ = SelectGroupAsync(g); };
+    }
+
+    partial void OnSelectedGroupChanged(AdGroupDetail? value) => MembersTable.SetRows(value?.Members ?? []);
 
     [RelayCommand]
     public async Task LoadAsync()
@@ -33,12 +54,13 @@ public partial class GroupManagerViewModel : ListBrowserViewModel
             return;
         }
         BeginLoad();
-        Groups.Clear();
+        Table.Clear();
         _allGroups.Clear();
         try
         {
             _allGroups  = await _scanner.GetAllGroupsWithCountAsync();
             _lastLoaded = DateTime.Now;
+            Table.SetRows(_allGroups);
             ApplyFilter();
             EndLoad();
         }
@@ -49,15 +71,10 @@ public partial class GroupManagerViewModel : ListBrowserViewModel
 
     private void ApplyFilter()
     {
-        Groups.Clear();
         var q = FilterText.Trim();
-        foreach (var g in _allGroups)
-        {
-            if (string.IsNullOrEmpty(q) ||
-                g.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                g.Description.Contains(q, StringComparison.OrdinalIgnoreCase))
-                Groups.Add(g);
-        }
+        Table.SetFilter(string.IsNullOrEmpty(q) ? null : g =>
+            g.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            g.Description.Contains(q, StringComparison.OrdinalIgnoreCase));
     }
 
     [RelayCommand]

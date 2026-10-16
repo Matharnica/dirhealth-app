@@ -5,11 +5,11 @@
              xmlns:shared="clr-namespace:DirHealth.Desktop.Views.Shared">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" MinWidth="420" />
+            <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left: Computer list -->
+        <!-- Left: Computer table (S14-2) -->
         <Border Grid.Column="0"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
@@ -29,31 +29,11 @@
                      Foreground="{DynamicResource TextPrimaryBrush}"
                      BorderBrush="{DynamicResource InputBorderBrush}"
                      Padding="8,6" Margin="0,0,0,8"
-                     x:Name="FilterBox" />
+                     x:Name="FilterBox" AutomationProperties.Name="Filter computers" />
             <ProgressBar Grid.Row="2" Height="2" IsIndeterminate="True" Margin="0,0,0,4"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
             <Grid Grid.Row="3">
-                <ListBox x:Name="ComputerList"
-                         ItemsSource="{Binding Computers}"
-                         Background="Transparent" BorderThickness="0"
-                         SelectionMode="Single"
-                         VirtualizingStackPanel.IsVirtualizing="True"
-                         VirtualizingStackPanel.VirtualizationMode="Recycling"
-                         ScrollViewer.IsDeferredScrollingEnabled="True"
-                         SelectionChanged="ComputerList_SelectionChanged">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="4,4">
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding OperatingSystem}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           FontSize="11" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <shared:DataTable DataContext="{Binding Table}" />
                 <!-- Shared empty / error state (S12-1) -->
                 <shared:ListStateOverlay />
             </Grid>
@@ -61,7 +41,7 @@
         </Border>
 
         <!-- Right: Detail panel -->
-        <Border Grid.Column="1" Margin="24,20,24,20"
+        <Border Grid.Column="1" Width="460" Margin="24,20,24,20"
                 Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibility}}">
             <detail:ComputerDetailView DataContext="{Binding Detail}" />
         </Border>

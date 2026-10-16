@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -32,7 +33,16 @@ public partial class GpoBrowserViewModel : BaseViewModel
     public bool ShowPlaceholder => !IsLoading && !HasError && Gpos is null;
     public bool ShowEmptyState  => !IsLoading && !HasError && Gpos is { Count: 0 };
 
-    public GpoBrowserViewModel(AdScanner scanner) { _scanner = scanner; }
+    /// <summary>Shared sortable/exportable table (S14-3); mirrors Gpos.</summary>
+    public TableViewModel<AdGpo> Table { get; } = new("GPOs", ViewColumns.Gpos) { };
+
+    public GpoBrowserViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+    }
+
+    partial void OnGposChanged(List<AdGpo>? value) => Table.SetRows(value ?? []);
 
     [RelayCommand]
     public async Task LoadAsync()

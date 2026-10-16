@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.DirectoryServices;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Storage;
+using DirHealth.Desktop.Core.Export;
 
 namespace DirHealth.Desktop.Core.AD;
 
@@ -16,6 +17,9 @@ public partial class AdScanner
     }
 
     public string DomainName => _connector.Domain ?? Environment.UserDomainName;
+
+    /// <summary>Export metadata context (S14-5).</summary>
+    public ExportContext GetExportContext() => _connector.GetExportContext();
 
     public record CompleteScanResult(
         List<AdFinding> Findings,
@@ -974,12 +978,17 @@ public partial class AdScanner
         using var root     = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
             "sAMAccountName", "displayName", "mail", "lastLogonTimestamp",
-            "pwdLastSet", "userAccountControl", "distinguishedName");
+            "pwdLastSet", "userAccountControl", "distinguishedName",
+            // S14-4: ADRecon-style export + Copy SID
+            "objectSid", "whenCreated", "accountExpires", "department", "title",
+            "manager", "description", "adminCount", "servicePrincipalName",
+            "msDS-AllowedToDelegateTo");
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
         {
             var props = result.Properties;
+            int uac   = (int)GetLong(props, "userAccountControl");
             users.Add(new AdUser
             {
                 SamAccountName      = GetString(props, "sAMAccountName"),
@@ -987,9 +996,22 @@ public partial class AdScanner
                 Email               = GetString(props, "mail"),
                 LastLogon           = GetDateTime(props, "lastLogonTimestamp"),
                 PasswordLastSet     = GetDateTime(props, "pwdLastSet"),
-                PasswordNeverExpires = UacFlags.PasswordNeverExpires((int)GetLong(props, "userAccountControl")),
-                IsEnabled           = UacFlags.IsEnabled((int)GetLong(props, "userAccountControl")),
+                PasswordNeverExpires = UacFlags.PasswordNeverExpires(uac),
+                IsEnabled           = UacFlags.IsEnabled(uac),
                 DistinguishedName   = GetString(props, "distinguishedName"),
+                Sid                 = props["objectSid"].Count > 0 && props["objectSid"][0] is byte[] sid
+                                        ? WellKnownGroups.SidBytesToString(sid) : "",
+                UserAccountControl  = uac,
+                WhenCreated         = props["whenCreated"].Count > 0 && props["whenCreated"][0] is DateTime wc
+                                        ? DateTime.SpecifyKind(wc, DateTimeKind.Utc) : null,
+                AccountExpires      = AdTime.FromAccountExpires(GetLong(props, "accountExpires")),
+                Department          = GetString(props, "department"),
+                Title               = GetString(props, "title"),
+                Manager             = GetString(props, "manager"),
+                Description         = GetString(props, "description"),
+                AdminCount          = GetLong(props, "adminCount") > 0,
+                HasSpn              = props["servicePrincipalName"].Count > 0,
+                Delegation          = AdTime.DelegationKind(uac, props["msDS-AllowedToDelegateTo"].Count > 0),
             });
         }
         return users;

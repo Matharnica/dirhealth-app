@@ -1,4 +1,5 @@
 using System.DirectoryServices;
+using DirHealth.Desktop.Core.Export;
 
 namespace DirHealth.Desktop.Core.AD;
 
@@ -94,6 +95,25 @@ public class AdConnector
         {
             return AdminCheckResult.Failed(ex.Message, WellKnownGroups.DomainAdmins.FallbackName);
         }
+    }
+
+    /// <summary>
+    /// Who/where for export metadata (S14-5): domain, the DC that actually answers this
+    /// connection, and the account used. Read-only bind; failures come back as "unknown".
+    /// </summary>
+    public ExportContext GetExportContext()
+    {
+        string dc;
+        try
+        {
+            using var root = GetRootEntry();
+            dc = root.Options?.GetCurrentServerName() ?? "unknown";
+        }
+        catch { dc = "unknown"; }
+        var user = !string.IsNullOrEmpty(Username)
+            ? Username
+            : System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+        return new ExportContext(Domain ?? Environment.UserDomainName, dc, user);
     }
 
     // ── SID-based group resolution (S13-1) ────────────────────────────────────

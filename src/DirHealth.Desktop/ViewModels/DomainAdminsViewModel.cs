@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -12,7 +13,19 @@ public partial class DomainAdminsViewModel : BaseViewModel
     [ObservableProperty] private bool          _isLoading;
     [ObservableProperty] private AdGroupDetail? _group;
 
-    public DomainAdminsViewModel(AdScanner scanner) { _scanner = scanner; }
+    public TableViewModel<AdGroupMember> Table { get; } = new("Domain Admins", ViewColumns.GroupMembers)
+    {
+        Dn  = m => m.DistinguishedName,
+        Sam = m => m.SamAccountName,
+    };
+
+    public DomainAdminsViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+    }
+
+    partial void OnGroupChanged(AdGroupDetail? value) => Table.SetRows(value?.Members ?? []);
 
     [RelayCommand]
     public async Task LoadAsync()
@@ -22,7 +35,10 @@ public partial class DomainAdminsViewModel : BaseViewModel
         try
         {
             Group         = await _scanner.GetDomainAdminsAsync();
-            StatusMessage = $"{Group.Members.Count} member(s) in Domain Admins";
+            // S13-1: a group that could not be resolved says why instead of "0 members"
+            StatusMessage = string.IsNullOrEmpty(Group.DistinguishedName)
+                ? $"{Group.Name}: {Group.Description}"
+                : $"{Group.Members.Count} member(s) in {Group.Name}";
         }
         catch (Exception ex) { StatusMessage = $"Error: {ex.Message}"; }
         finally { IsLoading = false; }

@@ -14,6 +14,18 @@ All notable changes to DirHealth are documented here.
 - **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
 - **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
+### Added — Sprint 14 (Tables and user export)
+- **Shared data table** (S14-1) — every list is now a sortable table (click a header; arrow shows the direction), the header stays visible while scrolling, a counter shows "37 of 1,204" for the local filter, and an **Export** menu writes "CSV (37 filtered)" in the displayed order or "CSV (all 1,204)". Right-click a row: Copy DN / Copy SID / Copy sAMAccountName.
+- **Rolled out to 11 views** (S14-1/2/3) — Users, Computers, Password Report, Domain Admins, Privileged Groups (one row per membership; empty or missing groups keep a row with a status), Group Manager (groups and members), DC Inventory, Domain Trusts, GPOs, OUs, Recent Changes. Selection and detail panels work as before; Esc closes the detail.
+- **ADRecon-style user export** (S14-4) — "Export users…" writes SamAccountName, DisplayName, Enabled, OU, LastLogonApprox (±14 d), NeverLoggedOn, DaysSinceLogon, PwdLastSet, PasswordAgeDays, PasswordNeverExpires, PwdNotRequired, PreAuthNotRequired, Delegation, AdminCount, HasSPN, WhenCreated, AccountExpires, Department, Title, SID, DN and one TRUE/FALSE column per stored userAccountControl flag. Mail, Manager and Description are opt-in (data minimisation — descriptions often contain passwords).
+- **Audit metadata for every CSV** (S14-5) — a `<name>.meta.txt` next to each export: domain, queried domain controller, user, UTC time, view, filter, row count, DirHealth version and the SHA-256 of the CSV. The CSV itself stays clean (no comment lines).
+
+### Fixed — Sprint 14
+- **Findings badge** (A6) — the sidebar badge counts open findings only, as intended since v2.8.0.
+- **Acknowledge note** (A8) — selecting a finding in the list now loads its saved note (the list bypassed the command that loaded it).
+- **Severity colours** (A9) — app and PDF use the same colours from one source (Critical #DC2626, High #D97706, Medium #CA8A04, Low #6B7280). High findings are now orange in the app, as in the PDF.
+- **Honest logon labels** (A10) — "Last Logon (replicated, ±14 d)": `lastLogonTimestamp` can lag up to 14 days. CSV date columns are empty instead of "Never".
+
 ### Added — Sprint 13
 - **Read-only guard test** (S13-6) — a unit test scans the application source for AD write APIs (`CommitChanges`, `DeleteTree`, `SetPassword`, `Properties[...] = …`, …) and fails with file:line on any hit.
 

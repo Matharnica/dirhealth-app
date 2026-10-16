@@ -207,10 +207,10 @@
                                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Severity}" Value="High">
-                                                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                                                    <Setter Property="Foreground" Value="{StaticResource HighSeverityBrush}" />
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Severity}" Value="Medium">
-                                                                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                                                    <Setter Property="Foreground" Value="{StaticResource MediumSeverityBrush}" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>

@@ -1,0 +1,36 @@
+<Window x:Class="DirHealth.Desktop.Views.UserBrowser.UserExportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export users" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{DynamicResource BackgroundBrush}" ShowInTaskbar="False">
+    <!-- S14-4: ADRecon-style export. Personal columns are opt-in (data minimisation). -->
+    <StackPanel Margin="20">
+        <TextBlock Text="Export users (CSV)" FontSize="16" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
+
+        <TextBlock Text="ROWS" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+        <RadioButton x:Name="FilteredRadio" GroupName="Scope" IsChecked="True" Margin="0,2"
+                     Foreground="{DynamicResource TextPrimaryBrush}" />
+        <RadioButton x:Name="AllRadio" GroupName="Scope" Margin="0,2"
+                     Foreground="{DynamicResource TextPrimaryBrush}" />
+
+        <TextBlock Text="OPTIONAL COLUMNS" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,14,0,4" />
+        <CheckBox x:Name="MailBox"        Content="Mail"        Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}" />
+        <CheckBox x:Name="ManagerBox"     Content="Manager"     Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}" />
+        <CheckBox x:Name="DescriptionBox" Content="Description" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}" />
+        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,6,0,0" Foreground="#FCD34D"
+                   Text="Personal data — include only what the report needs. Descriptions often contain passwords." />
+
+        <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,12,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   Text="Always included: account state, logon and password ages, UAC flags (TRUE/FALSE), delegation, adminCount, SPN, OU, SID. A .meta.txt with SHA-256 is written next to the file." />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Padding="14,5" Margin="0,0,8,0"
+                    IsCancel="True" />
+            <Button Content="Export…" Style="{StaticResource PrimaryButton}" Padding="14,5"
+                    IsDefault="True" Click="Export_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

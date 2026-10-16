@@ -2,9 +2,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
-using System.Collections.ObjectModel;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
+
+/// <summary>Choices from the user export dialog (S14-4). Opt-in columns default to off.</summary>
+public record UserExportOptions(bool FilteredOnly, bool IncludeMail = false, bool IncludeManager = false, bool IncludeDescription = false);
 
 public partial class UserBrowserViewModel : ListBrowserViewModel
 {
@@ -15,7 +18,8 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
     [ObservableProperty] private string _userFilter = "All";
     [ObservableProperty] private bool   _showDetail;
 
-    public ObservableCollection<AdUser> Users { get; } = new();
+    /// <summary>Shared sortable/exportable table (S14-1).</summary>
+    public TableViewModel<AdUser> Table { get; }
     public UserDetailViewModel Detail => _detail;
     public List<string> UserFilterOptions { get; } = ["All", "Active", "Disabled", "Expiring 30d", "Never logged in"];
 
@@ -32,6 +36,15 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
     {
         _scanner = scanner;
         _detail  = detail;
+        Table = new TableViewModel<AdUser>("Users", UserColumns.Grid)
+        {
+            Dn  = u => u.DistinguishedName,
+            Sid = u => u.Sid,
+            Sam = u => u.SamAccountName,
+        };
+        Table.FilterDescription = () => $"text='{FilterText}', status={UserFilter}";
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+        Table.SelectionChanged += row => { if (row is AdUser u) _ = SelectUserAsync(u); };
     }
 
     [RelayCommand]
@@ -44,12 +57,13 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
             return;
         }
         BeginLoad();
-        Users.Clear();
+        Table.Clear();
         _allUsers.Clear();
         try
         {
             _allUsers   = await _scanner.GetAllUsersAsync();
             _lastLoaded = DateTime.Now;
+            Table.SetRows(_allUsers);
             ApplyFilter();
             EndLoad();
         }
@@ -62,26 +76,27 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
 
     private void ApplyFilter()
     {
-        Users.Clear();
-        var query = FilterText.Trim();
-        foreach (var u in _allUsers)
-        {
-            if (!string.IsNullOrEmpty(query) &&
-                !u.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) &&
-                !u.SamAccountName.Contains(query, StringComparison.OrdinalIgnoreCase) &&
-                !u.Email.Contains(query, StringComparison.OrdinalIgnoreCase))
-                continue;
+        var query  = FilterText.Trim();
+        var status = UserFilter;
+        Table.SetFilter(u => MatchesFilter(u, query, status));
+    }
 
-            bool pass = UserFilter switch
-            {
-                "Active"          => u.IsEnabled,
-                "Disabled"        => !u.IsEnabled,
-                "Expiring 30d"    => u.DaysUntilPasswordExpiry is >= 0 and <= 30,
-                "Never logged in" => u.LastLogon is null,
-                _                 => true
-            };
-            if (pass) Users.Add(u);
-        }
+    public static bool MatchesFilter(AdUser u, string query, string status)
+    {
+        if (!string.IsNullOrEmpty(query) &&
+            !u.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) &&
+            !u.SamAccountName.Contains(query, StringComparison.OrdinalIgnoreCase) &&
+            !u.Email.Contains(query, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return status switch
+        {
+            "Active"          => u.IsEnabled,
+            "Disabled"        => !u.IsEnabled,
+            "Expiring 30d"    => u.DaysUntilPasswordExpiry is >= 0 and <= 30,
+            "Never logged in" => u.LastLogon is null,
+            _                 => true
+        };
     }
 
     [RelayCommand]
@@ -90,6 +105,28 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
         if (_detail is null) return;
         ShowDetail = true;
         await _detail.LoadAsync(user);
+    }
+
+    /// <summary>
+    /// ADRecon-style user export (S14-4) with opt-in columns; writes CSV + .meta.txt.
+    /// Returns the CSV path, or null when cancelled or failed (message in Table.StatusMessage).
+    /// </summary>
+    public string? ExportFullUsers(UserExportOptions options)
+    {
+        var columns = UserColumns.Export(options.IncludeMail, options.IncludeManager, options.IncludeDescription);
+        var rows    = options.FilteredOnly ? Table.RowsForFilteredExport() : Table.RowsForFullExport();
+        var optIn   = string.Join(", ", new[]
+        {
+            options.IncludeMail ? "Mail" : null,
+            options.IncludeManager ? "Manager" : null,
+            options.IncludeDescription ? "Description" : null,
+        }.Where(x => x is not null));
+        var filter = (options.FilteredOnly ? Table.FilterDescription?.Invoke() ?? "" : "(none — all rows)")
+                   + $"; opt-in columns: {(optIn.Length == 0 ? "none" : optIn)}";
+        var exportTable = new TableViewModel<AdUser>("Users-full", columns) { ContextProvider = Table.ContextProvider };
+        var path = exportTable.Export(rows, filter, options.FilteredOnly ? "filtered" : "all");
+        Table.StatusMessage = exportTable.StatusMessage;
+        return path;
     }
 
     internal void InvalidateCache()

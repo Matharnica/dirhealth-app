@@ -9,5 +9,6 @@ public class AdRecentChange
     public string   DistinguishedName { get; set; } = "";
 
     public string ChangedAtDisplay => ChangedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    public DateTime ChangedAtLocal => ChangedAt.ToLocalTime();
     public string TypeIcon         => ObjectType == "Computer" ? "🖥" : "👤";
 }

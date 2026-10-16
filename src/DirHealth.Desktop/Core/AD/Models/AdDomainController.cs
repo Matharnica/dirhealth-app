@@ -15,6 +15,8 @@ public class AdDomainController
     public string LastLogonDisplay =>
         LastLogon.HasValue ? $"{(int)(DateTime.UtcNow - LastLogon.Value.ToUniversalTime()).TotalDays} days ago" : "Never";
 
+    public string FsmoRolesText => string.Join(", ", FsmoRoles);
+
     public string EolInfo =>
         IsEol && EolDate.HasValue ? $"EOL since {EolDate.Value:MMM yyyy}" : "";
 }

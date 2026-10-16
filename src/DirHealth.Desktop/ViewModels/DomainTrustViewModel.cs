@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -18,7 +19,16 @@ public partial class DomainTrustViewModel : ListBrowserViewModel
     protected override bool IsEmpty => Trusts is { Count: 0 };
     public override string EmptyMessage => "No domain trusts found.";
 
-    public DomainTrustViewModel(AdScanner scanner) { _scanner = scanner; }
+    /// <summary>Shared sortable/exportable table (S14-3); mirrors Trusts.</summary>
+    public TableViewModel<AdDomainTrust> Table { get; } = new("Domain Trusts", ViewColumns.Trusts) { };
+
+    public DomainTrustViewModel(AdScanner scanner)
+    {
+        _scanner = scanner;
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+    }
+
+    partial void OnTrustsChanged(List<AdDomainTrust>? value) => Table.SetRows(value ?? []);
 
     [RelayCommand]
     public async Task LoadAsync()

@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.Core.AD.Models;
-using System.Collections.ObjectModel;
+using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
@@ -14,7 +14,8 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
     [ObservableProperty] private string _filterText = "";
     [ObservableProperty] private bool   _showDetail;
 
-    public ObservableCollection<AdComputer> Computers { get; } = new();
+    /// <summary>Shared sortable/exportable table (S14-2).</summary>
+    public TableViewModel<AdComputer> Table { get; }
     public ComputerDetailViewModel Detail => _detail;
 
     private List<AdComputer> _allComputers = new();
@@ -30,6 +31,10 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
     {
         _scanner = scanner;
         _detail  = detail;
+        Table = new TableViewModel<AdComputer>("Computers", ViewColumns.Computers) { Dn = c => c.DistinguishedName };
+        Table.FilterDescription = () => $"text='{FilterText}'";
+        if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
+        Table.SelectionChanged += row => { if (row is AdComputer c) _ = SelectComputerAsync(c); };
     }
 
     [RelayCommand]
@@ -42,12 +47,13 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
             return;
         }
         BeginLoad();
-        Computers.Clear();
+        Table.Clear();
         _allComputers.Clear();
         try
         {
             _allComputers = await _scanner.GetAllComputersAsync();
             _lastLoaded   = DateTime.Now;
+            Table.SetRows(_allComputers);
             ApplyFilter();
             EndLoad();
         }
@@ -58,15 +64,10 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
 
     private void ApplyFilter()
     {
-        Computers.Clear();
         var query = FilterText.Trim();
-        foreach (var c in _allComputers)
-        {
-            if (string.IsNullOrEmpty(query) ||
-                c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                c.OperatingSystem.Contains(query, StringComparison.OrdinalIgnoreCase))
-                Computers.Add(c);
-        }
+        Table.SetFilter(string.IsNullOrEmpty(query) ? null : c =>
+            c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            c.OperatingSystem.Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 
     [RelayCommand]
