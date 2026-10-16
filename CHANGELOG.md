@@ -6,6 +6,8 @@ All notable changes to DirHealth are documented here.
 
 ## [Unreleased]
 
+> Sprints 13–20 ship together as **3.0.0** once the live test against a real domain is done (major version: the score changes without any change in your AD, and old acknowledgements no longer hide findings).
+
 ### Fixed — Follow-up review of Sprints 13–20
 - **A check that could not read its data no longer reads as "Passed"** — the krbtgt, Guest, Pre-Windows 2000, operator-group, Recycle Bin and dSHeuristics checks used to report "passed" when the object they look at could not be read; they now report **Failed** with the reason. Domain-basics and LAPS/machine-account checks now run one query per rule, so one unreadable object fails only its own rule and the other rules keep their findings.
 - **User detail: "Last Logon (this DC)"** shows "Could not be read: …" when the query fails, instead of "No logon on this DC".

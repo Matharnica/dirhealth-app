@@ -90,20 +90,27 @@ public partial class DashboardViewModel : BaseViewModel
     public string ScoreDisplay => ScoreResult?.Display ?? ComplianceScore.ToString();
     public string ScoreCoverageText => ScoreResult?.CoverageText ?? "";
     /// <summary>Per-rule "+X if fixed", largest first (S17-4 dashboard breakdown).</summary>
-    public List<RuleScore> ScoreBreakdown => ScoreResult?.Rules.Where(r => r.PointsIfFixed > 0).ToList() ?? [];
+    public List<RuleScore> ScoreBreakdown => BreakdownOf(ScoreResult);
+
+    public static List<RuleScore> BreakdownOf(ScoreResult? r) =>
+        r?.Rules.Where(x => x.PointsIfFixed > 0).OrderByDescending(x => x.PointsIfFixed).ThenBy(x => x.RuleId).ToList() ?? [];
     /// <summary>
     /// One-time release notice (S19): shown after the first scan with a new score formula — i.e. while
     /// the last two history entries use different formulas — and gone after the next scan.
     /// </summary>
-    public string ScoreModelNotice => ScoreHistory.Count >= 2 && !ScoreHistoryStore.Comparable(ScoreHistory)
+    public string ScoreModelNotice => ModelNoticeFor(ScoreHistory);
+
+    public static string ModelNoticeFor(IReadOnlyList<ScoreEntry> history) => history.Count >= 2 && !ScoreHistoryStore.Comparable(history)
         ? "This version checks more and scores differently (new checks, exploitable issues weigh more). " +
           "Your score changed without any change in your Active Directory — compare from the next scan on."
         : "";
 
-    public string ScoreNote => ScoreResult is null && LastScanTime != "Never"
+    public string ScoreNote => NoteFor(ScoreResult, LastScanTime);
+
+    public static string NoteFor(ScoreResult? r, string lastScanTime) => r is null && lastScanTime != "Never"
         ? "Score from an older DirHealth version — run a scan to use the new score model."
-        : ScoreResult is { Available: false } ? "Too many checks failed to compute a score."
-        : ScoreResult is { IsUpperBound: true } ? "Upper bound: failed checks could only lower it."
+        : r is { Available: false } ? "Too many checks failed to compute a score."
+        : r is { IsUpperBound: true } ? "Upper bound: failed checks could only lower it."
         : "";
 
     /// <summary>Recomputes the displayed score after a scan or when exceptions change (ADR 0001/0002).</summary>

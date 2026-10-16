@@ -1,3 +1,5 @@
+using System.Windows.Media;
+using DirHealth.Desktop.Core;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using System.Windows;
@@ -98,6 +100,22 @@ public class ViewSmokeTests
             var type = typeof(DirHealth.Desktop.App).Assembly.GetType(typeName, throwOnError: true)!;
             var view = (FrameworkElement)Activator.CreateInstance(type)!;
             Layout(view);
+        });
+    }
+
+    // A9 at runtime (follow-up 2026-10-16): the brushes views use are the palette colours
+    [Fact]
+    public void SeverityBrushes_ComeFromPalette()
+    {
+        OnSta(() =>
+        {
+            EnsureResources();
+            foreach (var (key, colour) in new[]
+            {
+                ("CriticalSeverityBrush", SeverityPalette.CriticalColor), ("HighSeverityBrush", SeverityPalette.HighColor),
+                ("MediumSeverityBrush",   SeverityPalette.MediumColor),   ("LowSeverityBrush",  SeverityPalette.LowColor),
+            })
+                Assert.Equal(colour, ((SolidColorBrush)Application.Current.FindResource(key)).Color);
         });
     }
 
