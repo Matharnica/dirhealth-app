@@ -71,7 +71,8 @@ public partial class AdScanner
         foreach (var def in WellKnownGroups.Tier0)
         {
             var g = _connector.ResolveGroup(root, def);
-            if (!g.Found) continue;
+            // BUILTIN operator groups exist in every domain — not resolving one means the read failed
+            if (!g.Found) throw new InvalidOperationException($"{def.FallbackName} could not be read.");
             int? primaryRid = def.Source != GroupSidSource.Builtin && def.Rid > 0 ? def.Rid : null;
             var filter = "(&" + CheckFilters.EnabledUser + WellKnownGroups.MembershipClause(EscapeDn(g.DistinguishedName!), primaryRid) + ")";
             foreach (var u in QueryUsers(filter)) members.TryAdd(u.DistinguishedName, u);
@@ -137,7 +138,8 @@ public partial class AdScanner
         foreach (var def in WellKnownGroups.OperatorGroups)
         {
             var g = _connector.ResolveGroup(root, def);
-            if (!g.Found) continue;
+            // BUILTIN operator groups exist in every domain — not resolving one means the read failed
+            if (!g.Found) throw new InvalidOperationException($"{def.FallbackName} could not be read.");
             // Direct members of any class, with SID (exception key, ADR 0001)
             foreach (var (obj, _) in QueryObjects(root, $"(memberOf={EscapeDn(g.DistinguishedName!)})"))
             {
@@ -150,69 +152,90 @@ public partial class AdScanner
     });
 
     // ── S19-3 krbtgt and domain basics ───────────────────────────────────────
-    public async Task<List<AdFinding>> GetDomainBasicsFindingsAsync() => await Task.Run(() =>
+    // One sub-query per rule: each reads a different object (krbtgt, Guest, domain head,
+    // Pre-Win2000 group, configuration partition, DCs). A read that fails or finds nothing
+    // to read throws, so only that rule turns "Failed" — never "Passed" (S16-4), and the
+    // findings of the other rules are kept.
+    public Task<List<AdFinding>> GetKrbtgtFindingsAsync() => Task.Run(() =>
     {
-        var findings = new List<AdFinding>();
-        var now      = DateTime.UtcNow;
+        var krbtgt = QueryUsers("(&(objectClass=user)(sAMAccountName=krbtgt))").FirstOrDefault()
+                     ?? throw new InvalidOperationException("krbtgt account could not be read.");
+        return CheckLogic.KrbtgtPasswordTooOld(krbtgt.PasswordLastSet, DateTime.UtcNow)
+            ? [NewFinding("KrbtgtPasswordOld", "krbtgt Password Older Than 180 Days", FindingSeverity.High,
+                [new AffectedObject { Name = "krbtgt", DistinguishedName = krbtgt.DistinguishedName, Sid = krbtgt.Sid, Type = AffectedObjectType.User,
+                                      Detail = $"last set {krbtgt.PasswordLastSet:yyyy-MM-dd}" }])]
+            : new List<AdFinding>();
+    });
+
+    public Task<List<AdFinding>> GetGuestFindingsAsync() => Task.Run(() =>
+    {
         using var root = _connector.GetRootEntry();
         var domainSid  = AdConnector.GetDomainSid(root);
+        if (!WellKnownGroups.IsDomainSid(domainSid))
+            throw new InvalidOperationException("Domain SID could not be read — Guest account not checked.");
+        var guest = QueryObjects(root, $"(&(objectSid={WellKnownGroups.DomainGroupSid(domainSid!, WellKnownGroups.GuestRid)}){CheckFilters.NotDisabled})");
+        return guest.Count > 0
+            ? [NewFinding("GuestEnabled", "Built-in Guest Account Is Enabled", FindingSeverity.High, [guest[0].Obj])]
+            : new List<AdFinding>();
+    });
 
-        var krbtgt = QueryUsers("(&(objectClass=user)(sAMAccountName=krbtgt))").FirstOrDefault();
-        if (krbtgt is not null && CheckLogic.KrbtgtPasswordTooOld(krbtgt.PasswordLastSet, now))
-            findings.Add(NewFinding("KrbtgtPasswordOld", "krbtgt Password Older Than 180 Days", FindingSeverity.High,
-                [new AffectedObject { Name = "krbtgt", DistinguishedName = krbtgt.DistinguishedName, Sid = krbtgt.Sid, Type = AffectedObjectType.User,
-                                      Detail = $"last set {krbtgt.PasswordLastSet:yyyy-MM-dd}" }]));
-
-        if (WellKnownGroups.IsDomainSid(domainSid))
-        {
-            var guest = QueryObjects(root, $"(&(objectSid={WellKnownGroups.DomainGroupSid(domainSid!, WellKnownGroups.GuestRid)}){CheckFilters.NotDisabled})");
-            if (guest.Count > 0)
-                findings.Add(NewFinding("GuestEnabled", "Built-in Guest Account Is Enabled", FindingSeverity.High, [guest[0].Obj]));
-        }
-
+    public Task<List<AdFinding>> GetMachineAccountQuotaFindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
         int maq = RequireRootInt(root, "ms-DS-MachineAccountQuota");
-        if (maq > 0)
-            findings.Add(NewFinding("MachineAccountQuota", $"Any User Can Join {maq} Computer(s) to the Domain", FindingSeverity.Medium,
-                [new AffectedObject { Name = $"ms-DS-MachineAccountQuota = {maq}", Type = AffectedObjectType.DomainSetting }]));
+        return CheckLogic.MachineAccountQuotaRisky(maq)
+            ? [NewFinding("MachineAccountQuota", $"Any User Can Join {maq} Computer(s) to the Domain", FindingSeverity.Medium,
+                [new AffectedObject { Name = $"ms-DS-MachineAccountQuota = {maq}", Type = AffectedObjectType.DomainSetting }])]
+            : new List<AdFinding>();
+    });
 
+    public Task<List<AdFinding>> GetPreWindows2000FindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
+        // BUILTIN group S-1-5-32-554 exists in every domain — not resolving it means the read failed
         var preWin = _connector.ResolveGroup(root, WellKnownGroups.PreWindows2000);
-        if (preWin.Found)
-        {
-            using var s = _connector.CreateSearcher(root, $"(distinguishedName={EscapeDn(preWin.DistinguishedName!)})", "member");
-            var r = s.FindOne();
-            var risky = r is null ? [] : r.Properties["member"].Cast<object>()
-                .Select(m => CheckLogic.RiskyPreWin2000Member(m?.ToString() ?? "")).Where(n => n is not null).Distinct().ToList();
-            if (risky.Count > 0)
-                findings.Add(NewFinding("PreWindows2000Access", "Pre-Windows 2000 Compatible Access Includes Everyone/Authenticated Users", FindingSeverity.High,
-                    risky.Select(n => new AffectedObject { Name = n!, Type = AffectedObjectType.DomainSetting, Detail = preWin.Name }).ToList()));
-        }
+        if (!preWin.Found)
+            throw new InvalidOperationException("Pre-Windows 2000 Compatible Access group could not be read.");
+        using var s = _connector.CreateSearcher(root, $"(distinguishedName={EscapeDn(preWin.DistinguishedName!)})", "member");
+        var r = s.FindOne() ?? throw new InvalidOperationException("Pre-Windows 2000 Compatible Access group could not be read.");
+        var risky = r.Properties["member"].Cast<object>()
+            .Select(m => CheckLogic.RiskyPreWin2000Member(m?.ToString() ?? "")).Where(n => n is not null).Distinct().ToList();
+        return risky.Count > 0
+            ? [NewFinding("PreWindows2000Access", "Pre-Windows 2000 Compatible Access Includes Everyone/Authenticated Users", FindingSeverity.High,
+                risky.Select(n => new AffectedObject { Name = n!, Type = AffectedObjectType.DomainSetting, Detail = preWin.Name }).ToList())]
+            : new List<AdFinding>();
+    });
 
-        using (var dse = _connector.GetEntry(string.IsNullOrEmpty(_connector.Domain) ? "LDAP://RootDSE" : $"LDAP://{_connector.Domain}/RootDSE"))
-        {
-            var config = dse.Properties["configurationNamingContext"].Value?.ToString();
-            if (!string.IsNullOrEmpty(config))
-            {
-                var path = $"CN=Recycle Bin Feature,CN=Optional Features,CN=Directory Service,CN=Windows NT,CN=Services,{config}";
-                using var feature = _connector.GetEntry(string.IsNullOrEmpty(_connector.Domain) ? $"LDAP://{path}" : $"LDAP://{_connector.Domain}/{path}");
-                // Back-link attribute: request it explicitly with a base search
-                using var s = new DirectorySearcher(feature, "(objectClass=*)", ["msDS-EnabledFeatureBL"], SearchScope.Base);
-                var fr = s.FindOne();
-                if (fr is not null && fr.Properties["msDS-EnabledFeatureBL"].Count == 0)
-                    findings.Add(NewFinding("RecycleBinDisabled", "AD Recycle Bin Is Not Enabled", FindingSeverity.Medium,
-                        [new AffectedObject { Name = "Recycle Bin Feature", Type = AffectedObjectType.DomainSetting }]));
-            }
-        }
+    public Task<List<AdFinding>> GetRecycleBinFindingsAsync() => Task.Run(() =>
+    {
+        var config = RootDseValue("configurationNamingContext");
+        using var feature = EntryAt($"CN=Recycle Bin Feature,CN=Optional Features,CN=Directory Service,CN=Windows NT,CN=Services,{config}");
+        // Back-link attribute: request it explicitly with a base search
+        using var s = new DirectorySearcher(feature, "(objectClass=*)", ["msDS-EnabledFeatureBL"], SearchScope.Base);
+        var fr = s.FindOne() ?? throw new InvalidOperationException("Recycle Bin feature object could not be read.");
+        return CheckLogic.RecycleBinDisabled(fr.Properties["msDS-EnabledFeatureBL"].Count)
+            ? [NewFinding("RecycleBinDisabled", "AD Recycle Bin Is Not Enabled", FindingSeverity.Medium,
+                [new AffectedObject { Name = "Recycle Bin Feature", Type = AffectedObjectType.DomainSetting }])]
+            : new List<AdFinding>();
+    });
 
+    public Task<List<AdFinding>> GetFunctionalLevelFindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
         int level = RequireRootInt(root, "msDS-Behavior-Version");
-        if (level < CheckLogic.MinFunctionalLevel)
-            findings.Add(NewFinding("FunctionalLevelOld", $"Domain Functional Level {CheckLogic.FunctionalLevelName(level)}", FindingSeverity.Medium,
-                [new AffectedObject { Name = $"msDS-Behavior-Version = {level}", Type = AffectedObjectType.DomainSetting, Detail = CheckLogic.FunctionalLevelName(level) }]));
+        return level < CheckLogic.MinFunctionalLevel
+            ? [NewFinding("FunctionalLevelOld", $"Domain Functional Level {CheckLogic.FunctionalLevelName(level)}", FindingSeverity.Medium,
+                [new AffectedObject { Name = $"msDS-Behavior-Version = {level}", Type = AffectedObjectType.DomainSetting, Detail = CheckLogic.FunctionalLevelName(level) }])]
+            : new List<AdFinding>();
+    });
 
+    public Task<List<AdFinding>> GetDomainControllerCountFindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
         var dcs = QueryObjects(root, CheckFilters.DomainControllers);
-        if (dcs.Count < 2)
-            findings.Add(NewFinding("SingleDomainController", $"Only {dcs.Count} Domain Controller(s)", FindingSeverity.High,
-                dcs.Select(d => d.Obj).DefaultIfEmpty(new AffectedObject { Name = "no domain controller found", Type = AffectedObjectType.DomainSetting }).ToList()));
-        return findings;
+        return CheckLogic.TooFewDomainControllers(dcs.Count)
+            ? [NewFinding("SingleDomainController", $"Only {dcs.Count} Domain Controller(s)", FindingSeverity.High, dcs.Select(d => d.Obj).ToList())]
+            : new List<AdFinding>();
     });
 
     // ── S19-4 Kerberos encryption ────────────────────────────────────────────

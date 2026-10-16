@@ -32,56 +32,71 @@ public partial class AdScanner
         return found;
     }
 
-    public async Task<List<AdFinding>> GetRemainingCheckFindingsAsync() => await Task.Run(() =>
-    {
-        var findings = new List<AdFinding>();
-        var now = DateTime.UtcNow;
-        string Ft(int days) => now.AddDays(-days).ToFileTimeUtc().ToString(CultureInfo.InvariantCulture);
-        using var root = _connector.GetRootEntry();
+    private static string FileTimeDaysAgo(int days) =>
+        DateTime.UtcNow.AddDays(-days).ToFileTimeUtc().ToString(CultureInfo.InvariantCulture);
 
-        // LAPS
+    // One sub-query per source (schema, computers, conflict objects, dSHeuristics, smart-card
+    // users): a failed read marks only its own rules "Failed" and keeps the others' findings (S16-4).
+    public Task<List<AdFinding>> GetLapsFindingsAsync() => Task.Run(() =>
+    {
         var laps = LapsAttributesInSchema();
         if (laps.Count == 0)
-            findings.Add(NewFinding("LapsNotDeployed", "LAPS Is Not Deployed (No LAPS Schema Attributes)", FindingSeverity.High,
-                [new AffectedObject { Name = "LAPS schema extension", Type = AffectedObjectType.DomainSetting, Detail = "neither legacy nor Windows LAPS" }]));
-        else
-        {
-            var without = QueryObjects(root, CheckFilters.ComputersWithoutLaps(laps)).Select(x => x.Obj).ToList();
-            if (without.Count > 0)
-                findings.Add(NewFinding("ComputersWithoutLaps", $"{without.Count} Computer(s) Without a LAPS-Managed Password", FindingSeverity.Medium, without));
-        }
+            return [NewFinding("LapsNotDeployed", "LAPS Is Not Deployed (No LAPS Schema Attributes)", FindingSeverity.High,
+                [new AffectedObject { Name = "LAPS schema extension", Type = AffectedObjectType.DomainSetting, Detail = "neither legacy nor Windows LAPS" }])];
+        using var root = _connector.GetRootEntry();
+        var without = QueryObjects(root, CheckFilters.ComputersWithoutLaps(laps)).Select(x => x.Obj).ToList();
+        return without.Count > 0
+            ? [NewFinding("ComputersWithoutLaps", $"{without.Count} Computer(s) Without a LAPS-Managed Password", FindingSeverity.Medium, without)]
+            : new List<AdFinding>();
+    });
 
-        // Machine / DC passwords that stopped rotating
-        var stale = QueryObjects(root, CheckFilters.StaleMachinePasswords(Ft(CheckFilters.MachinePasswordMaxDays), Ft(CheckFilters.MachinePasswordMaxDays)))
-            .Concat(QueryObjects(root, CheckFilters.StaleDcPasswords(Ft(CheckFilters.DcPasswordMaxDays))))
+    // Machine / DC passwords that stopped rotating
+    public Task<List<AdFinding>> GetMachinePasswordFindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
+        var cutoff = FileTimeDaysAgo(CheckFilters.MachinePasswordMaxDays);
+        var stale = QueryObjects(root, CheckFilters.StaleMachinePasswords(cutoff, cutoff))
+            .Concat(QueryObjects(root, CheckFilters.StaleDcPasswords(FileTimeDaysAgo(CheckFilters.DcPasswordMaxDays))))
             .Select(x => x.Obj).ToList();
-        if (stale.Count > 0)
-            findings.Add(NewFinding("MachinePasswordNotRotated", $"{stale.Count} Active Computer(s) Whose Machine Password Stopped Rotating", FindingSeverity.Medium, stale));
+        return stale.Count > 0
+            ? [NewFinding("MachinePasswordNotRotated", $"{stale.Count} Active Computer(s) Whose Machine Password Stopped Rotating", FindingSeverity.Medium, stale)]
+            : new List<AdFinding>();
+    });
 
-        // Replication conflicts / duplicates
+    // Replication conflicts / duplicates
+    public Task<List<AdFinding>> GetDuplicateObjectFindingsAsync() => Task.Run(() =>
+    {
+        using var root = _connector.GetRootEntry();
         var conflicts = QueryObjects(root, CheckFilters.ConflictObjects).Select(x => { x.Obj.Detail = "replication conflict / duplicate"; return x.Obj; }).ToList();
-        if (conflicts.Count > 0)
-            findings.Add(NewFinding("DuplicateObjects", $"{conflicts.Count} Replication-Conflict or Duplicate Object(s)", FindingSeverity.Low, conflicts));
+        return conflicts.Count > 0
+            ? [NewFinding("DuplicateObjects", $"{conflicts.Count} Replication-Conflict or Duplicate Object(s)", FindingSeverity.Low, conflicts)]
+            : new List<AdFinding>();
+    });
 
-        // dSHeuristics
-        var dsPath = $"CN=Directory Service,CN=Windows NT,CN=Services,{RootDseValue("configurationNamingContext")}";
-        using (var ds = EntryAt(dsPath))
-        {
-            using var s = new DirectorySearcher(ds, "(objectClass=*)", ["dSHeuristics"], SearchScope.Base);
-            var heur = s.FindOne() is { } r && r.Properties["dSHeuristics"].Count > 0 ? r.Properties["dSHeuristics"][0]?.ToString() : null;
-            if (CheckLogic.AnonymousLdapAllowed(heur))
-                findings.Add(NewFinding("AnonymousLdapAllowed", "Anonymous LDAP Operations Are Allowed (dSHeuristics)", FindingSeverity.High,
-                    [new AffectedObject { Name = $"dSHeuristics = {heur}", Type = AffectedObjectType.DomainSetting }]));
-            var excluded = CheckLogic.AdminSdExMaskGroups(heur);
-            if (excluded.Count > 0)
-                findings.Add(NewFinding("AdminSdExMask", "Operator Groups Excluded From AdminSDHolder Protection", FindingSeverity.High,
-                    excluded.Select(g => new AffectedObject { Name = g, Type = AffectedObjectType.DomainSetting, Detail = $"dSHeuristics = {heur}" }).ToList()));
-        }
-
-        // Smart-card accounts: their password hash never changes unless rotated
-        var smart = QueryUsers(CheckFilters.SmartcardOldPassword(Ft(CheckFilters.SmartcardPasswordMaxDays))).Select(AffectedObject.FromUser).ToList();
-        if (smart.Count > 0)
-            findings.Add(NewFinding("SmartcardOldPassword", $"{smart.Count} Smart-Card Account(s) With an Unrotated Password Hash", FindingSeverity.Medium, smart));
+    // dSHeuristics — an absent value is the secure default; an unreadable object is a failure
+    public Task<List<AdFinding>> GetDsHeuristicsFindingsAsync() => Task.Run(() =>
+    {
+        var findings = new List<AdFinding>();
+        using var ds = EntryAt($"CN=Directory Service,CN=Windows NT,CN=Services,{RootDseValue("configurationNamingContext")}");
+        using var s = new DirectorySearcher(ds, "(objectClass=*)", ["dSHeuristics"], SearchScope.Base);
+        var r = s.FindOne() ?? throw new InvalidOperationException("Directory Service object could not be read.");
+        var heur = r.Properties["dSHeuristics"].Count > 0 ? r.Properties["dSHeuristics"][0]?.ToString() : null;
+        if (CheckLogic.AnonymousLdapAllowed(heur))
+            findings.Add(NewFinding("AnonymousLdapAllowed", "Anonymous LDAP Operations Are Allowed (dSHeuristics)", FindingSeverity.High,
+                [new AffectedObject { Name = $"dSHeuristics = {heur}", Type = AffectedObjectType.DomainSetting }]));
+        var excluded = CheckLogic.AdminSdExMaskGroups(heur);
+        if (excluded.Count > 0)
+            findings.Add(NewFinding("AdminSdExMask", "Operator Groups Excluded From AdminSDHolder Protection", FindingSeverity.High,
+                excluded.Select(g => new AffectedObject { Name = g, Type = AffectedObjectType.DomainSetting, Detail = $"dSHeuristics = {heur}" }).ToList()));
         return findings;
+    });
+
+    // Smart-card accounts: their password hash never changes unless rotated
+    public Task<List<AdFinding>> GetSmartcardFindingsAsync() => Task.Run(() =>
+    {
+        var smart = QueryUsers(CheckFilters.SmartcardOldPassword(FileTimeDaysAgo(CheckFilters.SmartcardPasswordMaxDays))).Select(AffectedObject.FromUser).ToList();
+        return smart.Count > 0
+            ? [NewFinding("SmartcardOldPassword", $"{smart.Count} Smart-Card Account(s) With an Unrotated Password Hash", FindingSeverity.Medium, smart)]
+            : new List<AdFinding>();
     });
 }

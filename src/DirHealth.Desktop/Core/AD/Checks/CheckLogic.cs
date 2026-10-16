@@ -51,6 +51,19 @@ public static class CheckLogic
     public static bool KrbtgtPasswordTooOld(DateTime? pwdLastSetUtc, DateTime nowUtc) =>
         pwdLastSetUtc is null || (nowUtc - pwdLastSetUtc.Value).TotalDays > KrbtgtMaxDays;
 
+    /// <summary>ms-DS-MachineAccountQuota above 0 lets any authenticated user join computers.</summary>
+    public static bool MachineAccountQuotaRisky(int quota) => quota > 0;
+
+    /// <summary>msDS-EnabledFeatureBL lists the DCs where the feature is enabled; none = disabled.</summary>
+    public static bool RecycleBinDisabled(int enabledFeatureBacklinks) => enabledFeatureBacklinks == 0;
+
+    /// <summary>
+    /// Fewer than two DCs is a finding. Zero is not a finding but a failed read — every domain
+    /// has at least the DC that answered — so it throws and the check reads "Failed" (S16-4).
+    /// </summary>
+    public static bool TooFewDomainControllers(int count) =>
+        count > 0 ? count < 2 : throw new InvalidOperationException("No domain controller found — the DC query returned nothing.");
+
     /// <summary>msDS-Behavior-Version of the domain: 7 = Windows Server 2016 (also the level of 2019/2022).</summary>
     public const int MinFunctionalLevel = 7;
 

@@ -76,9 +76,10 @@ public partial class UserDetailViewModel : BaseViewModel
         try
         {
             if (_scanner is null) return;
+            string? lastLogonError = null;
             try { LastLogonThisDc = await _scanner.GetLastLogonOnConnectedDcAsync(user.DistinguishedName); }
-            catch { LastLogonThisDc = null; } // detail still useful without it; row says "no logon on this DC"
-            Attributes = UserDetailRows.Build(user, LastLogonThisDc);
+            catch (Exception ex) { LastLogonThisDc = null; lastLogonError = ex.Message; } // detail stays useful; the row shows the error
+            Attributes = UserDetailRows.Build(user, LastLogonThisDc, lastLogonError);
 
             var groups = await _scanner.GetUserGroupsAsync(user.DistinguishedName);
             GroupPaths.Assign(user.SamAccountName, groups);

@@ -6,13 +6,10 @@ All notable changes to DirHealth are documented here.
 
 ## [Unreleased]
 
-### Fixed — Sprint 13 (Correct results)
-- **Admin groups found by SID, not by name** (S13-1) — Domain Admins (RID 512), Schema Admins (518), Enterprise Admins (519, forest root), Key Admins (526), Enterprise Key Admins (527) and the BUILTIN groups (S-1-5-32-544/548/549/550/551/555) are now resolved by SID. On domains installed in another language (e.g. German "Domänen-Admins") the login check, the Domain Admins view, the Privileged Groups view and the Stale Domain Admins finding no longer come back empty. The UI shows the group's real name from AD. DnsAdmins has no fixed RID and is still looked up by name — if it is missing, the view now says "Not found" instead of dropping it.
-- **Login: "could not check" ≠ "not an admin"** (S13-1) — a failed LDAP query during the Domain Admins check used to read as "not a member". The login dialog now shows the real error. Accounts whose *primary group* is Domain Admins are recognised. The Domain-Admin requirement itself is unchanged.
-- **User groups include nested and primary groups** (S13-2) — the user detail and the user PDF list direct, nested (`LDAP_MATCHING_RULE_IN_CHAIN`) and primary-group memberships, each marked `direct` / `nested` / `primary`. A failed lookup shows an error instead of an empty list.
-- **End-of-life list** (S13-3) — Windows 10 (2025-10-14), Windows 2000 (2010-07-13) and Windows NT (2004-12-31) are flagged. Windows 10 LTSC/LTSB editions are deliberately not flagged (later support end, not distinguishable from `operatingSystem` alone). The remediation text mentions paid Extended Security Updates, which AD cannot show.
-- **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
-- **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
+### Fixed — Follow-up review of Sprints 13–20
+- **A check that could not read its data no longer reads as "Passed"** — the krbtgt, Guest, Pre-Windows 2000, operator-group, Recycle Bin and dSHeuristics checks used to report "passed" when the object they look at could not be read; they now report **Failed** with the reason. Domain-basics and LAPS/machine-account checks now run one query per rule, so one unreadable object fails only its own rule and the other rules keep their findings.
+- **User detail: "Last Logon (this DC)"** shows "Could not be read: …" when the query fails, instead of "No logon on this DC".
+- Dashboard hint text now says "add exceptions" instead of the retired "acknowledge".
 
 ### Added — Sprint 20 (Column chooser, remaining checks)
 - **Column chooser** (S20-1) — right-click a column header to show or hide columns; the menu shows how many are hidden and offers "Reset to default". The choice is remembered per view. The Export menu has a "Visible columns only" switch (default: all columns).
@@ -72,6 +69,14 @@ All notable changes to DirHealth are documented here.
 - **Acknowledge note** (A8) — selecting a finding in the list now loads its saved note (the list bypassed the command that loaded it).
 - **Severity colours** (A9) — app and PDF use the same colours from one source (Critical #DC2626, High #D97706, Medium #CA8A04, Low #6B7280). High findings are now orange in the app, as in the PDF.
 - **Honest logon labels** (A10) — "Last Logon (replicated, ±14 d)": `lastLogonTimestamp` can lag up to 14 days. CSV date columns are empty instead of "Never".
+
+### Fixed — Sprint 13 (Correct results)
+- **Admin groups found by SID, not by name** (S13-1) — Domain Admins (RID 512), Schema Admins (518), Enterprise Admins (519, forest root), Key Admins (526), Enterprise Key Admins (527) and the BUILTIN groups (S-1-5-32-544/548/549/550/551/555) are now resolved by SID. On domains installed in another language (e.g. German "Domänen-Admins") the login check, the Domain Admins view, the Privileged Groups view and the Stale Domain Admins finding no longer come back empty. The UI shows the group's real name from AD. DnsAdmins has no fixed RID and is still looked up by name — if it is missing, the view now says "Not found" instead of dropping it.
+- **Login: "could not check" ≠ "not an admin"** (S13-1) — a failed LDAP query during the Domain Admins check used to read as "not a member". The login dialog now shows the real error. Accounts whose *primary group* is Domain Admins are recognised. The Domain-Admin requirement itself is unchanged.
+- **User groups include nested and primary groups** (S13-2) — the user detail and the user PDF list direct, nested (`LDAP_MATCHING_RULE_IN_CHAIN`) and primary-group memberships, each marked `direct` / `nested` / `primary`. A failed lookup shows an error instead of an empty list.
+- **End-of-life list** (S13-3) — Windows 10 (2025-10-14), Windows 2000 (2010-07-13) and Windows NT (2004-12-31) are flagged. Windows 10 LTSC/LTSB editions are deliberately not flagged (later support end, not distinguishable from `operatingSystem` alone). The remediation text mentions paid Extended Security Updates, which AD cannot show.
+- **Search errors are visible** (S13-4) — a failed LDAP search shows "Search failed: …" instead of "No results found."
+- **CSV export** (S13-5) — files are UTF-8 with BOM (umlauts display correctly in Excel), use the Windows region's list separator (`,` on English, `;` on German systems), and formula protection now also catches line feeds, full-width `＝＋－＠` and leading blanks before a formula character. Finding titles are escaped too.
 
 ### Added — Sprint 13
 - **Read-only guard test** (S13-6) — a unit test scans the application source for AD write APIs (`CommitChanges`, `DeleteTree`, `SetPassword`, `Properties[...] = …`, …) and fails with file:line on any hit.

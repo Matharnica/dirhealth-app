@@ -241,10 +241,16 @@ public sealed class ReportPdfRenderer
         g.DrawRectangle(new XSolidBrush(PdfPageBuilder.ColFooterBg), 0, y0, w, FooterH);
         g.DrawLine(new XPen(PdfPageBuilder.ColBorder, 0.5), 0, y0, w, y0);
         var brush = new XSolidBrush(PdfPageBuilder.ColLabelGray);
-        g.DrawString($"DirHealth {_m.ToolVersion} · {_m.Domain} · created {_m.CreatedLocal}", PdfPageBuilder.Mono9, brush, Margin, y0 + 14);
-        var pg = $"Page {n} of {total}";
+        g.DrawString(FooterText(_m), PdfPageBuilder.Mono9, brush, Margin, y0 + 14);
+        var pg = PageLabel(n, total);
         g.DrawString(pg, PdfPageBuilder.Mono9, brush, w - Margin - g.MeasureString(pg, PdfPageBuilder.Mono9).Width, y0 + 14);
     }
+
+    /// <summary>Left footer text on every page (S18-2) — pure, so tests can check it without parsing the PDF.</summary>
+    public static string FooterText(ReportModel m) => $"DirHealth {m.ToolVersion} · {m.Domain} · created {m.CreatedLocal}";
+
+    /// <summary>Right footer text; drawn in the second pass once the total is known.</summary>
+    public static string PageLabel(int n, int total) => $"Page {n} of {total}";
 
     /// <summary>Page count of a rendered report — for tests.</summary>
     public static int PageCount(string filePath) => PdfSharp.Pdf.IO.PdfReader.Open(filePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import).PageCount;

@@ -48,7 +48,7 @@ public partial class DashboardViewModel : BaseViewModel
     /// <summary>"16 passed · 3 found · 1 failed · 0 not applicable" — empty before the first S16 scan.</summary>
     public string CheckSummary => Checks.Count == 0 ? "" : Summarize(Checks);
 
-    /// <summary>Honest note while the score model (S17) cannot yet exclude failed checks.</summary>
+    /// <summary>Note when checks failed: they found nothing because they did not look, so the score is only an upper bound (ADR 0002).</summary>
     public string FailedChecksNote => HasFailedChecks
         ? $"{FailedChecks.Count} check(s) could not run — they found nothing because they did not look. The score may be too high until they run."
         : "";
