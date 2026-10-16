@@ -7,6 +7,10 @@ public enum SearchMode { Name, Sid, Email, Ou, Ldap }
 
 public class AdSearcher
 {
+    /// <summary>Rows shown at most (S15-1). Queries ask for one more to detect "more than".</summary>
+    public const int MaxResults = 500;
+    private const int QueryLimit = MaxResults + 1;
+
     private readonly AdConnector _connector;
 
     public AdSearcher(AdConnector connector)
@@ -29,9 +33,10 @@ public class AdSearcher
 
     private List<AdSearchResult> SearchByName(string query)
     {
-        var escaped = Escape(query);
-        var filter  = $"(|(cn=*{escaped}*)(displayName=*{escaped}*)(sAMAccountName=*{escaped}*))";
-        return RunSearch(filter);
+        // S15-3: "user:jdoe" etc. restrict the name search to one object type
+        var (type, term) = SearchQuery.Parse(query);
+        if (term.Length == 0) return [];
+        return RunSearch(SearchQuery.NameFilter(Escape(term), type));
     }
 
     private List<AdSearchResult> SearchBySid(string query)
@@ -60,7 +65,8 @@ public class AdSearcher
                     "distinguishedName", "objectClass", "userAccountControl" })
         {
             SearchScope = SearchScope.OneLevel,
-            PageSize    = 500
+            PageSize    = 500,
+            SizeLimit   = QueryLimit,
         };
         using var sr = searcher.FindAll();
         foreach (SearchResult r in sr)
@@ -80,9 +86,9 @@ public class AdSearcher
         var results = new List<AdSearchResult>();
         using var root    = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
-            "cn", "displayName", "sAMAccountName", "mail", "objectSid",
+            "cn", "ou", "displayName", "sAMAccountName", "mail", "objectSid",
             "distinguishedName", "objectClass", "userAccountControl");
-        searcher.SizeLimit = 500;
+        searcher.SizeLimit = QueryLimit;   // one more than shown → "more than 500" hint
         using var found = searcher.FindAll();
         foreach (SearchResult r in found)
             results.Add(MapResult(r));
@@ -100,6 +106,7 @@ public class AdSearcher
             var c = classes[i]?.ToString() ?? "";
             if (c == "computer") { type = AdObjectType.Computer; break; }
             if (c == "group")    { type = AdObjectType.Group;    break; }
+            if (c == "organizationalUnit") { type = AdObjectType.OrganizationalUnit; break; }
         }
 
         var dn = GetString(props, "distinguishedName");
@@ -108,7 +115,7 @@ public class AdSearcher
         return new AdSearchResult
         {
             ObjectType        = type,
-            Name              = GetString(props, "cn"),
+            Name              = type == AdObjectType.OrganizationalUnit ? GetString(props, "ou") : GetString(props, "cn"),
             DisplayName       = GetString(props, "displayName"),
             SamAccountName    = GetString(props, "sAMAccountName"),
             Email             = GetString(props, "mail"),

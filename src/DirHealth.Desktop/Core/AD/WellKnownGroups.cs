@@ -63,6 +63,28 @@ public static class WellKnownGroups
         new("Remote Desktop Users",  "Can RDP into all DCs",                         GroupSidSource.Builtin,    RemoteDesktopUsersRid),
     ];
 
+    // Tier 0 by SID (S15-4): domain-relative RIDs in any domain, plus BUILTIN operators.
+    // DnsAdmins (no fixed RID) and Cert Publishers follow in S19-1.
+    private static readonly HashSet<int> Tier0DomainRids =
+        [DomainAdminsRid, SchemaAdminsRid, EnterpriseAdminsRid, KeyAdminsRid, EnterpriseKeyAdminsRid];
+
+    private static readonly HashSet<string> Tier0BuiltinSids =
+    [
+        BuiltinGroupSid(BuiltinAdministratorsRid), BuiltinGroupSid(AccountOperatorsRid),
+        BuiltinGroupSid(ServerOperatorsRid),       BuiltinGroupSid(PrintOperatorsRid),
+        BuiltinGroupSid(BackupOperatorsRid),
+    ];
+
+    /// <summary>Is this group SID a Tier 0 (control-the-domain) group? Membership, not exposure.</summary>
+    public static bool IsTier0Sid(string? sid)
+    {
+        if (string.IsNullOrEmpty(sid)) return false;
+        if (Tier0BuiltinSids.Contains(sid)) return true;
+        return AccountSidPattern.IsMatch(sid)
+            && int.TryParse(sid[(sid.LastIndexOf('-') + 1)..], out var rid)
+            && Tier0DomainRids.Contains(rid);
+    }
+
     private static readonly Regex DomainSidPattern =
         new(@"^S-1-5-21-\d+-\d+-\d+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 

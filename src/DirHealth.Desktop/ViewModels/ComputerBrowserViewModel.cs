@@ -14,6 +14,13 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
     [ObservableProperty] private string _filterText = "";
     [ObservableProperty] private bool   _showDetail;
 
+    // S15-6 quick-filter chips. Password/admin chips do not apply to computer accounts.
+    [ObservableProperty] private bool _chipDisabled;
+    [ObservableProperty] private bool _chipInactive;
+
+    partial void OnChipDisabledChanged(bool value) => ApplyFilter();
+    partial void OnChipInactiveChanged(bool value) => ApplyFilter();
+
     /// <summary>Shared sortable/exportable table (S14-2).</summary>
     public TableViewModel<AdComputer> Table { get; }
     public ComputerDetailViewModel Detail => _detail;
@@ -32,7 +39,7 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
         _scanner = scanner;
         _detail  = detail;
         Table = new TableViewModel<AdComputer>("Computers", ViewColumns.Computers) { Dn = c => c.DistinguishedName };
-        Table.FilterDescription = () => $"text='{FilterText}'";
+        Table.FilterDescription = () => $"text='{FilterText}', chips={new QuickFilters.ComputerChips(ChipDisabled, ChipInactive)}";
         if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
         Table.SelectionChanged += row => { if (row is AdComputer c) _ = SelectComputerAsync(c); };
     }
@@ -65,9 +72,14 @@ public partial class ComputerBrowserViewModel : ListBrowserViewModel
     private void ApplyFilter()
     {
         var query = FilterText.Trim();
-        Table.SetFilter(string.IsNullOrEmpty(query) ? null : c =>
-            c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-            c.OperatingSystem.Contains(query, StringComparison.OrdinalIgnoreCase));
+        var chips = new QuickFilters.ComputerChips(ChipDisabled, ChipInactive);
+        var now   = DateTime.UtcNow;
+        if (string.IsNullOrEmpty(query) && !chips.Any) { Table.SetFilter(null); return; }
+        Table.SetFilter(c =>
+            (string.IsNullOrEmpty(query) ||
+             c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+             c.OperatingSystem.Contains(query, StringComparison.OrdinalIgnoreCase))
+            && QuickFilters.Matches(c, chips, now));
     }
 
     [RelayCommand]

@@ -30,7 +30,15 @@
                      BorderBrush="{DynamicResource InputBorderBrush}"
                      Padding="8,6" Margin="0,0,0,8"
                      x:Name="FilterBox" AutomationProperties.Name="Filter computers" />
-            <ProgressBar Grid.Row="2" Height="2" IsIndeterminate="True" Margin="0,0,0,4"
+            <!-- S15-6: local quick filters (narrow the loaded list, no new query) -->
+            <WrapPanel Grid.Row="2" Margin="0,0,0,6">
+                <TextBlock Text="Show only:" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,6"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <ToggleButton Style="{StaticResource FilterChip}" Content="Disabled"           IsChecked="{Binding ChipDisabled}" />
+                <ToggleButton Style="{StaticResource FilterChip}" Content="Inactive &gt; 90 d" IsChecked="{Binding ChipInactive}"
+                              ToolTip="No replicated logon in 90 days (±14 d), or never logged on" />
+            </WrapPanel>
+            <ProgressBar Grid.Row="3" Height="2" IsIndeterminate="True" Margin="0,0,0,4" VerticalAlignment="Top"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
             <Grid Grid.Row="3">
                 <shared:DataTable DataContext="{Binding Table}" />
