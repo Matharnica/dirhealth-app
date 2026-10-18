@@ -110,6 +110,8 @@ public partial class MainViewModel : BaseViewModel
         // S17: exceptions change the displayed score; the card shows "+X points if fixed"
         Findings.PointsFor          = category => Dashboard.ScoreResult?.PointsFor(category) ?? 0;
         Findings.ExceptionsChanged += () => Dashboard.RecomputeScore();
+        // S21-4: the findings-tab PDF shows the whole scan's score and check results
+        Findings.ReportContext      = () => new FindingsReportContext(Dashboard.ConnectedDomain, Dashboard.ScoreResult, Dashboard.ComplianceScore, Dashboard.Checks);
         Dashboard.PropertyChanged  += (_, e) =>
         {
             if (e.PropertyName == nameof(DashboardViewModel.ScoreResult)) Findings.RefreshPoints();

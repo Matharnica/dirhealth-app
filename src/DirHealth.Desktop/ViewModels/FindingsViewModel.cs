@@ -2,18 +2,22 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Export;
+using DirHealth.Desktop.Core.Export.Reports;
+using DirHealth.Desktop.Core.Services;
 using DirHealth.Desktop.Core.Storage;
 using DirHealth.Desktop.Core.AD;
 using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
+/// <summary>What the findings-tab PDF needs from the whole scan (S21-4): set by the main VM from the dashboard.</summary>
+public record FindingsReportContext(string Domain, ScoreResult? Score, int StoredScore, IReadOnlyList<CheckResult> Checks);
+
 public partial class FindingsViewModel : BaseViewModel
 {
     private readonly AcknowledgeStore _legacy;      // read-only hints from v2.9 (ADR 0001)
     private readonly ExceptionStore   _exceptions;  // per-object exceptions (ADR 0001)
     private readonly CsvExporter      _csvExporter = new();
-    private readonly PdfExporter      _pdfExporter = new();
 
     [ObservableProperty] private List<AdFinding> _findings = [];
     [ObservableProperty] private AdFinding?      _selectedFinding;
@@ -280,24 +284,62 @@ public partial class FindingsViewModel : BaseViewModel
         }
     }
 
-    [RelayCommand(CanExecute = nameof(HasFilteredFindings))]
-    public void ExportPdf()
+    // ── S21-4: findings-tab PDF through the report engine (ReportBuilder → ReportPdfRenderer) ──
+
+    /// <summary>Score and check results of the whole scan (set by the main VM). Null → the PDF has no
+    /// score breakdown and lists every rule without a result as "Failed" — never as "Passed".</summary>
+    public Func<FindingsReportContext>? ReportContext { get; set; }
+
+    /// <summary>Report options dialog; replaced in tests. Same dialog as the dashboard report.</summary>
+    public static Func<ReportOptions?> AskReportOptions { get; set; } = () => DashboardViewModel.AskReportOptions();
+
+    /// <summary>PDF save dialog; replaced in tests.</summary>
+    public static Func<string, string?> PickReportPath { get; set; } = name => DashboardViewModel.PickReportPath(name);
+
+    /// <summary>The current filter in words — printed on the PDF so a reader knows it is a selection.</summary>
+    public string FilterScopeText
     {
-        var dlg = new Microsoft.Win32.SaveFileDialog
+        get
         {
-            FileName   = $"DirHealth-Findings-{DateTime.Now:yyyyMMdd}",
-            DefaultExt = ".pdf",
-            Filter     = "PDF files|*.pdf"
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            try
-            {
-                _pdfExporter.ExportReport(FilteredFindings, Score, dlg.FileName);
-                StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)}";
-            }
-            catch (Exception ex) { StatusMessage = $"Export failed: {ex.Message}"; }
+            var parts = new List<string>();
+            if (SeverityFilter != "All") parts.Add($"severity = {SeverityFilter}");
+            if (!string.IsNullOrWhiteSpace(FilterText)) parts.Add($"text contains \"{FilterText.Trim()}\"");
+            if (!ShowAcknowledged && Findings.Any(f => f.IsAcknowledged)) parts.Add("fully excepted findings hidden");
+            var shown = $"{FilteredFindings.Count} of {Findings.Count} findings";
+            return parts.Count == 0 ? $"all findings ({shown})" : $"{string.Join(" · ", parts)} ({shown})";
         }
+    }
+
+    /// <summary>The report model for the current filter selection (pure inputs, testable).</summary>
+    public ReportModel BuildReportModel(ReportOptions options, DateTime nowLocal)
+    {
+        var ctx = ReportContext?.Invoke();
+        var input = new ReportInput(
+            Domain: ctx?.Domain ?? "", Findings: FilteredFindings,
+            Score: ctx?.Score, StoredScore: ctx?.StoredScore ?? Score, Checks: ctx?.Checks ?? [],
+            Exceptions: _exceptions.All, Diff: null, ScoreDelta: null,
+            InactiveUsers: [], ExpiringPasswords: [], DomainAdmins: [],
+            CreatedLocal: nowLocal, Version: ExportMetadata.AppVersion);
+        return ReportBuilder.Build(input, options with { FilterScope = FilterScopeText });
+    }
+
+    [RelayCommand(CanExecute = nameof(HasFilteredFindings))]
+    public async Task ExportPdfAsync()
+    {
+        var options = AskReportOptions();
+        if (options is null) return;
+        var path = PickReportPath($"DirHealth-Findings-{DateTime.Now:yyyyMMdd}");
+        if (path is null) return;
+        try
+        {
+            var model = BuildReportModel(options, DateTime.Now);
+            await Task.Run(() => ReportPdfRenderer.Render(model, path));
+            ExportMetadata.WriteFor(path, new ExportContext(model.Domain.Length > 0 ? model.Domain : "unknown", "unknown", Environment.UserName),
+                $"Findings report ({options.Kind})",
+                (model.FilterScope ?? "") + (options.RedactUserNames ? " · user names redacted" : ""), FilteredFindings.Count);
+            StatusMessage = $"Exported: {System.IO.Path.GetFileName(path)} (+ .meta.txt)";
+        }
+        catch (Exception ex) { StatusMessage = $"Export failed: {ex.Message}"; }
     }
 
     private bool HasFilteredFindings() => FilteredFindings.Count > 0;
