@@ -45,9 +45,8 @@ public class XlsxExporter
         return list;
     }
 
-    /// <summary>Writes the workbook. Returns the number of data rows.</summary>
-    public int Export(IEnumerable<object> rows, IReadOnlyList<ITableColumn> columns, string filePath,
-                      IReadOnlyList<(string Key, string Value)> info)
+    /// <summary>Header row + typed, cleaned cells for one sheet. Returns the records and the data row count.</summary>
+    private static (List<Dictionary<string, object?>> Records, int Count) Records(IEnumerable<object> rows, IReadOnlyList<ITableColumn> columns)
     {
         var headers = Headers(columns);
         var data = new List<Dictionary<string, object?>>();
@@ -65,13 +64,80 @@ public class XlsxExporter
         }
         // MiniExcel derives the header row from the first record; keep it for an empty table too
         if (data.Count == 0) data.Add(headers.ToDictionary(h => h, _ => (object?)null));
+        return (data, count);
+    }
 
-        var infoRows = info.Select(kv => new Dictionary<string, object?> { ["Key"] = kv.Key, ["Value"] = CleanText(kv.Value) }).ToList();
+    private static List<Dictionary<string, object?>> InfoRecords(IReadOnlyList<(string Key, string Value)> info) =>
+        info.Select(kv => new Dictionary<string, object?> { ["Key"] = kv.Key, ["Value"] = CleanText(kv.Value) }).ToList();
 
-        var sheets = new Dictionary<string, object> { ["Data"] = data, ["Info"] = infoRows };
-        // Explicit, not defaults — defaults may change with 2.x (ADR 0003)
+    private static void Save(string filePath, Dictionary<string, object> sheets)
+    {
+        // Explicit, not defaults — defaults may change with 2.x (ADR 0003). Applies to every sheet.
         var config = new OpenXmlConfiguration { FreezeRowCount = 1, AutoFilter = true };
         MiniExcel.SaveAs(filePath, sheets, printHeader: true, excelType: ExcelType.XLSX, configuration: config, overwriteFile: true);
+    }
+
+    /// <summary>Writes the workbook. Returns the number of data rows.</summary>
+    public int Export(IEnumerable<object> rows, IReadOnlyList<ITableColumn> columns, string filePath,
+                      IReadOnlyList<(string Key, string Value)> info)
+    {
+        var (data, count) = Records(rows, columns);
+        Save(filePath, new Dictionary<string, object> { ["Data"] = data, ["Info"] = InfoRecords(info) });
         return count;
     }
+
+    // ── S22-6: several sheets in one workbook ────────────────────────────────
+
+    /// <summary>Excel's limit for a sheet name.</summary>
+    public const int MaxSheetName = 31;
+    private static readonly char[] InvalidSheetChars = ['[', ']', ':', '*', '?', '/', '\\'];
+
+    /// <summary>
+    /// Excel-safe, unique sheet names in input order (S22-6): forbidden characters <c>[]:*?/\</c> replaced,
+    /// control characters removed, no leading/trailing apostrophe, at most 31 characters, unique ignoring
+    /// case (a clash gets " (2)", " (3)" … within the 31), "History" avoided (reserved by Excel).
+    /// </summary>
+    public static List<string> SheetNames(IEnumerable<string> wanted)
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "History" };
+        var result = new List<string>();
+        foreach (var w in wanted)
+        {
+            var chars = (w ?? "").Where(ch => ch >= 0x20).Select(ch => InvalidSheetChars.Contains(ch) ? '_' : ch).ToArray();
+            var baseName = new string(chars).Trim().Trim('\'').Trim();
+            if (baseName.Length == 0) baseName = "Sheet";
+            if (baseName.Length > MaxSheetName) baseName = baseName[..MaxSheetName].TrimEnd();
+            var name = baseName;
+            for (int n = 2; !used.Add(name); n++)
+            {
+                var suffix = $" ({n})";
+                name = (baseName.Length + suffix.Length > MaxSheetName ? baseName[..(MaxSheetName - suffix.Length)].TrimEnd() : baseName) + suffix;
+            }
+            result.Add(name);
+        }
+        return result;
+    }
+
+    /// <summary>Writes one workbook with the given sheets in order. Names must come from <see cref="SheetNames"/>.</summary>
+    public void ExportSheets(IReadOnlyList<XlsxSheet> sheets, string filePath)
+    {
+        var dict = new Dictionary<string, object>();
+        foreach (var sh in sheets)
+        {
+            if (sh.Name.Length > MaxSheetName || sh.Name.IndexOfAny(InvalidSheetChars) >= 0)
+                throw new ArgumentException($"Invalid sheet name: {sh.Name}");
+            dict.Add(sh.Name, sh.InfoRows is { } info ? InfoRecords(info) : Records(sh.Rows, sh.Columns).Records);
+        }
+        Save(filePath, dict);
+    }
+}
+
+/// <summary>One sheet of a multi-sheet workbook (S22-6): table rows + columns, or key/value info rows.</summary>
+public sealed record XlsxSheet(string Name, IEnumerable<object> Rows, IReadOnlyList<ITableColumn> Columns)
+{
+    public IReadOnlyList<(string Key, string Value)>? InfoRows { get; init; }
+
+    /// <summary>A "Key | Value" sheet like the S14-5 info sheet (no hash — ADR 0003).</summary>
+    public static XlsxSheet Info(string name, IReadOnlyList<(string Key, string Value)> info) =>
+        new(name, [], []) { InfoRows = info };
 }

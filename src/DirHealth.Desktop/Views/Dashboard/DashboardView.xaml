@@ -163,6 +163,22 @@
                             Content="Full Report PDF"
                             Command="{Binding ExportFullReportCommand}"
                             FontSize="12" />
+                    <!-- S22: exports for work and audit — enabled only after a live scan -->
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Content="Work List (CSV / Excel)"
+                            ToolTip="One row per rule and object: rule id, severity, weight, object, DN, SID, exception, how to fix"
+                            Command="{Binding ExportWorklistCommand}"
+                            FontSize="12" Margin="0,8,0,0" />
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Content="Workbook Excel"
+                            ToolTip="Summary sheet, one sheet per finding, info sheet"
+                            Command="{Binding ExportWorkbookCommand}"
+                            FontSize="12" Margin="0,8,0,0" />
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Content="Scan JSON"
+                            ToolTip="The whole scan as versioned JSON for scripts and SIEM"
+                            Command="{Binding ExportScanJsonCommand}"
+                            FontSize="12" Margin="0,8,0,0" />
                 </StackPanel>
             </Grid>
         </Border>

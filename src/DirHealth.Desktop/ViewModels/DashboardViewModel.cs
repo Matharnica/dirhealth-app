@@ -30,7 +30,8 @@ public partial class DashboardViewModel : BaseViewModel
     [ObservableProperty] private int    _groupIssuesCount;
     [ObservableProperty] private string _connectedDomain = "";
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ExportFullReportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportFullReportCommand), nameof(ExportWorklistCommand),
+                                nameof(ExportWorkbookCommand), nameof(ExportScanJsonCommand))]
     [NotifyPropertyChangedFor(nameof(IsFirstRun))]
     private string _lastScanTime = "Never";
     [ObservableProperty] private List<AdFinding> _findings = [];
@@ -134,8 +135,11 @@ public partial class DashboardViewModel : BaseViewModel
         LoadCachedResults();
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(IsBusy))
-                ExportFullReportCommand.NotifyCanExecuteChanged();
+            if (e.PropertyName != nameof(IsBusy)) return;
+            ExportFullReportCommand.NotifyCanExecuteChanged();
+            ExportWorklistCommand.NotifyCanExecuteChanged();
+            ExportWorkbookCommand.NotifyCanExecuteChanged();
+            ExportScanJsonCommand.NotifyCanExecuteChanged();
         };
 
         var refreshTimer = new System.Windows.Threading.DispatcherTimer
@@ -291,6 +295,87 @@ public partial class DashboardViewModel : BaseViewModel
         var dlg = new Microsoft.Win32.SaveFileDialog { FileName = name, DefaultExt = ".pdf", Filter = "PDF files|*.pdf" };
         return dlg.ShowDialog() == true ? dlg.FileName : null;
     };
+
+    // ── S22: exports for work and audit (worklist, workbook, JSON) ─────────────
+
+    /// <summary>Save dialog hook for the S22 exports (suggested name, filter, default extension); replaced in tests.</summary>
+    public static Func<string, string, string, string?> PickExportPath { get; set; } = (name, filter, ext) =>
+    {
+        var dlg = new Microsoft.Win32.SaveFileDialog { FileName = name, DefaultExt = ext, Filter = filter };
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
+    };
+
+    /// <summary>Runs one export off the UI thread with the shared busy/status/error handling (S22).</summary>
+    private async Task RunExportAsync(string what, string path, Func<Core.Export.ExportContext, string> write)
+    {
+        IsBusy = true;
+        StatusMessage = $"Exporting {what}…";
+        try
+        {
+            _exceptions.Apply(Findings, DateTime.UtcNow);   // exception state per object (ADR 0001)
+            var ctx = SafeExportContext();
+            var done = await Task.Run(() => write(ctx));
+            StatusMessage = $"{done}: {System.IO.Path.GetFileName(path)} (+ .meta.txt)";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>S22-5: one row per rule × object, as CSV or Excel (chosen by the file type in the dialog).</summary>
+    [RelayCommand(CanExecute = nameof(HasScanData))]
+    public async Task ExportWorklistAsync()
+    {
+        var path = PickExportPath($"DirHealth-Worklist-{DateTime.Now:yyyyMMdd}", "CSV files|*.csv|Excel workbook|*.xlsx", ".csv");
+        if (path is null) return;
+        var findings = Findings.ToList();
+        bool xlsx = path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+        await RunExportAsync("work list", path, ctx =>
+        {
+            int n = xlsx ? WorklistExporter.ExportXlsx(findings, path, ctx) : WorklistExporter.ExportCsv(findings, path, ctx);
+            return $"Work list saved ({n} row(s))";
+        });
+    }
+
+    /// <summary>S22-6: "Summary" + one sheet per finding + "Info".</summary>
+    [RelayCommand(CanExecute = nameof(HasScanData))]
+    public async Task ExportWorkbookAsync()
+    {
+        var path = PickExportPath($"DirHealth-Workbook-{DateTime.Now:yyyyMMdd}", "Excel workbook|*.xlsx", ".xlsx");
+        if (path is null) return;
+        var findings = Findings.ToList();
+        var score = ScoreResult;
+        await RunExportAsync("workbook", path, ctx =>
+        {
+            int sheets = WorklistExporter.ExportWorkbook(findings, score, path, ctx);
+            return $"Workbook saved ({sheets} sheet(s))";
+        });
+    }
+
+    /// <summary>S22-7: the whole scan as versioned JSON (ADR 0005).</summary>
+    [RelayCommand(CanExecute = nameof(HasScanData))]
+    public async Task ExportScanJsonAsync()
+    {
+        var path = PickExportPath($"DirHealth-Scan-{DateTime.Now:yyyyMMdd}", "JSON files|*.json", ".json");
+        if (path is null) return;
+        var findings = Findings.ToList();
+        var checks   = Checks.ToList();
+        var score    = ScoreResult;
+        var totals   = _totals;
+        var scanTime = LastScanTime;
+        await RunExportAsync("scan JSON", path, ctx =>
+        {
+            var input = new ScanJsonInput(findings, checks, score, totals, ctx.Domain, ctx.DomainController,
+                                          scanTime, DateTime.UtcNow, ExportMetadata.AppVersion);
+            int n = ScanJsonExporter.Export(input, path, ctx);
+            return $"Scan JSON saved ({n} finding(s))";
+        });
+    }
 
     private Core.Export.ExportContext SafeExportContext()
     {
