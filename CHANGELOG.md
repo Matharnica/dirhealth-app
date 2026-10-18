@@ -6,7 +6,27 @@ All notable changes to DirHealth are documented here.
 
 ## [Unreleased]
 
-> Sprints 13–20 ship together as **3.0.0** once the live test against a real domain is done (major version: the score changes without any change in your AD, and old acknowledgements no longer hide findings).
+> Sprints 13–23 ship together as **3.0.0** once the live test against a real domain is done (major version: the score changes without any change in your AD, and old acknowledgements no longer hide findings).
+
+### Added — Sprint 23 (High-value checks) — ⚠ your score will drop without any change in AD
+- **Privileged SID in SID history** (DH-PRV-010, Critical) — an account whose sIDHistory carries a Domain Admins, Enterprise Admins or BUILTIN\Administrators SID has those rights silently. Ordinary SID history is still reported by DH-USR-005.
+- **Backdoors on Tier 0 accounts** (DH-PRV-011–013) — key credentials (shadow credentials), explicit certificate mappings (`altSecurityIdentities`) and "trusted to authenticate for delegation" (protocol transition). DirHealth only checks that a value exists — it never reads key material. Three separate rules, so an exception for one does not hide the others.
+- **Recoverability** — no system-state backup of AD in the last 7 days (DH-DOM-010, read from the backup metadata `repadmin /showbackup` uses) and SYSVOL still replicated by the retired NTFRS (DH-DOM-011). Missing metadata reports **Failed**, never passed.
+- Score model version 5: the dashboard shows a one-time notice; trend and report do not compare across the change.
+
+### Added — Sprint 22 (Exports for work and audit)
+- **Work list** (CSV or Excel) — one row per rule and object with rule id, finding, severity, weight, object, DN, SID, exception state and fix. Ready to filter, assign and tick off.
+- **Excel workbook** — a Summary sheet, one sheet per finding with its objects, and an Info sheet.
+- **Scan as JSON** — the whole scan (score, checks, findings, objects, exception states) with `schemaVersion` and `formulaVersion`, for scripts and SIEM imports. Never contains password, LAPS or BitLocker attributes.
+- All three buttons sit on the dashboard and write the usual `.meta.txt` with SHA-256.
+
+### Added — Sprint 21 (Report for management)
+- **Risk matrix** (area × severity, open findings only) in the Summary and Full PDF report.
+- **References per finding** in the Full report (MITRE ATT&CK, Microsoft) as clickable links with the URL printed.
+- **"What was checked" appendix** — every rule with its status (Found / Passed / Failed / Not applicable), so a clean result is visible as clean.
+
+### Changed — Sprint 21
+- The Findings tab PDF now uses the same report engine as the dashboard (Summary/Full, redaction, "Page x of y", `.meta.txt`) and states the active filter. The old findings PDF layout is gone.
 
 ### Fixed — Follow-up review of Sprints 13–20
 - **A check that could not read its data no longer reads as "Passed"** — the krbtgt, Guest, Pre-Windows 2000, operator-group, Recycle Bin and dSHeuristics checks used to report "passed" when the object they look at could not be read; they now report **Failed** with the reason. Domain-basics and LAPS/machine-account checks now run one query per rule, so one unreadable object fails only its own rule and the other rules keep their findings.
