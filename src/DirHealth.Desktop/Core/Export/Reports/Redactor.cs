@@ -58,6 +58,10 @@ public sealed class Redactor
         Exceptions   = m.Exceptions.Select(e => e with { Object = Apply(e.Object), Reason = Apply(e.Reason), CreatedBy = Apply(e.CreatedBy) }).ToList(),
         FailedChecks = m.FailedChecks.Select(c => c with { Reason = Apply(c.Reason) }).ToList(),
         Appendix     = m.Appendix.Select(a => (a.Title, Apply(a.Table))).ToList(),
+        // S21: the filter text is typed by the user and may hold a name; check reasons can quote a DN.
+        // References and the risk matrix are catalog text and counts — nothing personal, left as is.
+        FilterScope  = m.FilterScope is null ? null : Apply(m.FilterScope),
+        CheckedRules = m.CheckedRules.Select(c => c with { Reason = Apply(c.Reason) }).ToList(),
         Redacted     = true,
     };
 }

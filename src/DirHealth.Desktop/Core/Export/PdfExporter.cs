@@ -10,86 +10,8 @@ namespace DirHealth.Desktop.Core.Export;
 
 public class PdfExporter
 {
-    public void ExportReport(List<AdFinding> findings, int score, string filePath)
-    {
-        var doc = new PdfDocument();
-        doc.Info.Title = "DirHealth AD Report";
-        var ui      = new PdfPageBuilder();
-        int pageNum = 1;
-
-        var page = doc.AddPage();
-        var gfx  = XGraphics.FromPdfPage(page);
-        ui.DrawHeader(gfx, page, "AD Health Report");
-        ui.DrawFooter(gfx, page, "—", pageNum++);
-
-        // Title strip (page 1 only)
-        ui.DrawTitleStrip(gfx, page,
-            "AD Health Report",
-            $"Score: {score}/100  ·  {ui.ScoreLabel(score)}",
-            $"{DateTime.Now:yyyy-MM-dd HH:mm}  ·  {findings.Count} findings");
-
-        double y        = ui.ContentTop + 40 + 16; // below title strip
-        double contentW = ui.ContentWidth(page);
-
-        void NewPage()
-        {
-            page = doc.AddPage();
-            gfx  = XGraphics.FromPdfPage(page);
-            ui.DrawHeader(gfx, page, "AD Health Report");
-            ui.DrawFooter(gfx, page, "—", pageNum++);
-            y = ui.ContentTop + 16;
-        }
-
-        foreach (var finding in findings)
-        {
-            // Each finding takes ≈ title + description + wrapped remediation + affected
-            if (y > ui.ContentBottom(page) - 90) NewPage();
-
-            var (bg, border, txt) = ui.SeverityStyle(finding.Severity);
-
-            // Draw the background + left border
-            gfx.DrawRectangle(new XSolidBrush(bg),
-                PdfPageBuilder.Margin, y, contentW, PdfPageBuilder.RowH);
-            gfx.DrawRectangle(new XSolidBrush(border),
-                PdfPageBuilder.Margin, y, 3, PdfPageBuilder.RowH);
-
-            gfx.DrawString(
-                $"[{finding.Severity}]  {finding.Title}",
-                PdfPageBuilder.F10B, txt,
-                PdfPageBuilder.Margin + 10, y + PdfPageBuilder.RowH - 6);
-            y += PdfPageBuilder.RowH;
-
-            // Description
-            gfx.DrawString(finding.Description, PdfPageBuilder.F9,
-                new XSolidBrush(PdfPageBuilder.ColLabelGray),
-                PdfPageBuilder.Margin + 14, y + 12);
-            y += 16;
-
-            // Remediation (wrapped) — the concrete fix, printed under the description
-            y = ui.DrawRemediation(gfx, page, finding, y);
-
-            // Affected objects
-            if (finding.AffectedObjects.Count > 0)
-            {
-                var preview = string.Join(", ", finding.AffectedObjects.Take(5));
-                if (finding.AffectedObjects.Count > 5)
-                    preview += $" (+{finding.AffectedObjects.Count - 5} more)";
-                gfx.DrawString(preview, PdfPageBuilder.F9,
-                    new XSolidBrush(PdfPageBuilder.ColLow),
-                    PdfPageBuilder.Margin + 14, y + 12);
-                y += 16;
-            }
-            y += PdfPageBuilder.RowGap + 4;
-        }
-
-        if (findings.Count == 0)
-            gfx.DrawString(
-                "No findings — AD environment looks healthy!",
-                PdfPageBuilder.F10, new XSolidBrush(PdfPageBuilder.ColLow),
-                PdfPageBuilder.Margin, y + 16);
-
-        doc.Save(filePath);
-    }
+    // S21-4: the findings-tab PDF goes through ReportBuilder → ReportPdfRenderer like the dashboard
+    // report — the separate ExportReport layout was removed (one PDF engine for findings).
 
     public void ExportPasswordReport(IEnumerable<AdUser> users, string filePath)
     {
@@ -458,20 +380,6 @@ internal sealed class PdfPageBuilder
         return lines;
     }
 
-    // Draws the wrapped remediation guidance under a finding; returns the new y. No-op when empty.
-    internal double DrawRemediation(XGraphics gfx, PdfPage page, AdFinding finding, double y)
-    {
-        if (string.IsNullOrEmpty(finding.Remediation)) return y;
-        var fixBrush = new XSolidBrush(ColGradEnd);
-        double maxW  = ContentWidth(page) - 24;
-        foreach (var line in WrapText(gfx, "→ Fix: " + finding.Remediation, F9, maxW))
-        {
-            gfx.DrawString(line, F9, fixBrush, Margin + 14, y + 12);
-            y += 13;
-        }
-        return y + 3;
-    }
-
     internal (XColor bg, XColor border, XSolidBrush text) SeverityStyle(FindingSeverity sev) =>
         sev switch
         {
@@ -487,9 +395,4 @@ internal sealed class PdfPageBuilder
         score >= 80 ? ColScoreGood :
         score >= 60 ? ColScoreWarn :
                       ColScoreCrit;
-
-    internal string ScoreLabel(int score) =>
-        score >= 80 ? "Good" :
-        score >= 60 ? "Warning" :
-                      "Critical";
 }
