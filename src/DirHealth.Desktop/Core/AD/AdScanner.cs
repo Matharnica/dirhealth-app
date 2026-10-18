@@ -31,7 +31,7 @@ public partial class AdScanner
         ScanTotals        Totals);
 
     /// <summary>
-    /// S19-3 / S20-2 checks as one sub-query per rule source: each reads a different object,
+    /// S19-3 / S20-2 / S23 checks as one sub-query per rule source: each reads a different object,
     /// so one failed read marks only its own rules "Failed" (S16-4). The names are the
     /// <see cref="ScanGuard.QueryOf"/> targets — a test checks both lists match.
     /// </summary>
@@ -49,6 +49,11 @@ public partial class AdScanner
         ("Remaining.Duplicates",            GetDuplicateObjectFindingsAsync),
         ("Remaining.DsHeuristics",          GetDsHeuristicsFindingsAsync),
         ("Remaining.Smartcard",             GetSmartcardFindingsAsync),
+        // Sprint 23 (S23-1 … S23-3)
+        ("Privileged.SidHistory",           GetPrivilegedSidHistoryFindingsAsync),
+        ("Privileged.Backdoors",            GetAdminBackdoorFindingsAsync),
+        ("Recovery.Backup",                 GetBackupFindingsAsync),
+        ("Recovery.Sysvol",                 GetSysvolReplicationFindingsAsync),
     ];
 
     public async Task<CompleteScanResult> RunCompleteScanAsync()
@@ -89,7 +94,7 @@ public partial class AdScanner
         var operatorsTask      = Timed("OperatorGroups",           () => GetOperatorGroupFindingsAsync(),           scanLog);
         var kerbEncTask        = Timed("KerberosEncryption",       () => GetKerberosEncryptionFindingsAsync(),      scanLog);
         var delegTrustTask     = Timed("DelegationTrusts",         () => GetDelegationTrustFindingsAsync(),         scanLog);
-        var splitTasks         = SplitChecks().Select(c => Timed(c.Query, c.Run, scanLog)).ToList();   // S19-3 / S20-2
+        var splitTasks         = SplitChecks().Select(c => Timed(c.Query, c.Run, scanLog)).ToList();   // S19-3 / S20-2 / S23
 
         try
         {

@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace DirHealth.Desktop.Core.Storage;
 
-/// <summary>FormulaVersion: 1 = v2.9 and earlier (missing in old files), 2 = ADR 0002 (S17), 3 = S19 rules, 4 = S20 rules — see ScoreModel.FormulaVersion.</summary>
+/// <summary>FormulaVersion: 1 = v2.9 and earlier (missing in old files), 2 = ADR 0002 (S17), 3 = S19 rules, 4 = S20 rules, 5 = S23 rules — see ScoreModel.FormulaVersion.</summary>
 public record ScoreEntry(DateTime Timestamp, int Score, int FormulaVersion = 1);
 
 public class ScoreHistoryStore

@@ -50,6 +50,9 @@ public class FollowUpS13to20Tests
         "FunctionalLevelOld", "SingleDomainController",
         "LapsNotDeployed", "ComputersWithoutLaps", "MachinePasswordNotRotated", "DuplicateObjects",
         "AnonymousLdapAllowed", "AdminSdExMask", "SmartcardOldPassword",
+        // Sprint 23
+        "PrivilegedSidHistory", "AdminShadowCredentials", "AdminAltSecurityIdentities", "AdminProtocolTransition",
+        "BackupOutdated", "SysvolNtfrs",
     ];
 
     [Fact]

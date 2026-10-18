@@ -122,4 +122,33 @@ public static class CheckFilters
 
     public static string SmartcardOldPassword(string cutoff) =>
         "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=262144)" + $"(pwdLastSet<={cutoff}))";
+
+    // ── Sprint 23 ────────────────────────────────────────────────────────────
+    /// <summary>
+    /// (S23-1) Enabled users/computers and all groups with sIDHistory. Groups have no userAccountControl,
+    /// so the "not disabled" clause alone would be undefined for them and drop them — hence the OR.
+    /// The SID values are read and evaluated client-side (CheckLogic.IsPrivilegedHistorySid).
+    /// </summary>
+    public const string SidHistoryAnyObject =
+        "(&(sIDHistory=*)(|(objectClass=group)" + NotDisabled + "))";
+
+    /// <summary>(S23-2) Presence only — the key material in msDS-KeyCredentialLink is never requested.</summary>
+    public const string ShadowCredentialUsers = "(&" + EnabledUser + "(msDS-KeyCredentialLink=*))";
+
+    /// <summary>(S23-2) Presence only — the certificate mappings in altSecurityIdentities are never requested.</summary>
+    public const string AltSecurityIdentityUsers = "(&" + EnabledUser + "(altSecurityIdentities=*))";
+
+    /// <summary>(S23-2) TRUSTED_TO_AUTH_FOR_DELEGATION (0x1000000) — constrained delegation with protocol transition.</summary>
+    public const string ProtocolTransitionUsers =
+        "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=16777216))";
+
+    /// <summary>
+    /// (S23-3) Last system-state backup (dSASignature metadata) may be at most this old.
+    /// Annahme, mit Stefan klären (Plan S23-10): 7 days = at least one backup per week.
+    /// </summary>
+    public const int BackupMaxDays = 7;
+
+    /// <summary>(S23-3) Global SYSVOL migration state object (relative to the domain DN) and its "Eliminated" value.</summary>
+    public const string DfsrGlobalSettingsRdn = "CN=DFSR-GlobalSettings,CN=System";
+    public const int    DfsrEliminated        = 48;
 }
