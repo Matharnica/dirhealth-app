@@ -153,6 +153,104 @@ public static class CheckLogic
         return !spnExists("HOST/" + host);
     }
 
+    // ── S23-1 privileged SID in sIDHistory ────────────────────────────────────
+    /// <summary>
+    /// Domain-relative RIDs that make a SID in sIDHistory privileged, matched in any domain (own or foreign —
+    /// without SID filtering a foreign Domain Admins SID works here as well): the Tier 0 groups of
+    /// <see cref="WellKnownGroups.IsTier0Sid"/> (512, 517, 518, 519, 526, 527) plus built-in Administrator 500,
+    /// krbtgt 502 and Domain Controllers 516 (replication rights → DCSync). The fix block uses the same lists.
+    /// </summary>
+    public static readonly IReadOnlyList<int> PrivilegedDomainRids = [500, 502, 512, 516, 517, 518, 519, 526, 527];
+
+    /// <summary>BUILTIN Administrators and the operator groups (S-1-5-32-xxx).</summary>
+    public static readonly IReadOnlyList<int> PrivilegedBuiltinRids = [544, 548, 549, 550, 551];
+
+    /// <summary>Enterprise Domain Controllers (well-known).</summary>
+    public const string EnterpriseDomainControllersSid = "S-1-5-9";
+
+    private static readonly System.Text.RegularExpressions.Regex DomainAccountSid =
+        new(@"^S-1-5-21-\d+-\d+-\d+-(\d+)$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>Is a SID found in sIDHistory a privileged one (S23-1)?</summary>
+    public static bool IsPrivilegedHistorySid(string? sid)
+    {
+        if (string.IsNullOrEmpty(sid)) return false;
+        if (sid == EnterpriseDomainControllersSid || WellKnownGroups.IsTier0Sid(sid)) return true;
+        if (PrivilegedBuiltinRids.Any(r => sid == WellKnownGroups.BuiltinGroupSid(r))) return true;
+        var m = DomainAccountSid.Match(sid);
+        return m.Success && int.TryParse(m.Groups[1].Value, out var rid) && PrivilegedDomainRids.Contains(rid);
+    }
+
+    public static IReadOnlyList<string> PrivilegedHistorySids(IEnumerable<string> sidHistory) =>
+        sidHistory.Where(IsPrivilegedHistorySid).ToList();
+
+    // ── S23-2 admin backdoors on Tier 0 accounts ──────────────────────────────
+    /// <param name="HasKeyCredential">msDS-KeyCredentialLink present (presence filter, value never read).</param>
+    /// <param name="HasAltSecurityIdentities">altSecurityIdentities present (presence filter, value never read).</param>
+    public record BackdoorFacts(int UserAccountControl, bool HasKeyCredential, bool HasAltSecurityIdentities);
+
+    [Flags]
+    public enum BackdoorIssue { None = 0, ShadowCredentials = 1, AltSecurityIdentities = 2, ProtocolTransition = 4 }
+
+    public static BackdoorIssue EvaluateBackdoors(BackdoorFacts f)
+    {
+        var issues = BackdoorIssue.None;
+        if (f.HasKeyCredential)         issues |= BackdoorIssue.ShadowCredentials;
+        if (f.HasAltSecurityIdentities) issues |= BackdoorIssue.AltSecurityIdentities;
+        if (UacFlags.Has(f.UserAccountControl, UacFlags.TrustedToAuthForDelegation)) issues |= BackdoorIssue.ProtocolTransition;
+        return issues;
+    }
+
+    // ── S23-3 recoverability ──────────────────────────────────────────────────
+    /// <summary>
+    /// Time of the last system-state backup from the msDS-ReplAttributeMetaData values of a naming-context head
+    /// (one XML document per attribute, DS_REPL_ATTR_META_DATA). A backup updates dSASignature, so its
+    /// ftimeLastOriginatingChange is the backup time (what "repadmin /showbackup" prints). Returns
+    /// <see cref="DateTime.MinValue"/> when the metadata says "never" (1601). Throws when the dSASignature entry
+    /// is missing or unreadable — the check must read "Failed", never "Passed".
+    /// </summary>
+    public static DateTime LastBackupUtc(IEnumerable<string> replAttributeMetaData)
+    {
+        foreach (var raw in replAttributeMetaData)
+        {
+            var xml = raw.TrimEnd('\0', ' ', '\r', '\n');
+            if (!xml.Contains("dSASignature", StringComparison.OrdinalIgnoreCase)) continue;
+            System.Xml.Linq.XElement doc;
+            try { doc = System.Xml.Linq.XElement.Parse(xml); }
+            catch (System.Xml.XmlException ex) { throw new InvalidOperationException("Replication metadata could not be parsed.", ex); }
+            if (!string.Equals(doc.Element("pszAttributeName")?.Value.Trim(), "dSASignature", StringComparison.OrdinalIgnoreCase)) continue;
+            var t = doc.Element("ftimeLastOriginatingChange")?.Value.Trim();
+            if (!DateTime.TryParse(t, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var when))
+                throw new InvalidOperationException($"dSASignature timestamp could not be read: '{t}'.");
+            return when.Year <= 1601 ? DateTime.MinValue : DateTime.SpecifyKind(when, DateTimeKind.Utc);
+        }
+        throw new InvalidOperationException("No dSASignature replication metadata found — backup age unknown.");
+    }
+
+    public static bool BackupTooOld(DateTime lastBackupUtc, DateTime nowUtc) =>
+        lastBackupUtc == DateTime.MinValue || (nowUtc - lastBackupUtc).TotalDays > CheckFilters.BackupMaxDays;
+
+    /// <summary>
+    /// SYSVOL still replicated by NTFRS? Source: Microsoft, "Verifying the State of SYSVOL Migration"
+    /// (https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-r2-and-2008/dd639789(v=ws.10)):
+    /// msDFSR-Flags on CN=DFSR-GlobalSettings,CN=System holds the global state — Start 0, Prepared 16,
+    /// Redirected 32, Eliminated 48; only Eliminated means NTFRS no longer replicates SYSVOL.
+    /// Without the DFSR object the domain never started the migration — that is only accepted as a finding when
+    /// the FRS SYSVOL replica set is visible; if neither object can be seen, or the attribute is missing,
+    /// the state is unknown and the check throws (Failed).
+    /// </summary>
+    public static bool SysvolOnNtfrs(bool dfsrGlobalSettingsFound, int? msDfsrFlags, bool frsSysvolReplicaSetFound)
+    {
+        if (dfsrGlobalSettingsFound)
+            return msDfsrFlags is { } f
+                ? f != CheckFilters.DfsrEliminated
+                : throw new InvalidOperationException("msDFSR-Flags is missing on DFSR-GlobalSettings — SYSVOL migration state unknown.");
+        return frsSysvolReplicaSetFound
+            ? true
+            : throw new InvalidOperationException("Neither DFSR-GlobalSettings nor the FRS SYSVOL replica set could be read.");
+    }
+
     // trustAttributes bits (MS-ADTS 6.1.6.7.9)
     public const int TrustNonTransitive          = 0x1;
     public const int TrustQuarantinedDomain      = 0x4;    // SID filtering on an external trust

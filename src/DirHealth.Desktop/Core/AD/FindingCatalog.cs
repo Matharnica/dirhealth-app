@@ -167,6 +167,13 @@ public static class FindingCatalog
         ["AnonymousLdapAllowed"]             = (ScoreMeasure.Presence, 1, ScorePopulation.None),
         ["AdminSdExMask"]                    = (ScoreMeasure.Presence, 1, ScorePopulation.None),
         ["SmartcardOldPassword"]             = (ScoreMeasure.Count, 3, ScorePopulation.None),
+        // Sprint 23 (formula v5)
+        ["PrivilegedSidHistory"]             = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminShadowCredentials"]           = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminAltSecurityIdentities"]       = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["AdminProtocolTransition"]          = (ScoreMeasure.Count, 1, ScorePopulation.None),
+        ["BackupOutdated"]                   = (ScoreMeasure.Presence, 1, ScorePopulation.None),
+        ["SysvolNtfrs"]                      = (ScoreMeasure.Presence, 1, ScorePopulation.None),
     };
 
     /// <summary>Object rules whose objects have no SID (trusts) — keyed by name like policy rules (ADR 0001).</summary>
@@ -802,5 +809,116 @@ public static class FindingCatalog
             "Between the two steps the account can log on with a password; run both steps together.",
             ObjectRevert("DH-USR-006", "Set-ADUser -Identity $_.DistinguishedName -SmartcardLogonRequired $true"),
             CheckFilters.SmartcardOldPassword("$cutoff"));
+
+        // ══ Sprint 23 — checks with high value ═══════════════════════════════
+
+        // ── S23-1 privileged SID in sIDHistory (separate from DH-USR-005, which lists every SID history) ──
+        yield return new("PrivilegedSidHistory", "DH-PRV-010", 10,
+            "Enabled accounts and groups whose sIDHistory contains a privileged SID — Domain/Enterprise/Schema Admins, Administrator, krbtgt, Domain Controllers, Key Admins, Cert Publishers or the BUILTIN Administrators/operator groups of this or any other domain.",
+            "Windows adds every sIDHistory SID to the logon token. An account with a Domain Admins SID in its history is a Domain Admin without being in the group — the classic persistence trick after a compromise (SID-history injection).",
+            "Remove the privileged SIDs from sIDHistory now; if a migration is still running, privileged SIDs never belong in the history. Then check how they got there (only DsAddSidHistory/ADMT or a DC compromise can write them).",
+            [Mitre("T1134.005", "Access Token Manipulation: SID-History Injection"),
+             new("Microsoft Defender for Identity: Unsecure SID History attributes", "https://learn.microsoft.com/en-us/defender-for-identity/security-assessment-unsecure-sid-history-attribute")],
+            PrivilegedSidHistoryFix(),
+            "Access that genuinely depended on the privileged historical SID is lost — which is the intended outcome; no regular account needs it.",
+            "# sIDHistory cannot be written back with PowerShell — only DsAddSidHistory/ADMT during a migration can set it.\n" +
+            "# To undo, restore the objects from a system-state backup (authoritative restore). The backup CSV lists the removed SIDs.",
+            CheckFilters.SidHistoryAnyObject);
+
+        // ── S23-2 admin backdoors on Tier 0 accounts ─────────────────────────
+        // Three rules instead of one: each backdoor has its own legitimate use, fix and side effect, and an
+        // exception for one (e.g. a smart-card mapping) must not hide the other two.
+        yield return new("AdminShadowCredentials", "DH-PRV-011", 8,
+            "Enabled Tier 0 accounts with msDS-KeyCredentialLink set (DirHealth only checks that a value exists — it never reads the keys).",
+            "Whoever can write a key credential to an admin account logs on as that admin with PKINIT, without knowing the password and surviving password resets (\"Shadow Credentials\"). Windows Hello for Business also writes this attribute — on an admin account that is rare and should be deliberate.",
+            "Confirm each key belongs to a Windows Hello for Business / FIDO device the admin really uses; clear unknown keys and reset the password. Prefer admin accounts without Hello for Business.",
+            [Mitre("T1556", "Modify Authentication Process"),
+             new("Microsoft: Windows Hello for Business key trust", "https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/deploy/hybrid-key-trust")],
+            Tier0Preamble +
+            "$targets = $admins | Get-ADUser -Properties 'msDS-KeyCredentialLink' | Where-Object { $_.'msDS-KeyCredentialLink' }\n" +
+            "$targets | Select-Object DistinguishedName, 'msDS-KeyCredentialLink' | Export-Clixml .\\dirhealth-DH-PRV-011-backup.xml   # public keys only, needed for the revert\n" +
+            "$targets | ForEach-Object { Set-ADUser $_ -Clear 'msDS-KeyCredentialLink' -WhatIf }   # review the output, then remove -WhatIf",
+            "Windows Hello for Business / FIDO sign-in of these admins stops until they enroll again.",
+            $"{Ps}\nImport-Clixml .\\dirhealth-DH-PRV-011-backup.xml | ForEach-Object {{ Set-ADUser -Identity $_.DistinguishedName -Add @{{'msDS-KeyCredentialLink' = [string[]]$_.'msDS-KeyCredentialLink'}} }}",
+            null);   // Tier 0 scope like the S19 admin rules — the fix block computes the same set
+
+        yield return new("AdminAltSecurityIdentities", "DH-PRV-012", 8,
+            "Enabled Tier 0 accounts with altSecurityIdentities set — an explicit certificate or Kerberos mapping (DirHealth only checks that a value exists — it never reads it).",
+            "Anyone holding a certificate that matches the mapping logs on as the admin (ESC14). Weak mappings (issuer/subject, e-mail) can be met by certificates an attacker requests himself. Smart-card setups use strong mappings legitimately — review, do not clear blindly.",
+            "Keep only strong mappings (X509IssuerSerialNumber, X509SKI or X509SHA1PublicKey) that belong to the admin's own smart card; remove every other mapping.",
+            [Mitre("T1649", "Steal or Forge Authentication Certificates"),
+             new("Microsoft: KB5014754 certificate-based authentication changes", "https://support.microsoft.com/en-us/topic/kb5014754-certificate-based-authentication-changes-on-windows-domain-controllers-ad2c23b0-15d8-4340-a468-4d4f3b188f16")],
+            Tier0Preamble +
+            "$targets = $admins | Get-ADUser -Properties 'altSecurityIdentities' | Where-Object { $_.altSecurityIdentities }\n" +
+            "$targets | Select-Object DistinguishedName, @{n='Mappings';e={$_.altSecurityIdentities -join '|'}} | Export-Csv .\\dirhealth-DH-PRV-012-backup.csv -NoTypeInformation\n" +
+            "$targets | ForEach-Object { Set-ADUser $_ -Clear 'altSecurityIdentities' -WhatIf }   # review each mapping first, then remove -WhatIf",
+            "Smart-card or certificate logon that relies on these mappings stops for the affected admins.",
+            ObjectRevert("DH-PRV-012", "Set-ADUser -Identity $_.DistinguishedName -Add @{altSecurityIdentities = [string[]]($_.Mappings -split '\\|')}"),
+            null);   // Tier 0 scope like the S19 admin rules — the fix block computes the same set
+
+        yield return new("AdminProtocolTransition", "DH-PRV-013", 7,
+            "Enabled Tier 0 accounts trusted to authenticate for delegation (TRUSTED_TO_AUTH_FOR_DELEGATION, protocol transition).",
+            "With protocol transition the account can obtain tickets for any user — including other admins — to its delegation targets without that user ever logging on. On a Tier 0 account this turns one stolen admin credential into impersonation of everyone.",
+            "Remove \"Trust this user for delegation to specified services only — use any authentication protocol\" from admin accounts; run services needing delegation under a dedicated, unprivileged account or gMSA.",
+            [MsDelegation, Mitre("T1558", "Steal or Forge Kerberos Tickets")],
+            Tier0Preamble +
+            $"$s4u = Get-ADUser -LDAPFilter \"{CheckFilters.ProtocolTransitionUsers}\" | ForEach-Object DistinguishedName\n" +
+            "$targets = $admins | Where-Object { $s4u -contains $_.DistinguishedName }\n" +
+            "$targets | Select-Object DistinguishedName, SamAccountName | Export-Csv .\\dirhealth-DH-PRV-013-backup.csv -NoTypeInformation\n" +
+            "$targets | Set-ADAccountControl -TrustedToAuthForDelegation $false -WhatIf   # remove -WhatIf to apply",
+            "A service running as this account that relies on protocol transition (e.g. web SSO to back-end services) stops delegating.",
+            ObjectRevert("DH-PRV-013", "Set-ADAccountControl -Identity $_.DistinguishedName -TrustedToAuthForDelegation $true"),
+            null);   // Tier 0 scope like the S19 admin rules — the fix block computes the same set
+
+        // ── S23-3 recoverability ─────────────────────────────────────────────
+        yield return new("BackupOutdated", "DH-DOM-010", 7,
+            $"The last system-state backup of the domain, configuration or schema naming context is older than {CheckFilters.BackupMaxDays} days or never happened (read from the dSASignature replication metadata, like \"repadmin /showbackup\").",
+            "Without a recent backup a ransomware attack, a failed update or a deleted OU cannot be undone — the forest has to be rebuilt by hand. Only system-state backups update this timestamp; object-level or VM snapshot tools may not.",
+            "Schedule a daily system-state backup of at least two domain controllers, keep a copy offline and test a restore regularly.",
+            [new("Microsoft: Back up and restore Active Directory (forest recovery)", "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/forest-recovery-guide/ad-forest-recovery-backing-up-a-full-server"),
+             Mitre("T1490", "Inhibit System Recovery")],
+            $"{Ps}\n$root = Get-ADRootDSE\n" +
+            "$root.defaultNamingContext, $root.configurationNamingContext, $root.schemaNamingContext | ForEach-Object {\n" +
+            "    Get-ADReplicationAttributeMetadata -Object $_ -Server $root.dnsHostName -Properties dSASignature |\n" +
+            "        Select-Object Object, LastOriginatingChangeTime, Version }   # read-only — time of the last backup per naming context\n" +
+            "repadmin /showbackup *   # same data for every DC\n" +
+            "# Fix outside AD: e.g. wbadmin start systemstatebackup -backupTarget:E: -quiet (scheduled daily on two DCs)",
+            "None from this list; a backup job only reads the DC.",
+            "# Read-only listing — nothing to undo.",
+            null);
+
+        yield return new("SysvolNtfrs", "DH-DOM-011", 5,
+            $"SYSVOL is still replicated by the deprecated File Replication Service (NTFRS): msDFSR-Flags on {CheckFilters.DfsrGlobalSettingsRdn} is not {CheckFilters.DfsrEliminated} (Eliminated), or the DFSR migration never started.",
+            "NTFRS is deprecated and unsupported on current Windows Server versions — new domain controllers cannot be added, and its replication breaks silently, so GPOs drift between DCs.",
+            "Migrate SYSVOL to DFSR with dfsrmig (Prepared → Redirected → Eliminated), waiting for all DCs to reach each state before the next step.",
+            [new("Microsoft: Verifying the state of SYSVOL migration", "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-r2-and-2008/dd639789(v=ws.10)"),
+             new("Microsoft: Migrate SYSVOL replication to DFS Replication", "https://learn.microsoft.com/en-us/windows-server/storage/dfs-replication/migrate-sysvol-to-dfsr")],
+            $"{Ps}\nGet-ADObject \"{CheckFilters.DfsrGlobalSettingsRdn},$((Get-ADDomain).DistinguishedName)\" -Properties msDFSR-Flags | Select-Object msDFSR-Flags   # 0 Start, 16 Prepared, 32 Redirected, 48 Eliminated\n" +
+            "dfsrmig /getglobalstate      # read-only\n" +
+            "dfsrmig /getmigrationstate   # read-only: have all DCs reached the global state?\n" +
+            "# Migrate one step at a time, checking /getmigrationstate before the next:\n" +
+            "# dfsrmig /setglobalstate 1   # Prepared\n" +
+            "# dfsrmig /setglobalstate 2   # Redirected\n" +
+            "# dfsrmig /setglobalstate 3   # Eliminated — irreversible",
+            "During the migration SYSVOL is copied once; the last step (Eliminated) removes NTFRS for good.",
+            "# Up to Redirected: dfsrmig /setglobalstate 0 rolls back. After Eliminated there is no way back.",
+            null);
+    }
+
+    /// <summary>
+    /// S23-1 fix: the same privileged-SID test as <see cref="Checks.CheckLogic.IsPrivilegedHistorySid"/>, as a
+    /// PowerShell scriptblock built from the same RID lists, so the command removes exactly what was reported.
+    /// </summary>
+    private static string PrivilegedSidHistoryFix()
+    {
+        var domainRids  = string.Join(",", Checks.CheckLogic.PrivilegedDomainRids);
+        var builtinRids = string.Join(",", Checks.CheckLogic.PrivilegedBuiltinRids);
+        return $"{Ps}\n" +
+            "$priv = { param($s) $v = \"$s\"; $rid = [int64]($v.Split('-')[-1])\n" +
+            $"    $v -eq '{Checks.CheckLogic.EnterpriseDomainControllersSid}' -or ($v -like 'S-1-5-32-*' -and $rid -in {builtinRids}) -or\n" +
+            $"    ($v -match '^S-1-5-21-\\d+-\\d+-\\d+-\\d+$' -and $rid -in {domainRids}) }}\n" +
+            $"$targets = Get-ADObject -LDAPFilter \"{CheckFilters.SidHistoryAnyObject}\" -Properties sIDHistory | Where-Object {{ @($_.sIDHistory | Where-Object {{ & $priv $_ }}).Count -gt 0 }}\n" +
+            "$targets | Select-Object DistinguishedName, @{n='sIDHistory';e={$_.sIDHistory -join ';'}} | Export-Csv .\\dirhealth-DH-PRV-010-backup.csv -NoTypeInformation\n" +
+            "$targets | ForEach-Object { $bad = @($_.sIDHistory | Where-Object { & $priv $_ }); Set-ADObject $_ -Remove @{sIDHistory = $bad} -WhatIf }   # review the output, then remove -WhatIf";
     }
 }

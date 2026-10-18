@@ -123,6 +123,13 @@ public static class ScanGuard
         ["AnonymousLdapAllowed"]             = "Remaining.DsHeuristics",
         ["AdminSdExMask"]                    = "Remaining.DsHeuristics",
         ["SmartcardOldPassword"]             = "Remaining.Smartcard",
+        // Sprint 23
+        ["PrivilegedSidHistory"]             = "Privileged.SidHistory",
+        ["AdminShadowCredentials"]           = "Privileged.Backdoors",
+        ["AdminAltSecurityIdentities"]       = "Privileged.Backdoors",
+        ["AdminProtocolTransition"]          = "Privileged.Backdoors",
+        ["BackupOutdated"]                   = "Recovery.Backup",
+        ["SysvolNtfrs"]                      = "Recovery.Sysvol",
     };
 
     /// <summary>

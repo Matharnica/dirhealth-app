@@ -28,8 +28,8 @@ public record ScoreResult(
 /// </summary>
 public static class ScoreModel
 {
-    /// <summary>2 = ADR 0002 (S17). 3 = 23 new rules (S19). 4 = 7 more rules (S20) — scores drop without any AD change.</summary>
-    public const int    FormulaVersion  = 4;
+    /// <summary>2 = ADR 0002 (S17). 3 = 23 new rules (S19). 4 = 7 more rules (S20). 5 = 6 more rules (S23) — scores drop without any AD change.</summary>
+    public const int    FormulaVersion  = 5;
     public const double PointsPerWeight = 2.5;
     /// <summary>Below this share of the catalog weight evaluated, no number is shown.</summary>
     public const double MinCoverage     = 0.5;

@@ -128,7 +128,7 @@ public class Sprint20Tests : IDisposable
             Assert.NotNull(FindingCatalog.Get(c));
             Assert.True(ScanGuard.QueryOf.ContainsKey(c), c);
         }
-        Assert.Equal(4, ScoreModel.FormulaVersion);
+        Assert.True(ScoreModel.FormulaVersion >= 4);   // bumped again by later sprints (S23: 5)
     }
 
     // ── S20-3 ACL PoC (DCSync) ───────────────────────────────────────────────
