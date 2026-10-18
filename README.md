@@ -37,7 +37,7 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 
 ## What it checks
 
-50 read-only checks. A check that cannot run is shown as **Failed** — never as passed.
+56 read-only checks. A check that cannot run is shown as **Failed** — never as passed.
 
 | Category | What DirHealth finds |
 |---|---|
@@ -52,7 +52,7 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 🏛️ Privileged Groups | Domain Admins, Enterprise Admins, Schema Admins, Key Admins, DnsAdmins, and 7 more — found by SID, so localized group names work |
 | 👑 Stale Domain Admins | Privileged accounts inactive for 30+ days |
 | 🔗 Domain Trusts | All inter-domain/forest trust relationships with direction and type |
-| 🕵️ SID History | Accounts carrying historical SIDs — silent privilege escalation risk |
+| 🕵️ SID History | Accounts carrying historical SIDs — silent privilege escalation risk; privileged SIDs (Domain/Enterprise Admins, Administrators) flagged as Critical |
 | 📅 Timeline | All AD objects created or modified in the last 7 / 30 / 90 days |
 | 📜 GPO Browser | Every Group Policy Object with its link status — orphaned (unlinked) and disabled GPOs flagged |
 | 📋 AD Data Quality | Completeness of user master data (email, phone, department, title, manager, office) |
@@ -61,6 +61,8 @@ DirHealth scans your Active Directory for stale accounts, weak password policies
 | 🔐 Kerberos Encryption | DES-only accounts, service accounts without AES, reversible password encryption, `userPassword` set (presence only — the value is never read) |
 | 🤝 Delegation & Trusts | Delegation to DCs/krbtgt or to services that no longer exist; trusts without SID filtering, with TGT delegation, or inactive |
 | 🗝️ LAPS & Machine Accounts | LAPS not deployed or computers without LAPS, machine passwords that stopped rotating, replication-conflict/duplicate objects, anonymous LDAP and AdminSDHolder exclusions in dSHeuristics, smart-card accounts with an unrotated password |
+| 🚪 Tier 0 Backdoors | Shadow credentials, explicit certificate mappings (`altSecurityIdentities`) and protocol transition on Tier 0 accounts (presence only — key material is never read) |
+| 💾 Recoverability | No AD system-state backup in the last 7 days; SYSVOL still replicated by NTFRS |
 
 Every finding reduces your **Hygiene Score (0–100, higher is better)** — exploitable issues weigh more than hygiene, and each finding shows how many points fixing it is worth. Each finding ships a plain-language explanation, a **copyable PowerShell fix with an undo command** (DirHealth never runs it — it only reads AD), and its affected objects. Document accepted risks as **per-object exceptions** with a reason and an expiry date.
 
@@ -68,7 +70,7 @@ Every finding reduces your **Hygiene Score (0–100, higher is better)** — exp
 
 1. **Download** the latest `.exe` from [Releases](https://github.com/matharnica/dirhealth-app/releases/latest) — single file, no runtime needed
 2. **Log in** with your domain admin credentials
-3. **Scan & fix** — review findings, drill into categories, export a management summary or a full PDF report (optionally with user names redacted), and any table as CSV or Excel with an audit side-file (SHA-256)
+3. **Scan & fix** — review findings, drill into categories, export a management summary or a full PDF report with risk matrix, references and a "what was checked" appendix (optionally with user names redacted), a work list (one row per rule and object), an Excel workbook, the whole scan as JSON, and any table as CSV or Excel — every file with an audit side-file (SHA-256)
 
 ## Download
 

@@ -144,7 +144,7 @@ public static class CheckFilters
 
     /// <summary>
     /// (S23-3) Last system-state backup (dSASignature metadata) may be at most this old.
-    /// Annahme, mit Stefan klären (Plan S23-10): 7 days = at least one backup per week.
+    /// 7 days = at least one backup per week (confirmed by the product owner 2026-10-18).
     /// </summary>
     public const int BackupMaxDays = 7;
 
