@@ -60,6 +60,14 @@ public class Sprint23Tests
     }
 
     [Fact]
+    public void SidHistoryRules_CrossReferenceEachOther()
+    {
+        // Decision 2026-10-25: an account with an admin SID in its history counts in both rules — the texts must say so.
+        Assert.Contains("DH-PRV-010", FindingCatalog.Get("SidHistory")!.Why);
+        Assert.Contains("DH-USR-005", FindingCatalog.Get("PrivilegedSidHistory")!.Why);
+    }
+
+    [Fact]
     public void Fixes_ArePowerShellText_WithWhatIfOrReadOnly()
     {
         foreach (var c in NewCategories)

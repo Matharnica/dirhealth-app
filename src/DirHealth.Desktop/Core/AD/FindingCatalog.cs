@@ -236,7 +236,8 @@ public static class FindingCatalog
 
         yield return new("SidHistory", "DH-USR-005", 6,
             "Enabled user accounts that carry SIDs from a previous domain (sIDHistory).",
-            "Windows honours historical SIDs in every access check — an account can hold privileges of its old domain without being in any privileged group.",
+            "Windows honours historical SIDs in every access check — an account can hold privileges of its old domain without being in any privileged group. " +
+            "Accounts whose history holds an admin SID also appear in DH-PRV-010 (Critical); clearing sIDHistory resolves both.",
             "After confirming migrations are complete, clear sIDHistory so migrated accounts no longer carry hidden privileges from the source domain.",
             [Mitre("T1134.005", "Access Token Manipulation: SID-History Injection")],
             $"{Ps}\n$targets = Get-ADUser -LDAPFilter \"{CheckFilters.SidHistory}\" -Properties sIDHistory\n" +
@@ -815,7 +816,8 @@ public static class FindingCatalog
         // ── S23-1 privileged SID in sIDHistory (separate from DH-USR-005, which lists every SID history) ──
         yield return new("PrivilegedSidHistory", "DH-PRV-010", 10,
             "Enabled accounts and groups whose sIDHistory contains a privileged SID — Domain/Enterprise/Schema Admins, Administrator, krbtgt, Domain Controllers, Key Admins, Cert Publishers or the BUILTIN Administrators/operator groups of this or any other domain.",
-            "Windows adds every sIDHistory SID to the logon token. An account with a Domain Admins SID in its history is a Domain Admin without being in the group — the classic persistence trick after a compromise (SID-history injection).",
+            "Windows adds every sIDHistory SID to the logon token. An account with a Domain Admins SID in its history is a Domain Admin without being in the group — the classic persistence trick after a compromise (SID-history injection). " +
+            "Such accounts also appear in DH-USR-005 on purpose (decision 2026-10-25): both rules count, each stays independent if the other's query fails.",
             "Remove the privileged SIDs from sIDHistory now; if a migration is still running, privileged SIDs never belong in the history. Then check how they got there (only DsAddSidHistory/ADMT or a DC compromise can write them).",
             [Mitre("T1134.005", "Access Token Manipulation: SID-History Injection"),
              new("Microsoft Defender for Identity: Unsecure SID History attributes", "https://learn.microsoft.com/en-us/defender-for-identity/security-assessment-unsecure-sid-history-attribute")],
