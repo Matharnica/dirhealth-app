@@ -167,7 +167,7 @@ public class KernwegTests : IDisposable
         });
     }
 
-    [Fact(Skip = "Befund: Light-Theme nicht wählbar — ThemeManager.Apply lädt immer Dark.xaml (Core/Theme/ThemeManager.cs:13), Settings hat keinen Umschalter mehr. Produktentscheidung offen."), Trait("Category", K)]
+    [Fact(Skip = "Befund: Light-Theme nicht wählbar — ThemeManager.Apply lädt immer Dark.xaml (Core/Theme/ThemeManager.cs:13), Settings hat keinen Umschalter. Geparkt (Entscheid 2026-10-25), kein Bau vor v3.0.0."), Trait("Category", K)]
     public void K01_LightTheme_IsSelectable() { }
 
     [Fact(Skip = "manuell: Installer, Login gegen echte Domäne, DPAPI-Zugangsdaten nach Neustart, Download des Installers (Host-Pinning in MainViewModel) — docs/verification-checklist.md K01"), Trait("Category", K)]
