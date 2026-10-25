@@ -9,7 +9,7 @@ All notable changes to DirHealth are documented here.
 > Sprints 13–23 ship together as **3.0.0** once the live test against a real domain is done (major version: the score changes without any change in your AD, and old acknowledgements no longer hide findings).
 
 ### Added — Sprint 23 (High-value checks) — ⚠ your score will drop without any change in AD
-- **Privileged SID in SID history** (DH-PRV-010, Critical) — an account whose sIDHistory carries a Domain Admins, Enterprise Admins or BUILTIN\Administrators SID has those rights silently. Ordinary SID history is still reported by DH-USR-005.
+- **Privileged SID in SID history** (DH-PRV-010, Critical) — an account whose sIDHistory carries a Domain Admins, Enterprise Admins or BUILTIN\Administrators SID has those rights silently. Ordinary SID history is still reported by DH-USR-005. An account with a privileged SID appears in both rules on purpose — clearing its sIDHistory resolves both, and the texts of both rules point to each other.
 - **Backdoors on Tier 0 accounts** (DH-PRV-011–013) — key credentials (shadow credentials), explicit certificate mappings (`altSecurityIdentities`) and "trusted to authenticate for delegation" (protocol transition). DirHealth only checks that a value exists — it never reads key material. Three separate rules, so an exception for one does not hide the others.
 - **Recoverability** — no system-state backup of AD in the last 7 days (DH-DOM-010, read from the backup metadata `repadmin /showbackup` uses) and SYSVOL still replicated by the retired NTFRS (DH-DOM-011). Missing metadata reports **Failed**, never passed.
 - Score model version 5: the dashboard shows a one-time notice; trend and report do not compare across the change.
