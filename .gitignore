@@ -5,6 +5,7 @@
 publish/
 installer/Output/
 CLAUDE.md
+CLAUDE_*.md
 docs/
 .superpowers/
 .claude/
