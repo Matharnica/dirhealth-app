@@ -56,7 +56,7 @@
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <RadioButton Content="7d" GroupName="Period" Margin="0,0,8,0"
-                                     IsChecked="{Binding SelectedDays, Converter={StaticResource EqualityConverter}, ConverterParameter=7}" />
+                                     IsChecked="{Binding SelectedDays, Converter={StaticResource EqualityConverterGibtEsNicht}, ConverterParameter=7}" />
                         <RadioButton Content="30d" GroupName="Period" Margin="0,0,8,0"
                                      IsChecked="{Binding SelectedDays, Converter={StaticResource EqualityConverter}, ConverterParameter=30}" />
                         <RadioButton Content="90d" GroupName="Period"
