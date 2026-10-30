@@ -41,7 +41,7 @@
                     <!-- EOL DCs -->
                     <Border BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <Border.Style>
-                            <Style TargetType="TextBlock">
+                            <Style TargetType="Border">
                                 <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                 <Style.Triggers>
