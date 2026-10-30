@@ -25,8 +25,10 @@ namespace DirHealth.Tests;
 /// one placeholder item (Selectors such as ComboBox also select it, so the selection box renders the
 /// template) and lays out again — repeated, so templates nested in templates are reached too. Each
 /// template that really produced visuals is counted; <see cref="ItemTemplates_AreInstantiated"/>
-/// keeps that count from silently dropping to zero. Proof: a missing StaticResource in
-/// DataQualityView's item template turned this test red (run RUN_RED), the reverted state is
+/// keeps that count from silently dropping (16 on 2026-10-30 — counted per view, so the
+/// UserDetailView embedded in UserBrowser/AdSearch counts there again; 2 not reached, both collapsed:
+/// FindingsView references, SettingsView scan-interval ComboBox). Proof: a missing StaticResource in
+/// DataQualityView's item template turned this test red (run 41140214658), the reverted state is
 /// green (same PR, following run). At the time of writing the views contain no ContentTemplate and no
 /// DataGridTemplateColumn, so those need no extra handling.
 ///
@@ -139,7 +141,7 @@ public class ViewSmokeTests(ITestOutputHelper output)
         });
         output.WriteLine($"item templates instantiated: {total}");
         foreach (var line in perView) output.WriteLine("  " + line);
-        Assert.True(total >= 8, $"only {total} item templates instantiated: {string.Join("; ", perView)}");
+        Assert.True(total >= 16, $"only {total} item templates instantiated: {string.Join("; ", perView)}");
     }
 
     private sealed record TemplateProbe(int Instantiated, IReadOnlyList<string> NotReached);
