@@ -18,7 +18,10 @@ namespace DirHealth.Tests;
 /// view with the app's resources and lays it out once.
 ///
 /// What it does NOT check: binding paths (WPF only traces those), visual appearance,
-/// behaviour after a real AD load. Needs the WindowsDesktop runtime → runs in CI only.
+/// behaviour after a real AD load, and anything inside a DataTemplate/ItemTemplate — the views are
+/// built with empty lists, so item templates are never instantiated (mutation probe 2026-10-30:
+/// a missing StaticResource in DataQualityView's item template stayed green; one in TimelineView's
+/// own content turned red). Needs the WindowsDesktop runtime → runs in CI only.
 /// </summary>
 public class ViewSmokeTests
 {
