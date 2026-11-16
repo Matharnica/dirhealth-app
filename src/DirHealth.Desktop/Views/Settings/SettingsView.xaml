@@ -157,8 +157,14 @@
                     <TextBlock Text="PASSWORD" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
                     <PasswordBox Style="{StaticResource DarkPasswordBox}"
-                                 x:Name="PasswordInput" Margin="0,0,0,20"
+                                 x:Name="PasswordInput" Margin="0,0,0,12"
                                  PasswordChanged="PasswordInput_PasswordChanged" />
+
+                    <!-- M1: same choice as the login window; unticked = Save keeps nothing on disk -->
+                    <CheckBox IsChecked="{Binding RememberCredentials}"
+                              Foreground="{DynamicResource TextSecondaryBrush}"
+                              Content="Remember credentials"
+                              FontSize="12" Margin="0,0,0,20" />
 
                     <Grid>
                         <Grid.ColumnDefinitions>

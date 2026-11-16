@@ -11,16 +11,21 @@ public record SavedCredentials(string Domain, string Username, string Password);
 
 public static class CredentialStore
 {
-    private static readonly string _path = Path.Combine(
+    internal static readonly string DefaultPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "DirHealth", "credentials.dat");
 
-    public static SavedCredentials? Load()
+    public static SavedCredentials? Load() => Load(DefaultPath);
+    public static void Save(string domain, string username, string password) => Save(DefaultPath, domain, username, password);
+    public static void Clear() => Clear(DefaultPath);
+
+    // Path overloads: tests use a temp file and never touch the real credentials.dat (M1, 2026-11-16).
+    internal static SavedCredentials? Load(string path)
     {
         try
         {
-            if (!File.Exists(_path)) return null;
-            var raw = File.ReadAllBytes(_path);
+            if (!File.Exists(path)) return null;
+            var raw = File.ReadAllBytes(path);
 
             // Try DPAPI (current format)
             try
@@ -38,7 +43,7 @@ public static class CredentialStore
                 var json = CryptoHelper.Decrypt(Encoding.UTF8.GetString(raw), legacyPassphrase);
                 var creds = JsonSerializer.Deserialize<SavedCredentials>(json);
                 if (creds is not null)
-                    Save(creds.Domain, creds.Username, creds.Password);
+                    Save(path, creds.Domain, creds.Username, creds.Password);
                 return creds;
             }
             catch { }
@@ -48,21 +53,21 @@ public static class CredentialStore
         catch { return null; }
     }
 
-    public static void Save(string domain, string username, string password)
+    internal static void Save(string path, string domain, string username, string password)
     {
         try
         {
             var json      = JsonSerializer.Serialize(new SavedCredentials(domain, username, password));
             var plaintext = Encoding.UTF8.GetBytes(json);
             var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            File.WriteAllBytes(_path, encrypted);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, encrypted);
         }
         catch (Exception ex)
         {
             try
             {
-                var logPath = Path.Combine(Path.GetDirectoryName(_path)!, "dirhealth.log");
+                var logPath = Path.Combine(Path.GetDirectoryName(path)!, "dirhealth.log");
                 File.AppendAllText(logPath,
                     $"{DateTime.Now:HH:mm:ss} CredentialStore.Save failed: {ex.GetType().Name}: {ex.Message}\n");
             }
@@ -70,8 +75,8 @@ public static class CredentialStore
         }
     }
 
-    public static void Clear()
+    internal static void Clear(string path)
     {
-        try { if (File.Exists(_path)) File.Delete(_path); } catch { }
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 }
