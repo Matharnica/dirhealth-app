@@ -338,17 +338,31 @@ public static class CheckLogic
     /// <summary>
     /// Decides how GetTier0Members treats each resolved Tier 0 group. Mandatory groups (fixed RID or BUILTIN SID,
     /// see <see cref="WellKnownGroups.IsOptionalTier0"/>) must resolve — otherwise the read failed and the checks are
-    /// "Failed". Optional groups (DnsAdmins, Key Admins, Enterprise Key Admins) that are simply absent are skipped
-    /// and returned for the scan log. An optional group whose lookup itself failed (any other error) still throws:
+    /// "Failed". Key Admins / Enterprise Key Admins (by SID) that a successful search did not find are skipped and
+    /// returned for the scan log. An optional group whose lookup itself failed (any other error) still throws:
     /// "absent" must be proven by a successful search, never assumed.
+    /// <para>DnsAdmins has no fixed RID and is found by name, so "not found" may also mean "renamed" — skipping it then
+    /// would silently drop its members from every Tier 0 check (fail-open). It is skipped only when
+    /// <paramref name="dnsRolePresent"/> proves that AD-integrated DNS is absent; if DNS zones exist the checks stay
+    /// <b>Failed</b> (decision 2026-11-16: Failed, not a warning — visible in the check list and score coverage).
+    /// <paramref name="dnsRolePresent"/> is only called when DnsAdmins was not found; if it throws, the checks fail.</para>
     /// </summary>
-    public static IReadOnlyList<string> Tier0SkippedGroups(IEnumerable<(WellKnownGroupDef Def, bool Found, string? Error)> groups)
+    public static IReadOnlyList<string> Tier0SkippedGroups(
+        IEnumerable<(WellKnownGroupDef Def, bool Found, string? Error)> groups, Func<bool> dnsRolePresent)
     {
         var skipped = new List<string>();
         foreach (var (def, found, error) in groups)
         {
             if (found) continue;
-            if (WellKnownGroups.IsOptionalTier0(def) && error == GroupNotFoundError) { skipped.Add(def.FallbackName); continue; }
+            if (WellKnownGroups.IsOptionalTier0(def) && error == GroupNotFoundError)
+            {
+                if (def.Source == GroupSidSource.NameOnly && dnsRolePresent())
+                    throw new InvalidOperationException(
+                        $"AD-integrated DNS zones exist, but no group named {def.FallbackName} was found (renamed?) — " +
+                        "Tier 0 membership cannot be determined.");
+                skipped.Add(def.FallbackName);
+                continue;
+            }
             throw new InvalidOperationException($"{def.FallbackName} could not be read{(string.IsNullOrEmpty(error) ? "." : $": {error}")}");
         }
         return skipped;

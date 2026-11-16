@@ -89,19 +89,55 @@ public class CoreReviewFixTests
         Assert.False(WellKnownGroups.IsOptionalTier0(Tier0(d => d.Source == GroupSidSource.Builtin && d.Rid == 544)));
     }
 
+    private static readonly Func<bool> NoDns  = () => false;
+    private static readonly Func<bool> HasDns = () => true;
+
+    private static IEnumerable<(WellKnownGroupDef, bool, string?)> OptionalMissing(Func<WellKnownGroupDef, bool> missing) =>
+        WellKnownGroups.Tier0.Select(d => missing(d) ? (d, false, (string?)GroupNotFoundError) : (d, true, (string?)null));
+
     [Fact]
-    public void Tier0_MissingOptionalGroups_AreSkipped_NotFailed()
+    public void Tier0_MissingOptionalGroups_NoDnsRole_AreSkipped_NotFailed()
     {
-        var groups = WellKnownGroups.Tier0.Select(d => WellKnownGroups.IsOptionalTier0(d)
-            ? (d, false, (string?)GroupNotFoundError)
-            : (d, true, (string?)null));
-        Assert.Equal(new[] { "DnsAdmins", "Enterprise Key Admins", "Key Admins" }, Tier0SkippedGroups(groups).OrderBy(n => n));
+        var skipped = Tier0SkippedGroups(OptionalMissing(WellKnownGroups.IsOptionalTier0), NoDns);
+        Assert.Equal(new[] { "DnsAdmins", "Enterprise Key Admins", "Key Admins" }, skipped.OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Tier0_KeyAdminsMissing_AreSkipped_RegardlessOfDns()
+    {
+        var skipped = Tier0SkippedGroups(OptionalMissing(d => d.Rid is 526 or 527 && d.Source != GroupSidSource.Builtin), HasDns);
+        Assert.Equal(new[] { "Enterprise Key Admins", "Key Admins" }, skipped.OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Tier0_DnsAdminsMissing_WhileDnsZonesExist_IsNeverSilentlyPassed()
+    {
+        // a renamed DnsAdmins must not drop out of the Tier 0 checks (fail-open) — the checks stay Failed
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            Tier0SkippedGroups(OptionalMissing(d => d.Source == GroupSidSource.NameOnly), HasDns));
+        Assert.Contains("DnsAdmins", ex.Message);
+    }
+
+    [Fact]
+    public void Tier0_DnsAdminsMissing_DnsStateUnreadable_Throws()
+    {
+        Assert.ThrowsAny<Exception>(() => Tier0SkippedGroups(
+            OptionalMissing(d => d.Source == GroupSidSource.NameOnly),
+            () => throw new InvalidOperationException("referral")));
+    }
+
+    [Fact]
+    public void Tier0_DnsAdminsFound_DnsStateIsNotQueried()
+    {
+        bool asked = false;
+        Tier0SkippedGroups(OptionalMissing(_ => false), () => asked = true);
+        Assert.False(asked);
     }
 
     [Fact]
     public void Tier0_AllPresent_SkipsNothing()
     {
-        Assert.Empty(Tier0SkippedGroups(WellKnownGroups.Tier0.Select(d => (d, true, (string?)null))));
+        Assert.Empty(Tier0SkippedGroups(WellKnownGroups.Tier0.Select(d => (d, true, (string?)null)), HasDns));
     }
 
     [Theory]
@@ -110,7 +146,7 @@ public class CoreReviewFixTests
     public void Tier0_MissingMandatoryGroup_Throws(int rid)
     {
         var groups = WellKnownGroups.Tier0.Select(d => (d, d.Rid != rid, d.Rid == rid ? (string?)GroupNotFoundError : null));
-        var ex = Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups));
+        var ex = Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups, NoDns));
         Assert.Contains("could not be read", ex.Message);
     }
 
@@ -121,7 +157,7 @@ public class CoreReviewFixTests
         var groups = WellKnownGroups.Tier0.Select(d => d.Source == GroupSidSource.NameOnly
             ? (d, false, (string?)"The server is not operational.")
             : (d, true, (string?)null));
-        Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups));
+        Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups, NoDns));
     }
 
     [Fact]

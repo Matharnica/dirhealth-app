@@ -66,15 +66,16 @@ public partial class AdScanner
     // ── S19-2 admin hardening ─────────────────────────────────────────────────
     /// <summary>Enabled Tier 0 members (nested and primary group included), keyed by DN.</summary>
     /// <remarks>
-    /// Mandatory groups (fixed RID, BUILTIN) that do not resolve throw — the read failed. Optional groups
-    /// (DnsAdmins, Key Admins, Enterprise Key Admins) that a successful search did not find are skipped and noted
-    /// in the scan log (H3, review 2026-11-16): before, their absence made all 8 Tier 0 checks permanently Failed.
+    /// Mandatory groups (fixed RID, BUILTIN) that do not resolve throw — the read failed. Key Admins / Enterprise
+    /// Key Admins that a successful search did not find are skipped and noted in the scan log (H3, review
+    /// 2026-11-16): before, their absence made all 8 Tier 0 checks permanently Failed. DnsAdmins (found by name)
+    /// is skipped only when no AD-integrated DNS exists; otherwise a missing DnsAdmins keeps the checks Failed.
     /// </remarks>
     private Dictionary<string, AdUser> GetTier0Members(DirectoryEntry root)
     {
         var members  = new Dictionary<string, AdUser>(StringComparer.OrdinalIgnoreCase);
         var resolved = WellKnownGroups.Tier0.Select(def => _connector.ResolveGroup(root, def)).ToList();
-        foreach (var name in CheckLogic.Tier0SkippedGroups(resolved.Select(r => (r.Def, r.Found, r.Error))))
+        foreach (var name in CheckLogic.Tier0SkippedGroups(resolved.Select(r => (r.Def, r.Found, r.Error)), () => DnsRolePresent(root)))
             NoteInScanLog("Tier0Groups", $"skipped, not present in this domain: {name}");
         foreach (var g in resolved.Where(r => r.Found))
         {
@@ -84,6 +85,33 @@ public partial class AdScanner
             foreach (var u in QueryUsers(filter)) members.TryAdd(u.DistinguishedName, u);
         }
         return members;
+    }
+
+    /// <summary>
+    /// AD-integrated DNS present? True when a MicrosoftDNS container exists under CN=System (legacy zones) or in
+    /// the DomainDnsZones partition. Read-only base searches; only "no such object" counts as absent — every
+    /// other error propagates, so an unreadable state never turns into "absent".
+    /// </summary>
+    private bool DnsRolePresent(DirectoryEntry root)
+    {
+        var domainDn = root.Properties["distinguishedName"].Value?.ToString();
+        if (string.IsNullOrEmpty(domainDn)) throw new InvalidOperationException("Domain object could not be read.");
+        return DnExists($"CN=MicrosoftDNS,CN=System,{domainDn}")
+            || DnExists($"CN=MicrosoftDNS,DC=DomainDnsZones,{domainDn}");
+    }
+
+    private bool DnExists(string dn)
+    {
+        try
+        {
+            using var entry = EntryAt(dn);
+            using var s = new DirectorySearcher(entry, "(objectClass=*)", ["distinguishedName"], SearchScope.Base);
+            return s.FindOne() is not null;
+        }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.ErrorCode == unchecked((int)0x80072030))   // LDAP_NO_SUCH_OBJECT
+        {
+            return false;
+        }
     }
 
     private HashSet<string> MembersOf(DirectoryEntry root, WellKnownGroupDef def, string extraClause = "")
