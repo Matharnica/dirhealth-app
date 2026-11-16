@@ -15,6 +15,8 @@ public class AdComputer
     public string DistinguishedName { get; set; } = "";
     /// <summary>objectSid — exception key (ADR 0001).</summary>
     public string Sid               { get; set; } = "";
+    /// <summary>dNSHostName — the only name WMI/ping may use (fix H1). Empty = no live details.</summary>
+    public string DnsHostName       { get; set; } = "";
 
     public string Ou => DnHelper.OuFromDn(DistinguishedName);
 }
