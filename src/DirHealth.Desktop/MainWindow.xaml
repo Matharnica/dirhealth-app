@@ -231,7 +231,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock HorizontalAlignment="Center" Foreground="#FCA5A5" FontSize="12">
                         <Run Text="⚠ " />
-                        <Run Text="{Binding ScoreDropMessage}" />
+                        <Run Text="{Binding ScoreDropMessage, Mode=OneWay}" />
                     </TextBlock>
                     <Button Grid.Column="1" Content="✕" FontSize="11"
                             AutomationProperties.Name="Dismiss score alert"
@@ -283,16 +283,30 @@
             <!-- Sidebar -->
             <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
-                <StackPanel Margin="12,20,12,12">
-                    <TextBlock Text="DirHealth" FontSize="18" FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}" Margin="8,0,0,4" />
-                    <TextBlock Text="AD Health Monitor" FontSize="11"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,20" />
+                <!-- G1: branding and Settings stay fixed, the navigation in between scrolls.
+                     At the default 1100×700 the 16 entries do not fit — without a ScrollViewer
+                     the lower entries (incl. Settings) were cut off. -->
+                <Grid Margin="12,20,12,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="DirHealth" FontSize="18" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentHoverBrush}" Margin="8,0,0,4" />
+                        <TextBlock Text="AD Health Monitor" FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,16" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel>
                     <!-- Overview -->
                     <TextBlock Text="OVERVIEW" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="8,0,0,4" Opacity="0.6" />
+                               Margin="8,0,0,4" />
                     <Button Style="{StaticResource NavButton}" Content="⊞  Dashboard"
                             Command="{Binding ShowDashboardCommand}"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DashboardViewModel}" />
@@ -306,7 +320,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="⚠  Findings" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Background="#EF4444" CornerRadius="8"
+                            <Border Grid.Column="1" Background="#B91C1C" CornerRadius="8"
                                     Padding="5,1" Margin="4,0,0,0"
                                     Visibility="{Binding FindingsCount, Converter={StaticResource NonZeroToVisibility}}">
                                 <TextBlock Text="{Binding FindingsCount}" FontSize="10"
@@ -318,7 +332,7 @@
                     <!-- AD Tools -->
                     <TextBlock Text="AD TOOLS" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="8,0,0,4" Opacity="0.6" />
+                               Margin="8,0,0,4" />
                     <Button Style="{StaticResource NavButton}" Content="🔍  AD Search"
                             Command="{Binding ShowAdSearchCommand}"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=AdSearchViewModel}" />
@@ -329,7 +343,7 @@
                     <!-- Computer -->
                     <TextBlock Text="COMPUTER" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="8,0,0,4" Opacity="0.6" />
+                               Margin="8,0,0,4" />
                     <Button Style="{StaticResource NavButton}" Content="🖥  Computers"
                             Command="{Binding ShowComputerBrowserCommand}" Margin="0,2,0,16"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=ComputerBrowserViewModel}" />
@@ -337,7 +351,7 @@
                     <!-- AD Views -->
                     <TextBlock Text="AD VIEWS" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="8,0,0,4" Opacity="0.6" />
+                               Margin="8,0,0,4" />
                     <Button Style="{StaticResource NavButton}" Content="🏢  OUs"
                             Command="{Binding ShowOuBrowserCommand}"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=OuBrowserViewModel}" />
@@ -366,18 +380,19 @@
                             Command="{Binding ShowGpoBrowserCommand}" Margin="0,2,0,0"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=GpoBrowserViewModel}" />
                     <Button Style="{StaticResource NavButton}" Content="📋  Data Quality"
-                            Command="{Binding ShowDataQualityCommand}" Margin="0,2,0,16"
+                            Command="{Binding ShowDataQualityCommand}" Margin="0,2,0,8"
                             Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=DataQualityViewModel}" />
+                    </StackPanel>
+                    </ScrollViewer>
 
-                    <!-- System -->
-                    <TextBlock Text="SYSTEM" FontSize="10" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="8,0,0,4" Opacity="0.6" />
-                    <Button Style="{StaticResource NavButton}" Content="⚙  Settings"
-                            Command="{Binding ShowSettingsCommand}"
-                            Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=SettingsViewModel}" />
-
-                </StackPanel>
+                    <!-- System: pinned below the scrolling navigation, always reachable -->
+                    <StackPanel Grid.Row="2">
+                        <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,4,0,8" />
+                        <Button Style="{StaticResource NavButton}" Content="⚙  Settings"
+                                Command="{Binding ShowSettingsCommand}"
+                                Tag="{Binding CurrentViewName, Converter={StaticResource EqualityConverter}, ConverterParameter=SettingsViewModel}" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- Content -->
