@@ -54,29 +54,40 @@ public class ReportPreviewTests
     /// references are the real ones), with object lists from 1 to 60 entries.</summary>
     private static List<AdFinding> Findings()
     {
-        var sev = new[] { FindingSeverity.Critical, FindingSeverity.Critical, FindingSeverity.High, FindingSeverity.High,
-                          FindingSeverity.High, FindingSeverity.High, FindingSeverity.Medium, FindingSeverity.Medium,
-                          FindingSeverity.Medium, FindingSeverity.Medium, FindingSeverity.Medium, FindingSeverity.Low,
-                          FindingSeverity.Low, FindingSeverity.Low, FindingSeverity.Low, FindingSeverity.High,
-                          FindingSeverity.Medium, FindingSeverity.Low, FindingSeverity.Critical, FindingSeverity.Medium };
-        var sizes = new[] { 3, 1, 60, 12, 7, 2, 34, 5, 1, 18, 9, 4, 27, 1, 6, 2, 11, 3, 1, 8 };
-        var rules = FindingCatalog.All.Where(r => r.Measure != ScoreMeasure.Informational).OrderBy(r => r.RuleId, StringComparer.Ordinal)
-                                      .Where((_, n) => n % 2 == 0).Take(sev.Length).ToList();
-        var list = new List<AdFinding>();
-        for (int k = 0; k < rules.Count; k++)
+        // a mid-sized domain in typical shape: a few severe, small findings and broad hygiene findings
+        var plan = new (string Category, FindingSeverity Severity, int Objects)[]
         {
-            var r = rules[k];
-            int n = sizes[k];
-            bool computers = r.RuleId.StartsWith("DH-CMP", StringComparison.Ordinal);
+            ("UnconstrainedDelegationComputers", FindingSeverity.Critical, 1),
+            ("KerberoastableAccounts",           FindingSeverity.High,     2),
+            ("AsRepRoasting",                    FindingSeverity.High,     1),
+            ("ComputersWithoutLaps",             FindingSeverity.High,    48),
+            ("KrbtgtPasswordOld",                FindingSeverity.Medium,   1),
+            ("PasswordNeverExpires",             FindingSeverity.Medium,  60),
+            ("StaleDomainAdmins",                FindingSeverity.Medium,   1),
+            ("ServiceAccountsWithoutAes",        FindingSeverity.Medium,   3),
+            ("EolOperatingSystems",              FindingSeverity.Medium,   2),
+            ("AdminWithMailbox",                 FindingSeverity.Low,      2),
+            ("InactiveUsers",                    FindingSeverity.Low,     34),
+            ("InactiveComputers",                FindingSeverity.Low,     27),
+            ("EmptyGroups",                      FindingSeverity.Low,     18),
+            ("RecycleBinDisabled",               FindingSeverity.Low,      1),
+        };
+        var list = new List<AdFinding>();
+        for (int k = 0; k < plan.Length; k++)
+        {
+            if (FindingCatalog.Get(plan[k].Category) is not { } r) continue;
+            int n = plan[k].Objects;
+            var sevK = plan[k].Severity;
+            bool computers = r.Category.Contains("Computer") || r.Category == "EolOperatingSystems";
             var objs = Enumerable.Range(0, n).Select(i => computers
                 ? Computer($"WS-BER-{100 + i:D3}", i % 3 == 0 ? "Windows Server 2012 R2 Standard (end of support 2023-10-10)" : "Windows 10 Enterprise 21H2")
                 : User(k * 3 + i, i % 4 == 0 ? $"last logon {2024 - i % 3}-0{1 + i % 9}-1{i % 9}, member of {1 + i % 5} privileged group(s)" : ""))
                 .ToList();
-            if (k == 0 && objs.Count > 0) { objs[0].Exception = ExceptionState.Active; objs[0].ExceptionLabel = "Excepted until 2027-01-31 — legacy ERP service"; }
+            if (k == 1 && objs.Count > 0) { objs[0].Exception = ExceptionState.Active; objs[0].ExceptionLabel = "Excepted until 2027-01-31 — legacy ERP service"; }
             list.Add(new AdFinding
             {
-                Category = r.Category, Severity = sev[k], Count = n, Objects = objs,
-                Title = k == 2 ? $"{n} accounts have passwords that never expire, including service accounts used by line-of-business applications"
+                Category = r.Category, Severity = sevK, Count = n, Objects = objs,
+                Title = k == 5 ? $"{n} accounts have passwords that never expire, including service accounts used by line-of-business applications"
                                : r.What.Length > 0 ? r.What : r.Category,
                 Description = r.Why,
             });
@@ -103,7 +114,7 @@ public class ReportPreviewTests
         var score  = ScoreModel.Compute(FindingCatalog.All, findings, checks, totals);
         var exceptions = new List<ObjectException>
         {
-            new(findings[0].RuleId, findings[0].Objects[0].Sid, findings[0].Objects[0].Name,
+            new(findings[1].RuleId, findings[1].Objects[0].Sid, findings[1].Objects[0].Name,
                 "Legacy ERP service account; vendor migration scheduled for Q1 2027, approved by CAB-2026-114",
                 Now.ToUniversalTime().AddDays(76), "CORP\\it.admin", Now.ToUniversalTime().AddDays(-20)),
         };
@@ -122,7 +133,9 @@ public class ReportPreviewTests
         var expiring = PasswordUsers().Take(12).ToList();
         return new ReportInput("corp.example.com", findings, score, score.Score, checks, exceptions, diff, -6,
             inactive, expiring, ["Administrator", Sam(1), Sam(2), "svc.backup"],
-            Now, "3.0.0-preview", totals, "DC01.corp.example.com", "16.11.2026 13:52:10");
+            Now, "3.0.0-preview", totals, "DC01.corp.example.com", "16.11.2026 13:52:10",
+            History: [.. new[] { 48, 51, 50, 55, 58, 57, 61, 66, 64 }.Select((s, n) => new ScoreEntry(Now.ToUniversalTime().AddDays(-7 * (9 - n)), s, ScoreModel.FormulaVersion)),
+                      new ScoreEntry(Now.ToUniversalTime(), score.Score, ScoreModel.FormulaVersion)]);
     }
 
     private static List<AdUser> PasswordUsers() => Enumerable.Range(0, 40).Select(i =>
@@ -178,6 +191,71 @@ public class ReportPreviewTests
         Assert.True(bytes.Length > 4000, $"{path}: {bytes.Length} bytes");
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes[..4]));
         Assert.True(ReportPdfRenderer.PageCount(path) >= 1);
+    }
+
+    // ── model content of the redesign (cover, executive summary, appendix) ───
+    [Fact]
+    public void Trend_KeepsOnlyTheLatestComparableRun_Capped()
+    {
+        var t0 = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var history = Enumerable.Range(0, 5).Select(n => new ScoreEntry(t0.AddDays(n), 40 + n, 4))
+            .Concat(Enumerable.Range(0, 15).Select(n => new ScoreEntry(t0.AddDays(10 + n), 60 + n, 5))).ToList();
+        var trend = ReportBuilder.Trend(history);
+        Assert.Equal(ReportBuilder.TrendPoints, trend.Count);
+        Assert.All(trend, p => Assert.InRange(p.Score, 60, 74));        // nothing from the old formula
+        Assert.Equal(74, trend[^1].Score);
+        Assert.Empty(ReportBuilder.Trend([new ScoreEntry(t0, 50, 5)]));   // one point is no trend
+        Assert.Empty(ReportBuilder.Trend([new ScoreEntry(t0, 50, 4), new ScoreEntry(t0.AddDays(1), 70, 5)]));
+        Assert.Empty(ReportBuilder.Trend(null));
+    }
+
+    [Fact]
+    public void Model_HasCoverFactsTrendAndMethodology()
+    {
+        var input = Input(Findings());
+        var full = ReportBuilder.Build(input, new ReportOptions(ReportKind.Full, false));
+        Assert.Equal("Security Health Report", full.CoverTitle);
+        Assert.Equal("CONFIDENTIAL", full.Classification);
+        Assert.Contains("changed nothing", full.Disclaimer);
+        Assert.InRange(full.KeyFacts!.Count, 1, 4);
+        Assert.Contains(full.KeyFacts, f => f.Contains("1 more are covered by an active exception"));
+        Assert.Contains(full.KeyFacts, f => f.StartsWith("Since the last scan: 2 new, 1 resolved"));
+        Assert.Equal(10, full.ScoreTrend!.Count);
+        Assert.Contains(full.Methodology!, l => l.Contains($"{ScoreModel.PointsPerWeight.ToString(System.Globalization.CultureInfo.InvariantCulture)} ×"));
+        Assert.Contains(full.Methodology!, l => l.Contains($"version {ScoreModel.FormulaVersion}"));
+        Assert.Equal(["#", "Finding", "Points if fixed", "Severity"], full.FixFirst.Headers);
+        Assert.All(full.FixFirst.Rows, r => Assert.True(Enum.TryParse<FindingSeverity>(r[3], out _), r[3]));
+
+        var summary = ReportBuilder.Build(input, new ReportOptions(ReportKind.Summary, false));
+        Assert.Equal("Management Summary", summary.CoverTitle);
+        Assert.Empty(summary.Methodology!);
+
+        var scoped = ReportBuilder.Build(input, new ReportOptions(ReportKind.Full, false, "severity = High"));
+        Assert.Equal("Findings Report", scoped.CoverTitle);
+        Assert.Empty(scoped.ScoreTrend!);                                  // a filter selection has no history
+        Assert.DoesNotContain(scoped.KeyFacts!, f => f.StartsWith("Since the last scan"));
+    }
+
+    [Fact]
+    public void Render_CoverAndSummary_CarryMarkers_RedactedVariantHidesNames()
+    {
+        var input = Input(Findings());
+        var text = new List<string>();
+        var dir = Directory.CreateTempSubdirectory("dh-preview-");
+        try
+        {
+            ReportPdfRenderer.Render(ReportBuilder.Build(input, new ReportOptions(ReportKind.Full, true)), Path.Combine(dir.FullName, "r.pdf"), text.Add);
+        }
+        finally { dir.Delete(recursive: true); }
+        Assert.Contains("CONFIDENTIAL", text);
+        Assert.Contains("NAMES REDACTED", text);
+        Assert.Contains("Executive summary", text);
+        Assert.Contains("How the score works", text);
+        Assert.Contains(text, t => t.StartsWith("Names redacted"));                 // redaction note on the cover
+        var userObjects = input.Findings.SelectMany(f => f.Objects).Where(o => o.Type == AffectedObjectType.User).Select(o => o.Name).ToList();
+        Assert.NotEmpty(userObjects);
+        Assert.DoesNotContain(text, t => userObjects.Any(n => t.Contains(n, StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(text, t => t.Contains("it.admin", StringComparison.OrdinalIgnoreCase));   // exception creator
     }
 
     [Fact]

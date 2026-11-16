@@ -442,7 +442,7 @@ public partial class DashboardViewModel : BaseViewModel
             Exceptions: _exceptions.All, Diff: LastDiff, ScoreDelta: scoreDelta,
             InactiveUsers: _cachedInactiveUsers, ExpiringPasswords: _cachedExpiringPasswords, DomainAdmins: _cachedDomainAdmins,
             CreatedLocal: nowLocal, Version: ExportMetadata.AppVersion,
-            Totals: _totals, DomainController: domainController, ScanTime: LastScanTime);
+            Totals: _totals, DomainController: domainController, ScanTime: LastScanTime, History: ScoreHistory);
         return ReportBuilder.Build(input, options);
     }
 

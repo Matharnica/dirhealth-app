@@ -256,7 +256,7 @@ public class Sprint18Tests : IDisposable
     {
         var path = P("summary.pdf");
         ReportPdfRenderer.Render(ReportBuilder.Build(Input(objects: 40), new ReportOptions(ReportKind.Summary, false)), path);
-        Assert.InRange(ReportPdfRenderer.PageCount(path), 1, 2);
+        Assert.InRange(ReportPdfRenderer.PageCount(path), 2, 3);   // cover + executive summary (report redesign); no finding cards
     }
 
     // G8 (follow-up 2026-10-16): footer texts of every page (S18-2)
