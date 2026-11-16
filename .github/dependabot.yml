@@ -1,13 +1,29 @@
 # Weekly update PRs for the SHA-pinned GitHub Actions (version in the comment) and the
 # NuGet packages. PRs target the default branch `dev` and must pass `build` like any other.
+#
+# Major versions are ignored on purpose: a major bump (e.g. Microsoft.Extensions.* 8 → 11 on a
+# .NET 8 app, or a new major of an action) is a deliberate upgrade with its own test, not a
+# weekly chore. Minor and patch updates arrive as one grouped PR per ecosystem.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      nuget-minor-patch:
+        update-types: ["minor", "patch"]
