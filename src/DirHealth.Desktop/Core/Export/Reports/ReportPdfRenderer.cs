@@ -199,7 +199,9 @@ public sealed class ReportPdfRenderer
         }
 
         // scan facts strip at the bottom of the dark block
-        var facts = _m.Scope.Where(l => l.Label is not ("Domain" or "Checks")).Take(5).ToList();
+        var facts = _m.Scope.Where(l => l.Label is not ("Domain" or "Checks" or "Time zone")).Take(4).ToList();
+        var zone = _m.Scope.FirstOrDefault(l => l.Label == "Time zone")?.Value;
+        var firstTime = facts.FirstOrDefault(l => l.Label is "Scan time" or "Report created")?.Label;
         if (facts.Count > 0)
         {
             double stripTop = blockH - 3 - 74, cellW = (pw - 2 * M) / facts.Count;
@@ -211,6 +213,9 @@ public sealed class ReportPdfRenderer
                 var lines = _f.Wrap(facts[i].Value, UI.F9, cellW - 14);
                 for (int k = 0; k < Math.Min(2, lines.Count); k++)
                     T(k == 1 && lines.Count > 2 ? _f.Fit(lines[k] + " …", UI.F9, cellW - 14) : lines[k], UI.F9, White, x, stripTop + 41 + k * 13);
+                // the time zone, named once, under the first time of the strip
+                if (zone is not null && facts[i].Label == firstTime && lines.Count == 1)
+                    T(_f.Fit(zone, UI.F8, cellW - 14), UI.F8, OnDarkMuted, x, stripTop + 54);
             }
         }
 
