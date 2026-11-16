@@ -1,5 +1,6 @@
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Storage;
+using System.Text.RegularExpressions;
 
 namespace DirHealth.Desktop.Core.Services;
 
@@ -69,8 +70,8 @@ public static class ScanDiffCalculator
 
     /// <summary>
     /// One finding per category for the diff. A single finding is returned unchanged; several are
-    /// summed (Count), take the highest severity, and get a neutral title naming the category —
-    /// a title like "PSO 'X': …" would describe only one of them.
+    /// summed (Count), take the highest severity, and get a neutral title naming the category in
+    /// words — a title like "PSO 'X': …" would describe only one of them.
     /// </summary>
     private static AdFinding Merge(List<AdFinding> group, bool neutralTitle = false)
     {
@@ -79,11 +80,23 @@ public static class ScanDiffCalculator
         return new AdFinding
         {
             Category    = top.Category,
-            Title       = $"{top.Category} ({group.Count} finding{(group.Count == 1 ? "" : "s")})",
+            Title       = $"{ReadableCategory(top.Category)} ({group.Count} finding{(group.Count == 1 ? "" : "s")})",
             Description = top.Description,
             Severity    = top.Severity,
             Count       = group.Sum(f => f.Count),
             Objects     = group.SelectMany(f => f.Objects).ToList(),
         };
     }
+
+    /// <summary>
+    /// "FineGrainedPasswordPolicy" → "Fine Grained Password Policy", "PreWindows2000Access" →
+    /// "Pre Windows 2000 Access". There is no display name per category anywhere in the app
+    /// (views, report and exports print the key), so the key is split rather than a second
+    /// name list being maintained.
+    /// </summary>
+    public static string ReadableCategory(string category) =>
+        WordBoundary.Replace(category, " ");
+
+    private static readonly Regex WordBoundary =
+        new(@"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=[0-9])", RegexOptions.Compiled);
 }

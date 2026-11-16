@@ -76,7 +76,7 @@ public class ScanDiffTests
         Assert.Equal(3, change.Finding.Count);
         Assert.Equal(FindingSeverity.High, change.Finding.Severity); // highest of the group
         Assert.DoesNotContain("PSO '", change.Finding.Title);        // never names a single PSO for the sum
-        Assert.Contains("FineGrainedPasswordPolicy", change.Finding.Title);
+        Assert.Equal("Fine Grained Password Policy (3 findings)", change.Finding.Title);
     }
 
     [Fact]
@@ -147,4 +147,26 @@ public class ScanDiffTests
 
         Assert.Same(f, Assert.Single(diff.NewFindings));
     }
+
+    [Fact]
+    public void Calculate_MergedTitle_IsReadable_SingleKeepsOwnTitle()
+    {
+        var merged = Assert.Single(ScanDiffCalculator.Calculate(CacheOf(60),
+            CacheOf(60, Pso("PSO 'A': Reversible Encryption Enabled", FindingSeverity.High),
+                        Pso("PSO 'B': No Account Lockout Configured", FindingSeverity.High))).NewFindings);
+        Assert.Equal("Fine Grained Password Policy (2 findings)", merged.Title);
+
+        var single = Assert.Single(ScanDiffCalculator.Calculate(CacheOf(60),
+            CacheOf(60, Pso("PSO 'A': Reversible Encryption Enabled", FindingSeverity.High))).NewFindings);
+        Assert.Equal("PSO 'A': Reversible Encryption Enabled", single.Title);
+    }
+
+    [Theory]
+    [InlineData("FineGrainedPasswordPolicy", "Fine Grained Password Policy")]
+    [InlineData("PreWindows2000Access",      "Pre Windows 2000 Access")]
+    [InlineData("EolOperatingSystems",       "Eol Operating Systems")]
+    [InlineData("LAPSNotDeployed",           "LAPS Not Deployed")]
+    [InlineData("InactiveUsers",             "Inactive Users")]
+    public void ReadableCategory_SplitsPascalCase(string key, string expected) =>
+        Assert.Equal(expected, ScanDiffCalculator.ReadableCategory(key));
 }

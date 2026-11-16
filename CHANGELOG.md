@@ -30,7 +30,7 @@ All notable changes to DirHealth are documented here.
 
 ### Fixed — Scan failed from the second scan on with several weak password policies (review 2026-11-16, core finding 1)
 - **Scans no longer fail when a domain has more than one fine-grained password policy finding.** Each weak PSO (Password Settings Object) can produce up to three findings of the same rule. The "changes since last scan" comparison could not handle two findings of one rule and threw, so every scan after the first ended with "Scan failed: An item with the same key has already been added" — the scan cache and the score history were no longer saved, also for scheduled scans.
-- The comparison now sums the findings of one rule (highest severity wins) and shows them under the rule name, e.g. "FineGrainedPasswordPolicy (3 findings)", instead of naming a single PSO. Score and cache format are unchanged; existing caches stay readable and repair themselves with the next scan.
+- The comparison now sums the findings of one rule (highest severity wins) and shows them under the rule name in words, e.g. "Fine Grained Password Policy (3 findings)", instead of naming a single PSO. Score and cache format are unchanged; existing caches stay readable and repair themselves with the next scan.
 
 ### Fixed — Follow-up review of Sprints 13–20
 - **A check that could not read its data no longer reads as "Passed"** — the krbtgt, Guest, Pre-Windows 2000, operator-group, Recycle Bin and dSHeuristics checks used to report "passed" when the object they look at could not be read; they now report **Failed** with the reason. Domain-basics and LAPS/machine-account checks now run one query per rule, so one unreadable object fails only its own rule and the other rules keep their findings.
