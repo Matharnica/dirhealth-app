@@ -11,8 +11,23 @@ All notable changes to DirHealth are documented here.
 ### Security — WMI live details only on click, Kerberos only (review 2026-11-16, H1)
 - **Selecting a computer no longer connects to it.** The detail view shows AD data only; ping, disks, local admins, sessions and event log load when you click **Load live details (WMI)**. Selecting another computer discards the previous live data.
 - **Only the DNS host name from AD is used** (`dNSHostName`), never the short name (cn). A short name that DNS cannot resolve could be answered by any machine in the subnet (LLMNR/NetBIOS) and receive your NTLM logon. Computers without `dNSHostName` show "No DNS host name in AD — live details unavailable" and are never contacted.
-- **Kerberos is enforced** — every WMI connection names the server principal (`kerberos:<domain>\<host>`) with packet privacy; there is no negotiated NTLM fallback anymore. Computers whose Kerberos setup is broken now show a clear error instead of connecting over NTLM.
+- **Kerberos is enforced** — every WMI connection names the server principal (`kerberos:<domain>\<host>`) with packet privacy, instead of letting Windows negotiate (which may fall back to NTLM). Computers whose Kerberos setup is broken now show a clear error instead of connecting over NTLM.
 - **WMI errors are shown** (access denied, RPC unavailable, Kerberos failed, timeout) instead of silently empty lists.
+
+### Fixed — Review 2026-11-16 (report, exports, UI, repository)
+- **PDF report:** PowerShell fix/undo scripts wrap copy-safe (PowerShell continuation, split strings, comments stay comments); table cells wrap instead of being cut, headers repeat after page breaks.
+- **Redaction:** built-in accounts and groups (krbtgt, Guest, Administrator, Domain Admins) stay readable; rule texts are no longer garbled; exception creators and known names in reasons are redacted, also in the `.meta.txt`.
+- **Exports:** every export writes a `.meta.txt` (findings CSV, data-quality CSV, password PDF); the findings PDF side-car names the real DC. CSV: plain numbers like `-5` are no longer prefixed with an apostrophe; formula protection unchanged.
+- **UI:** the sidebar scrolls at small window sizes with Settings pinned at the bottom; the dashboard lists findings by severity and shows open Critical/High/Medium counts; severity badges use one palette with distinct, WCAG-AA readable colours; the password report shows load errors instead of an all-clear; placeholders (e.g. exception reason) are visible; overlapping titles in five views fixed; readable rule names; updated welcome card.
+- **About:** Settings › About shows the actual license, Elastic License 2.0 (ELv2), instead of "MIT License".
+
+### Added — Review 2026-11-16
+- **Report page 1:** generated summary sentences, score legend, scan scope and failed checks; a neutral "Score not available" state instead of a red "n/a".
+- **Scan JSON:** `scanTimeUtc` (ISO 8601, UTC); `scanTime` stays, `schemaVersion` unchanged.
+
+### Changed — Review 2026-11-16 (build and repository)
+- **CI:** read-only token by default; only the tag-only `release` job may write. All GitHub Actions pinned to commit SHAs. Dependabot for Actions and NuGet (minor/patch grouped, major versions ignored).
+- **README:** correct download facts (installer + SHA-256, unsigned), how read-only is enforced, why Domain Admin is required, architecture overview. Removed the stale `AGENTS.md`.
 
 ### Added — Sprint 23 (High-value checks) — ⚠ your score will drop without any change in AD
 - **Privileged SID in SID history** (DH-PRV-010, Critical) — an account whose sIDHistory carries a Domain Admins, Enterprise Admins or BUILTIN\Administrators SID has those rights silently. Ordinary SID history is still reported by DH-USR-005. An account with a privileged SID appears in both rules on purpose — clearing its sIDHistory resolves both, and the texts of both rules point to each other.
