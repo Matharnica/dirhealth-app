@@ -9,12 +9,17 @@ namespace DirHealth.Desktop.ViewModels;
 public partial class SettingsViewModel : BaseViewModel
 {
     private readonly AdConnector _connector;
+    private readonly string      _credentialPath;
 
     [ObservableProperty] private string _selectedSection = "Connection";
 
     [ObservableProperty] private string _domain = "";
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
+    // Same meaning as the login window's "Remember credentials" (M1): the login writes
+    // credentials.dat only when ticked and deletes it otherwise, so the file's existence
+    // is the one source of truth for the choice. Save() follows this flag.
+    [ObservableProperty] private bool   _rememberCredentials;
     [ObservableProperty] private bool   _connectionTestPassed;
     [ObservableProperty] private string _connectionTestResult = "";
 
@@ -35,9 +40,13 @@ public partial class SettingsViewModel : BaseViewModel
     partial void OnAutoScanEnabledChanged(bool value)      => OnScheduleChanged?.Invoke(value, AutoScanIntervalHours);
     partial void OnAutoScanIntervalHoursChanged(int value) => OnScheduleChanged?.Invoke(AutoScanEnabled, value);
 
-    public SettingsViewModel(AdConnector connector)
+    public SettingsViewModel(AdConnector connector) : this(connector, CredentialStore.DefaultPath) { }
+
+    internal SettingsViewModel(AdConnector connector, string credentialPath)
     {
-        _connector = connector;
+        _connector      = connector;
+        _credentialPath = credentialPath;
+        RememberCredentials = CredentialStore.Load(credentialPath) is not null;
         Domain     = connector.Domain ?? "";
         Username   = connector.Username ?? "";
         Password   = connector.Password ?? "";
@@ -86,8 +95,13 @@ public partial class SettingsViewModel : BaseViewModel
         _connector.Domain   = string.IsNullOrWhiteSpace(Domain) ? null : Domain;
         _connector.Username = string.IsNullOrWhiteSpace(Username) ? null : Username;
         _connector.Password = string.IsNullOrWhiteSpace(Password) ? null : Password;
-        CredentialStore.Save(Domain ?? "", Username ?? "", Password ?? "");
-        StatusMessage       = "Settings saved.";
+        // M1: persist the Domain Admin password only on explicit opt-in. Unticked means
+        // "keep nothing on disk" — an existing credentials.dat is deleted, like the login does.
+        if (RememberCredentials)
+            CredentialStore.Save(_credentialPath, Domain ?? "", Username ?? "", Password ?? "");
+        else
+            CredentialStore.Clear(_credentialPath);
+        StatusMessage       = RememberCredentials ? "Settings saved." : "Settings saved (credentials not stored on disk).";
         OnCredentialsSaved?.Invoke();
 
         var timer = new System.Windows.Threading.DispatcherTimer
