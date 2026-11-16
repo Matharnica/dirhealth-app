@@ -59,7 +59,7 @@ jobs:
 
       - name: Build Installer
         if: github.event_name != 'pull_request'
-        uses: Minionguyjpro/Inno-Setup-Action@0aa2e2f0ff0885d9a036b4c12521d46784d31647 # v1.2.4
+        uses: Minionguyjpro/Inno-Setup-Action@36e43b836ce2c78d21787b1f7183caf85c60ba05 # v1.3.0
         with:
           path: installer/setup.iss
           options: /O+ /DAppVersion=${{ steps.version.outputs.version }}
