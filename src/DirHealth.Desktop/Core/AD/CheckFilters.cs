@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace DirHealth.Desktop.Core.AD;
 
 /// <summary>
@@ -19,8 +21,38 @@ public static class CheckFilters
     public const string PersonUser   = "(objectClass=user)(objectCategory=person)";
     public const string EnabledUser  = PersonUser + NotDisabled;
 
+    // ── never-logged-on accounts (review 2026-11-16 M2) ──────────────────────
+    // A missing lastLogonTimestamp alone matched accounts created yesterday. The never-logged-on branch now also
+    // requires whenCreated at or before the same cutoff. whenCreated is GeneralizedTime, lastLogonTimestamp a
+    // FILETIME — so the scanner passes both forms of ONE DateTime, and the fix block computes the whenCreated
+    // cutoff inline in PowerShell from the same threshold ($cutoff stays the FILETIME variable).
+
+    /// <summary>GeneralizedTime for a whenCreated/whenChanged filter value (UTC, culture-invariant).</summary>
+    public static string GeneralizedTime(DateTime utc) =>
+        utc.ToString("yyyyMMddHHmmss'.0Z'", CultureInfo.InvariantCulture);
+
+    /// <summary>FILETIME for a lastLogonTimestamp/pwdLastSet filter value.</summary>
+    public static string FileTime(DateTime utc) =>
+        utc.ToFileTimeUtc().ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>PowerShell subexpression with the GeneralizedTime of "now − days" (fix block, inside "…").</summary>
+    public static string PsGeneralizedCutoff(int days) =>
+        $"$([datetime]::UtcNow.AddDays(-{days}).ToString('yyyyMMddHHmmss.0Z'))";
+
+    /// <summary>Never logged on AND created at or before the cutoff — a brand-new account is not "inactive".</summary>
+    private static string NeverLoggedOnSince(string createdCutoff) =>
+        $"(&(!(lastLogonTimestamp=*))(whenCreated<={createdCutoff}))";
+
+    /// <summary>Scanner: both cutoffs from one point in time.</summary>
+    public static string InactiveUsers(DateTime cutoffUtc) =>
+        InactiveUsers(FileTime(cutoffUtc), GeneralizedTime(cutoffUtc));
+
+    /// <summary>Fix block: <paramref name="cutoff"/> is the PowerShell FILETIME variable ("$cutoff").</summary>
     public static string InactiveUsers(string cutoff) =>
-        $"(&{EnabledUser}(|(lastLogonTimestamp<={cutoff})(!(lastLogonTimestamp=*))))";
+        InactiveUsers(cutoff, PsGeneralizedCutoff(InactiveUserDays));
+
+    public static string InactiveUsers(string cutoff, string createdCutoff) =>
+        $"(&{EnabledUser}(|(lastLogonTimestamp<={cutoff}){NeverLoggedOnSince(createdCutoff)}))";
 
     public const string PasswordNeverExpires =
         "(&" + EnabledUser + "(userAccountControl:1.2.840.113556.1.4.803:=65536))";
@@ -39,8 +71,15 @@ public static class CheckFilters
     /// <summary>Single-member groups: all groups, member count checked client-side.</summary>
     public const string AllGroups = "(objectClass=group)";
 
+    public static string InactiveComputers(DateTime cutoffUtc) =>
+        InactiveComputers(FileTime(cutoffUtc), GeneralizedTime(cutoffUtc));
+
+    /// <summary>Fix block: <paramref name="cutoff"/> is the PowerShell FILETIME variable ("$cutoff").</summary>
     public static string InactiveComputers(string cutoff) =>
-        $"(&(objectClass=computer){NotDisabled}(|(lastLogonTimestamp<={cutoff})(!(lastLogonTimestamp=*))))";
+        InactiveComputers(cutoff, PsGeneralizedCutoff(InactiveComputerDays));
+
+    public static string InactiveComputers(string cutoff, string createdCutoff) =>
+        $"(&(objectClass=computer){NotDisabled}(|(lastLogonTimestamp<={cutoff}){NeverLoggedOnSince(createdCutoff)}))";
 
     public const string ComputersWithoutOs = "(&(objectClass=computer)(!(operatingSystem=*)))";
 
@@ -68,9 +107,16 @@ public static class CheckFilters
     public const string SidHistory = "(&" + EnabledUser + "(sIDHistory=*))";
 
     /// <summary>Stale Domain Admins: enabled, nested/primary member of the group, no recent logon.</summary>
+    public static string StaleDomainAdmins(string escapedGroupDn, DateTime cutoffUtc) =>
+        StaleDomainAdmins(escapedGroupDn, FileTime(cutoffUtc), GeneralizedTime(cutoffUtc));
+
+    /// <summary>Fix block: <paramref name="cutoff"/> is the PowerShell FILETIME variable ("$cutoff").</summary>
     public static string StaleDomainAdmins(string escapedGroupDn, string cutoff) =>
+        StaleDomainAdmins(escapedGroupDn, cutoff, PsGeneralizedCutoff(StaleAdminDays));
+
+    public static string StaleDomainAdmins(string escapedGroupDn, string cutoff, string createdCutoff) =>
         $"(&{EnabledUser}{WellKnownGroups.MembershipClause(escapedGroupDn, WellKnownGroups.DomainAdminsRid)}" +
-        $"(|(lastLogonTimestamp<={cutoff})(!(lastLogonTimestamp=*))))";
+        $"(|(lastLogonTimestamp<={cutoff}){NeverLoggedOnSince(createdCutoff)}))";
 
     // ── Sprint 19 ────────────────────────────────────────────────────────────
     /// <summary>Enabled users whose primary group is not Domain Users/Guests (hidden membership).</summary>

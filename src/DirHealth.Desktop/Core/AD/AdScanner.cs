@@ -361,9 +361,8 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
-            var cutoffFileTime = cutoff.ToFileTimeUtc();
-            return QueryUsers(CheckFilters.InactiveUsers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            // M2: one cutoff for lastLogonTimestamp (FILETIME) and whenCreated (GeneralizedTime)
+            return QueryUsers(CheckFilters.InactiveUsers(DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 
@@ -408,9 +407,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
-            var cutoffFileTime = cutoff.ToFileTimeUtc();
-            return QueryComputers(CheckFilters.InactiveComputers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            return QueryComputers(CheckFilters.InactiveComputers(DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 
@@ -702,9 +699,8 @@ public partial class AdScanner
             if (!da.Found)
                 throw new InvalidOperationException($"Domain Admins group not found: {da.Error}");
 
-            var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
-            // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512
-            return QueryUsers(CheckFilters.StaleDomainAdmins(EscapeDn(da.DistinguishedName!), cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512; never-logged-on only if created before the cutoff (M2)
+            return QueryUsers(CheckFilters.StaleDomainAdmins(EscapeDn(da.DistinguishedName!), DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 

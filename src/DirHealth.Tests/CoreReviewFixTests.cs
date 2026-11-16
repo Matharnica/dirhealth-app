@@ -153,4 +153,42 @@ public class CoreReviewFixTests
         Assert.Contains("(!(isCriticalSystemObject=TRUE))", CheckFilters.EmptyGroups);
         Assert.Contains($"-LDAPFilter \"{CheckFilters.EmptyGroups}\"", FindingCatalog.Get("EmptyGroups")!.Fix);
     }
+
+    // ── M2: never-logged-on accounts only count after the cutoff ─────────────
+    private static readonly DateTime Cutoff = new(2026, 8, 18, 12, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void GeneralizedTime_IsLdapFormat()
+    {
+        Assert.Equal("20260818120000.0Z", CheckFilters.GeneralizedTime(Cutoff));
+    }
+
+    public static TheoryData<string> ScannerFilters => new()
+    {
+        CheckFilters.InactiveUsers(Cutoff),
+        CheckFilters.InactiveComputers(Cutoff),
+        CheckFilters.StaleDomainAdmins("CN=Domain Admins,CN=Users,DC=c,DC=x", Cutoff),
+    };
+
+    [Theory]
+    [MemberData(nameof(ScannerFilters))]
+    public void ScannerFilter_NeverLoggedOnBranch_RequiresWhenCreatedAtTheSameCutoff(string filter)
+    {
+        var fileTime = Cutoff.ToFileTimeUtc().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Contains($"(lastLogonTimestamp<={fileTime})", filter);
+        Assert.Contains("(&(!(lastLogonTimestamp=*))(whenCreated<=20260818120000.0Z))", filter);
+        Assert.DoesNotContain("$", filter);   // no PowerShell leaks into the scanner's filter
+    }
+
+    [Theory]
+    [InlineData("InactiveUsers",     CheckFilters.InactiveUserDays)]
+    [InlineData("InactiveComputers", CheckFilters.InactiveComputerDays)]
+    [InlineData("StaleDomainAdmins", CheckFilters.StaleAdminDays)]
+    public void FixBlock_NeverLoggedOnBranch_ComputesWhenCreatedFromTheSameThreshold(string category, int days)
+    {
+        var rule = FindingCatalog.Get(category)!;
+        Assert.Contains($"(whenCreated<={CheckFilters.PsGeneralizedCutoff(days)})", rule.CheckFilter);
+        Assert.Contains($"-LDAPFilter \"{rule.CheckFilter}\"", rule.Fix);   // fix block = scan filter
+        Assert.Contains($"AddDays(-{days})", rule.Fix);                     // $cutoff uses the same days
+    }
 }
