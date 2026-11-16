@@ -93,8 +93,8 @@ public sealed class ReportPdfRenderer
         if (_toc.Count == 0) return;
         var entries = _toc.Take(8).ToList();
         int rows = (entries.Count + 1) / 2;
-        const double rowH = 16;
-        double need = 22 + rows * rowH;
+        const double rowH = 14;
+        double need = 20 + rows * rowH;
         if (_tocTop + need > _tocBottom) return;
         var page = _f.Doc.Pages[0];
         using var g = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
@@ -102,7 +102,7 @@ public sealed class ReportPdfRenderer
         _f.Sink("CONTENTS");
         g.DrawString("CONTENTS", UI.F7B, Muted, M, y + 8);
         g.DrawLine(new XPen(UI.ColBorder, 0.8), M, y + 13, M + w, y + 13);
-        y += 22;
+        y += 20;
         var leader = new XPen(UI.ColBorderDark, 0.6) { DashStyle = XDashStyle.Dot };
         for (int i = 0; i < entries.Count; i++)
         {
@@ -276,12 +276,12 @@ public sealed class ReportPdfRenderer
             .Append(("Score", _m.ScoreAvailable ? $"{_m.ScoreText} / 100 · {_m.ScoreLabel}" : _m.ScoreText, false))
             .Append(("Score scale", _m.ScoreLegend, false)));
 
-        _f.Heading("Overview by finding", 80);
+        _f.Heading("Overview by finding", PdfFlow.KeepFor(_m.CategoryOverview));
         Mark("Overview by finding");
         _f.Table(_m.CategoryOverview, [CellKind.Mono, CellKind.Text, CellKind.Severity, CellKind.Number, CellKind.Number]);
         if (_m.Changes.Rows.Count > 0)
         {
-            _f.Heading("Changes since the last scan (objects)", 80);
+            _f.Heading("Changes since the last scan (objects)", PdfFlow.KeepFor(_m.Changes));
             if (_m.Kind == ReportKind.Summary) Mark("Changes since the last scan");
             _f.Table(_m.Changes, [CellKind.Muted, CellKind.Text]);
         }
@@ -473,7 +473,7 @@ public sealed class ReportPdfRenderer
                 _f.Y += 6;
             }
         }
-        _f.Overline($"AFFECTED OBJECTS ({objects.ToString("N0", CultureInfo.InvariantCulture)})", 40);
+        _f.Overline($"AFFECTED OBJECTS ({objects.ToString("N0", CultureInfo.InvariantCulture)})", PdfFlow.KeepFor(f.Objects));
         _f.Table(f.Objects, [CellKind.Text, CellKind.Muted, CellKind.Text, CellKind.Muted]);
         _f.Y += 14;
     }
@@ -547,7 +547,7 @@ public sealed class ReportPdfRenderer
 
         foreach (var (title, table) in _m.Appendix)
         {
-            _f.Heading(title);
+            _f.Heading(title, PdfFlow.KeepFor(table));
             _f.Table(table);
         }
     }

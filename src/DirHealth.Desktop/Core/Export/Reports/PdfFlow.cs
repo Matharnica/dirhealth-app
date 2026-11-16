@@ -311,6 +311,13 @@ internal sealed class PdfFlow
     /// high as its longest cell, hairline rows; column headers repeat after every page break (S18-2).
     /// Six or more columns switch to a landscape page.
     /// </summary>
+    /// <summary>
+    /// Space a table should find on the current page before it starts: a short table as a whole, a long one
+    /// with its first rows — so a heading or a small table never ends up alone at the bottom of a page.
+    /// </summary>
+    public static double KeepFor(ReportTable t) =>
+        Math.Min(19 + 20 * Math.Max(1, t.Rows.Count) + (t.HiddenRows > 0 ? 18 : 0) + 6, 140);
+
     /// <param name="rowAccent">Optional colour per row index: the row gets a light tint and a 3 pt bar in it.</param>
     public void Table(ReportTable t, IReadOnlyList<CellKind>? kinds = null, string emptyText = "None.", Func<int, XColor?>? rowAccent = null)
     {
@@ -373,7 +380,7 @@ internal sealed class PdfFlow
                 .Select(c => Cell(row[c], FontOf(c), widths[c] - (KindOf(c) == CellKind.Severity ? 9 : 0))).ToList();
             int n = cells.Count == 0 ? 1 : Math.Max(1, cells.Max(l => l.Count));
             double h = n * CellLineH + 9;
-            if (first) { Ensure(headH + h); HeaderRow(); first = false; }
+            if (first) { Ensure(Math.Max(headH + h, KeepFor(t))); HeaderRow(); first = false; }
             else if (Ensure(h)) HeaderRow();          // re-print column headers after the break
             if (rowAccent?.Invoke(rowNo) is { } ra)
             {
