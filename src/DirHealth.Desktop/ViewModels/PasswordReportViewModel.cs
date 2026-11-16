@@ -81,7 +81,7 @@ public partial class PasswordReportViewModel : ListBrowserViewModel
                 var rows = Table.FilteredRows.ToList();
                 _pdfExporter.ExportPasswordReport(rows, dlg.FileName);
                 // Paket 3 F-08: every export gets its .meta.txt (SHA-256, who/where/when)
-                ExportMetadata.WriteFor(dlg.FileName, ExportMetadata.SafeContext(_scanner is null ? null : _scanner.GetExportContext),
+                ExportMetadata.WriteFor(dlg.FileName, ExportMetadata.SafeContext(Table.ContextProvider),
                     "Password report (PDF)", $"expiring within {WithinDays} days", rows.Count);
                 StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)} (+ .meta.txt)";
             }
