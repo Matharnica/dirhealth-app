@@ -80,7 +80,7 @@ public partial class AdScanner
         {
             var changes  = new List<AdRecentChange>();
             var cutoff   = DateTime.UtcNow.AddDays(-days);
-            var ldapTime = cutoff.ToString("yyyyMMddHHmmss.0") + "Z";
+            var ldapTime = CheckFilters.GeneralizedTime(cutoff);   // culture-invariant (L2)
             var filter   = $"(|(&(objectClass=user)(objectCategory=person)(whenChanged>={ldapTime}))" +
                            $"(&(objectClass=computer)(whenChanged>={ldapTime})))";
 
@@ -123,7 +123,9 @@ public partial class AdScanner
     {
         if (props[name].Count == 0) return null;
         var val = props[name][0];
-        if (val is DateTime dt) return dt.ToUniversalTime();
+        // DirectorySearcher returns GeneralizedTime as UTC with Kind=Unspecified — ToUniversalTime() would treat it
+        // as local time and shift it by the UTC offset (L1, review 2026-11-16)
+        if (val is DateTime dt) return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
         return null;
     }
 }

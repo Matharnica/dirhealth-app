@@ -20,6 +20,8 @@ public static class UserColumns
         new(LastLogonHeader,      u => u.LastLogon,           nameof(AdUser.LastLogon), "yyyy-MM-dd", monospace: true),
         new("Password Last Set",  u => u.PasswordLastSet,     nameof(AdUser.PasswordLastSet), "yyyy-MM-dd", monospace: true),
         new("Password Expires In (d)", u => u.DaysUntilPasswordExpiry, nameof(AdUser.DaysUntilPasswordExpiry)),
+        // Review 2026-11-16 H2: an empty "Expires In" cell is either "no expiry date" or "not readable" — say which.
+        new("Password Expiry",    u => u.PasswordExpiryStatus, nameof(AdUser.PasswordExpiryStatus)),
         new("OU",                 u => u.Ou,                  nameof(AdUser.Ou)),
     ];
 

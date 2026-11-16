@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DirHealth.Desktop.Core.AD;
+using DirHealth.Desktop.Core.AD.Checks;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.ViewModels.Tables;
 
@@ -77,10 +78,23 @@ public partial class UserBrowserViewModel : ListBrowserViewModel
             _allUsers   = await _scanner.GetAllUsersAsync();
             _lastLoaded = DateTime.Now;
             Table.SetRows(_allUsers);
+            Table.StatusMessage = ExpiryNotice(_allUsers) ?? "";
             ApplyFilter();
             EndLoad();
         }
         catch (Exception ex) { SetError($"Failed to load users: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Review 2026-11-16 H2: users whose password expiry could not be read are not "fine" — say so above the
+    /// table instead of leaving their cells silently empty. Null when every expiry was read.
+    /// </summary>
+    public static string? ExpiryNotice(IReadOnlyCollection<AdUser> users)
+    {
+        int unreadable = users.Count(u => u.PasswordExpiryState == CheckLogic.PasswordExpiryState.Unreadable);
+        return unreadable == 0 ? null :
+            $"Password expiry could not be read for {unreadable} of {users.Count} user(s) — shown as \"{AdUser.UnreadableExpiryText}\". " +
+            "Check the read permissions of the scan account.";
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.DirectoryServices;
+using DirHealth.Desktop.Core.AD.Checks;
 using DirHealth.Desktop.Core.AD.Models;
 using DirHealth.Desktop.Core.Storage;
 using DirHealth.Desktop.Core.Export;
@@ -56,9 +57,18 @@ public partial class AdScanner
         ("Recovery.Sysvol",                 GetSysvolReplicationFindingsAsync),
     ];
 
+    /// <summary>Scan log of the scan running on this async flow (null outside RunCompleteScanAsync).
+    /// AsyncLocal flows into Task.Run, so sub-queries can add notes without a parameter.</summary>
+    private static readonly AsyncLocal<ConcurrentBag<ScanLogEntry>?> CurrentScanLog = new();
+
+    /// <summary>Adds an informational line to the current scan's log (no-op outside a scan).</summary>
+    private static void NoteInScanLog(string query, string note) =>
+        CurrentScanLog.Value?.Add(new ScanLogEntry(query, 0, 0, $"note: {note}"));
+
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
         var scanLog       = new ConcurrentBag<ScanLogEntry>();
+        CurrentScanLog.Value = scanLog;
         var failures      = new ConcurrentDictionary<string, string>();
         var notApplicable = new ConcurrentDictionary<string, string>();
         // S16-4: every sub-query runs guarded — a failure is recorded, not fatal
@@ -86,7 +96,8 @@ public partial class AdScanner
         var staleDAsTask       = Timed("StaleDomainAdmins",        () => GetStaleDomainAdminsAsync(),               scanLog);
         var fgppTask           = Timed("FineGrainedPwdPolicies",   () => GetFineGrainedPasswordPoliciesAsync(),     scanLog);
         var sidHistoryTask     = Timed("SidHistory",               () => GetSidHistoryAccountsAsync(),              scanLog);
-        var allUsersTask       = Timed("AllUsers",                 () => GetAllUsersAsync(),                        scanLog);
+        // H2 (review 2026-11-16): own sub-query — an unreadable expiry is logged as an error, never guessed
+        var expiringPwdTask    = Timed("ExpiringPasswords",        () => GetExpiringPasswordUsersAsync(),           scanLog);
         var domainAdminsTask   = Timed("DomainAdmins",             () => GetDomainAdminsAsync(),                    scanLog);
         // Sprint 19 checks — each query yields its findings; a failing one is marked Failed (S16-4)
         var hiddenPgTask       = Timed("HiddenPrimaryGroup",       () => GetHiddenPrimaryGroupFindingsAsync(),      scanLog);
@@ -105,7 +116,7 @@ public partial class AdScanner
                 noOsTask, securityTask, adminSdTask, policyTask, eolTask,
                 asRepTask, undelCompsTask, undelUsersTask, passwdNotReqdTask,
                 staleDAsTask, fgppTask, sidHistoryTask,
-                allUsersTask, domainAdminsTask,
+                expiringPwdTask, domainAdminsTask,
                 hiddenPgTask, adminHardenTask, operatorsTask, kerbEncTask, delegTrustTask, Task.WhenAll(splitTasks));
         }
         finally
@@ -338,11 +349,8 @@ public partial class AdScanner
         var checks = ScanGuard.Evaluate(FindingCatalog.All, findings, failures, notApplicable);
         int score  = ScoreModel.Compute(FindingCatalog.All, findings, checks, totals).Score;
 
-        // ── Expiring passwords (from already-loaded allUsers) ─────────────────────
-        var expiringPasswords = allUsersTask.Result
-            .Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= 30)
-            .OrderBy(u => u.DaysUntilPasswordExpiry)
-            .ToList();
+        // ── Expiring passwords (msDS-UserPasswordExpiryTimeComputed; empty + scan-log error if unreadable) ──
+        var expiringPasswords = expiringPwdTask.Result;
 
         var domainAdmins = domainAdminsTask.Result?.Members?.Select(m => m.Name).ToList() ?? [];
 
@@ -353,9 +361,8 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
-            var cutoffFileTime = cutoff.ToFileTimeUtc();
-            return QueryUsers(CheckFilters.InactiveUsers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            // M2: one cutoff for lastLogonTimestamp (FILETIME) and whenCreated (GeneralizedTime)
+            return QueryUsers(CheckFilters.InactiveUsers(DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 
@@ -382,7 +389,8 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            return QueryGroups(CheckFilters.EmptyGroups);
+            // M1: primary groups keep their members in primaryGroupID — an empty member attribute says nothing
+            return QueryGroups(CheckFilters.EmptyGroups).Where(g => !CheckLogic.IsPrimaryGroupSid(g.Sid)).ToList();
         });
     }
 
@@ -399,9 +407,7 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            var cutoff = DateTime.UtcNow.AddDays(-daysThreshold);
-            var cutoffFileTime = cutoff.ToFileTimeUtc();
-            return QueryComputers(CheckFilters.InactiveComputers(cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            return QueryComputers(CheckFilters.InactiveComputers(DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 
@@ -543,6 +549,24 @@ public partial class AdScanner
         return part.StartsWith("CN=", StringComparison.OrdinalIgnoreCase) ? part[3..] : part;
     }
 
+    /// <summary>
+    /// Does the object exist? Read-only base search. Only LDAP_NO_SUCH_OBJECT means "absent" — every other error
+    /// propagates (lives here, not in Checks19: the split check files contain no catch at all, see FollowUp G-tests).
+    /// </summary>
+    private bool DnExists(string dn)
+    {
+        try
+        {
+            using var entry = EntryAt(dn);
+            using var s = new DirectorySearcher(entry, "(objectClass=*)", ["distinguishedName"], SearchScope.Base);
+            return s.FindOne() is not null;
+        }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.ErrorCode == unchecked((int)0x80072030))   // LDAP_NO_SUCH_OBJECT
+        {
+            return false;
+        }
+    }
+
     private DirectoryEntry GetEntryByDn(string dn)
     {
         var path = string.IsNullOrEmpty(_connector.Domain)
@@ -606,37 +630,15 @@ public partial class AdScanner
         return await Task.Run(() => QueryComputers("(&(objectClass=computer))"));
     }
 
-    public int GetMaxPasswordAgeDays()
-    {
-        try
-        {
-            using var root = _connector.GetRootEntry();
-            var val = root.Properties["maxPwdAge"]?[0];
-            if (val is long l && l != 0 && l != long.MinValue)
-                return (int)TimeSpan.FromTicks(-l).TotalDays;
-        }
-        catch { }
-        return 90;
-    }
+    private const string AllUsersFilter = "(&(objectClass=user)(objectCategory=person))";
 
-    public async Task<List<AdUser>> GetAllUsersAsync()
-    {
-        var users = await Task.Run(() => QueryUsers("(&(objectClass=user)(objectCategory=person))"));
-        var maxDays = GetMaxPasswordAgeDays();
-        foreach (var u in users)
-        {
-            if (u.PasswordNeverExpires || u.PasswordLastSet is null)
-            {
-                u.DaysUntilPasswordExpiry = null;
-            }
-            else
-            {
-                var expiry = u.PasswordLastSet.Value.AddDays(maxDays);
-                u.DaysUntilPasswordExpiry = (int)(expiry - DateTime.UtcNow).TotalDays;
-            }
-        }
-        return users;
-    }
+    /// <summary>
+    /// All users with their password expiry taken from msDS-UserPasswordExpiryTimeComputed (H2, review
+    /// 2026-11-16): AD computes it from pwdLastSet and the effective maxPwdAge (PSO or domain policy, including
+    /// "never expires"). A user whose value could not be read keeps an empty expiry — no assumed default.
+    /// </summary>
+    public async Task<List<AdUser>> GetAllUsersAsync() =>
+        await Task.Run(() => QueryUsers(AllUsersFilter, withExpiry: true, out _));
 
     /// <summary>
     /// All groups of a user: direct, primary group (primaryGroupID → SID), and nested
@@ -715,9 +717,8 @@ public partial class AdScanner
             if (!da.Found)
                 throw new InvalidOperationException($"Domain Admins group not found: {da.Error}");
 
-            var cutoffFileTime = DateTime.UtcNow.AddDays(-daysThreshold).ToFileTimeUtc();
-            // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512
-            return QueryUsers(CheckFilters.StaleDomainAdmins(EscapeDn(da.DistinguishedName!), cutoffFileTime.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            // Nested membership (LDAP_MATCHING_RULE_IN_CHAIN) + primary group 512; never-logged-on only if created before the cutoff (M2)
+            return QueryUsers(CheckFilters.StaleDomainAdmins(EscapeDn(da.DistinguishedName!), DateTime.UtcNow.AddDays(-daysThreshold)));
         });
     }
 
@@ -986,17 +987,28 @@ public partial class AdScanner
         return r.Findings;
     }
 
-    public async Task<List<AdUser>> GetExpiringPasswordUsersAsync(int withinDays = 30)
+    /// <summary>
+    /// Users whose password expires within the window. Throws when the expiry of any user could not be read
+    /// (H2): a list that silently misses those users would look complete — the report shows the error instead.
+    /// </summary>
+    public async Task<List<AdUser>> GetExpiringPasswordUsersAsync(int withinDays = 30) => await Task.Run(() =>
     {
-        var allUsers = await GetAllUsersAsync();
-        return allUsers
-            .Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= withinDays)
-            .OrderBy(u => u.DaysUntilPasswordExpiry)
-            .ToList();
-    }
+        var users = QueryUsers(AllUsersFilter, withExpiry: true, out var unreadable);
+        if (unreadable > 0)
+            throw new InvalidOperationException(
+                $"Password expiry (msDS-UserPasswordExpiryTimeComputed) could not be read for {unreadable} of {users.Count} user(s) — " +
+                "check read permissions of the scan account.");
+        return CheckLogic.ExpiringWithin(users, withinDays);
+    });
 
-    private List<AdUser> QueryUsers(string filter)
+    private List<AdUser> QueryUsers(string filter) => QueryUsers(filter, withExpiry: false, out _);
+
+    /// <param name="withExpiry">Also load msDS-UserPasswordExpiryTimeComputed (constructed attribute) and set
+    /// PasswordExpires / DaysUntilPasswordExpiry. <paramref name="expiryUnreadable"/> counts users without it.</param>
+    private List<AdUser> QueryUsers(string filter, bool withExpiry, out int expiryUnreadable)
     {
+        expiryUnreadable = 0;
+        var now = DateTime.UtcNow;
         var users = new List<AdUser>();
         using var root     = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
@@ -1006,13 +1018,14 @@ public partial class AdScanner
             "objectSid", "whenCreated", "accountExpires", "department", "title",
             "manager", "description", "adminCount", "servicePrincipalName",
             "msDS-AllowedToDelegateTo", "msDS-SupportedEncryptionTypes");
+        if (withExpiry) searcher.PropertiesToLoad.Add(ExpiryComputedAttr);
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
         {
             var props = result.Properties;
             int uac   = (int)GetLong(props, "userAccountControl");
-            users.Add(new AdUser
+            var user  = new AdUser
             {
                 SamAccountName      = GetString(props, "sAMAccountName"),
                 DisplayName         = GetString(props, "displayName"),
@@ -1037,10 +1050,22 @@ public partial class AdScanner
                 Spns                = props["servicePrincipalName"].Cast<object>().Select(v => v?.ToString() ?? "").ToList(),
                 Delegation          = AdTime.DelegationKind(uac, props["msDS-AllowedToDelegateTo"].Count > 0),
                 SupportedEncryptionTypes = props["msDS-SupportedEncryptionTypes"].Count > 0 ? (int?)GetLong(props, "msDS-SupportedEncryptionTypes") : null,
-            });
+            };
+            if (withExpiry)
+            {
+                long? raw = props[ExpiryComputedAttr].Count > 0 && props[ExpiryComputedAttr][0] is long l ? l : null;
+                var expiry = CheckLogic.PasswordExpiryFromComputed(raw);
+                if (expiry.State == CheckLogic.PasswordExpiryState.Unreadable) expiryUnreadable++;
+                user.PasswordExpiryState     = expiry.State;
+                user.PasswordExpires         = expiry.ExpiresUtc;
+                user.DaysUntilPasswordExpiry = CheckLogic.DaysUntilExpiry(expiry, now);
+            }
+            users.Add(user);
         }
         return users;
     }
+
+    private const string ExpiryComputedAttr = "msDS-UserPasswordExpiryTimeComputed";
 
     private List<AdGroup> QueryGroups(string filter)
     {
