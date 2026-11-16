@@ -37,6 +37,11 @@
                        FontSize="12" Margin="0,4,0,0"
                        Foreground="{StaticResource TextSecondaryBrush}"
                        TextWrapping="Wrap"/>
+            <!-- Q17: say why Domain Admin is safe to enter — DirHealth never writes to AD -->
+            <TextBlock Text="DirHealth only reads Active Directory — nothing is changed."
+                       FontSize="12" Margin="0,2,0,0"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Domain -->
@@ -104,7 +109,7 @@
                                 <Setter Property="Text" Value="Connect"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsConnecting}" Value="True">
-                                        <Setter Property="Text" Value="Connecting..."/>
+                                        <Setter Property="Text" Value="Connecting…"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

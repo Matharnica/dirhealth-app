@@ -96,7 +96,7 @@
                             BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                             VerticalAlignment="Center">
                         <TextBlock Text="{Binding SelectedGroup.GroupScope}"
-                                   Foreground="{StaticResource AccentBrush}" FontSize="11" />
+                                   Foreground="{StaticResource AccentHoverBrush}" FontSize="11" />
                     </Border>
                 </Grid>
 

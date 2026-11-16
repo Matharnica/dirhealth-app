@@ -29,7 +29,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,10" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="MEMBERS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="MEMBERS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                             <TextBlock FontSize="28" FontWeight="Black">
                                 <TextBlock.Style>

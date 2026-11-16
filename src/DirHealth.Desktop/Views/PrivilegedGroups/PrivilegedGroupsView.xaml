@@ -34,7 +34,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="TOTAL MEMBERS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="TOTAL MEMBERS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding TotalMembers}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -45,7 +45,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="EMPTY GROUPS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="EMPTY GROUPS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding EmptyGroups}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
