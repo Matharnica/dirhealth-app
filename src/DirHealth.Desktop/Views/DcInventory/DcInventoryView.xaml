@@ -31,7 +31,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="TOTAL DCs" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="TOTAL DCs" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding DcCount}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -42,25 +42,26 @@
                     <Border BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <Border.Style>
                             <Style TargetType="Border">
+                                <!-- Q5: EOL DCs are highlighted; both triggers used to set the default, so never -->
                                 <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding EolCount}" Value="0">
-                                        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
                         <StackPanel>
-                            <TextBlock Text="END OF LIFE" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="END OF LIFE" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock FontSize="24" FontWeight="Black">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding EolCount}" Value="0">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -77,7 +78,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="GLOBAL CATALOGS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="GLOBAL CATALOGS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding GcCount}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />

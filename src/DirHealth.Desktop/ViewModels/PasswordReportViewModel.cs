@@ -8,13 +8,17 @@ using DirHealth.Desktop.ViewModels.Tables;
 
 namespace DirHealth.Desktop.ViewModels;
 
-public partial class PasswordReportViewModel : BaseViewModel
+/// <summary>
+/// Password expiry report. Loading/empty/error state comes from <see cref="ListBrowserViewModel"/>
+/// (Q6): before, the green "no users expiring ✓" hung on UserCount = 0 alone and also showed after a
+/// failed LDAP query and before the first load.
+/// </summary>
+public partial class PasswordReportViewModel : ListBrowserViewModel
 {
-    private readonly AdScanner   _scanner;
     private readonly PdfExporter _pdfExporter = new();
+    private readonly Func<int, Task<List<AdUser>>> _load;
 
-    [ObservableProperty] private bool _isLoading;
-    [ObservableProperty] private int  _withinDays = 30;
+    [ObservableProperty] private int _withinDays = 30;
 
     /// <summary>Shared sortable/exportable table (S14-2) — CSV export lives in its Export menu.</summary>
     public TableViewModel<AdUser> Table { get; } = new("Password Report", ViewColumns.PasswordReport)
@@ -27,9 +31,13 @@ public partial class PasswordReportViewModel : BaseViewModel
     public int UserCount => Table.TotalCount;
     public List<int> DayOptions { get; } = [14, 30, 60, 90];
 
-    public PasswordReportViewModel(AdScanner scanner)
+    protected override bool IsEmpty => Table.TotalCount == 0;
+    public override string EmptyMessage => $"No users with a password expiring within {WithinDays} days. ✓";
+
+    /// <param name="load">Loader for tests; default is the scanner's query.</param>
+    public PasswordReportViewModel(AdScanner scanner, Func<int, Task<List<AdUser>>>? load = null)
     {
-        _scanner = scanner;
+        _load = load ?? (days => scanner.GetExpiringPasswordUsersAsync(days));
         Table.FilterDescription = () => $"password expiring within {WithinDays} days";
         if (scanner is not null) Table.ContextProvider = scanner.GetExportContext;
     }
@@ -37,19 +45,20 @@ public partial class PasswordReportViewModel : BaseViewModel
     [RelayCommand]
     public async Task LoadAsync()
     {
-        IsLoading = true;
+        BeginLoad();
         Table.Clear();
         try
         {
-            var users = await _scanner.GetExpiringPasswordUsersAsync(WithinDays);
+            var users = await _load(WithinDays);
             Table.SetRows(users);
             StatusMessage = $"{users.Count} user(s) with password expiring within {WithinDays} days.";
+            EndLoad();
         }
-        catch (Exception ex) { StatusMessage = $"Error: {ex.Message}"; }
+        catch (Exception ex) { SetError(ex.Message); }
         finally
         {
-            IsLoading = false;
             OnPropertyChanged(nameof(UserCount));
+            OnPropertyChanged(nameof(EmptyMessage));
             ExportPdfCommand.NotifyCanExecuteChanged();
         }
     }

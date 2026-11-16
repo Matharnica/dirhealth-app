@@ -8,10 +8,13 @@
     <StackPanel Margin="20">
         <TextBlock Text="Export PDF report" FontSize="16" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
-        <RadioButton x:Name="SummaryRadio" GroupName="Kind" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}"
-                     Content="Summary — 1–2 pages for management: score, fix first, categories, changes" />
-        <RadioButton x:Name="FullRadio" GroupName="Kind" IsChecked="True" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}"
-                     Content="Full — summary plus every finding with fix, undo, objects, exceptions" />
+        <!-- Q18: wrapped labels — plain string content was cut off at the right edge -->
+        <RadioButton x:Name="SummaryRadio" GroupName="Kind" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}">
+            <TextBlock TextWrapping="Wrap" Text="Summary — 1–2 pages for management: score, fix first, categories, changes" />
+        </RadioButton>
+        <RadioButton x:Name="FullRadio" GroupName="Kind" IsChecked="True" Margin="0,2" Foreground="{DynamicResource TextPrimaryBrush}">
+            <TextBlock TextWrapping="Wrap" Text="Full — summary plus every finding with fix, undo, objects, exceptions" />
+        </RadioButton>
         <CheckBox x:Name="RedactBox" Margin="0,14,0,0" Foreground="{DynamicResource TextPrimaryBrush}"
                   Content="Redact user names (user-001, user-002 …)" />
         <TextBlock TextWrapping="Wrap" FontSize="11" Margin="22,2,0,0" Foreground="{DynamicResource TextSecondaryBrush}"

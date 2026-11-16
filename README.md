@@ -19,11 +19,16 @@
   <a href="https://dirhealth.app">
     <img alt="Website" src="https://img.shields.io/badge/Website-dirhealth.app-6366f1?style=for-the-badge" />
   </a>
+  <br/><br/>
+  <a href="https://github.com/Matharnica/dirhealth-app/actions/workflows/build.yml?query=branch%3Adev">
+    <img alt="CI (dev)" src="https://github.com/Matharnica/dirhealth-app/actions/workflows/build.yml/badge.svg?branch=dev" />
+  </a>
 </div>
 
 ---
 
 ![DirHealth Dashboard](landing/assets/screenshot.png)
+<sub>Screenshot of an earlier version — the current UI differs.</sub>
 
 ---
 
@@ -31,9 +36,11 @@
 
 DirHealth scans your Active Directory for stale accounts, weak password policies, and security risks — and gives you a clear hygiene score. Built by an admin, for admins.
 
-**Admin-only access:** DirHealth requires domain admin credentials at login. Your AD data stays in the right hands.
+**Read-only:** DirHealth never modifies your directory — see [Read-only by design](#read-only-by-design).
 
-**Read-only:** DirHealth never modifies your directory.
+**Domain Admin login:** DirHealth only accepts a Domain Admin account at login — see [Why Domain Admin?](#why-domain-admin).
+
+> **Release status:** the latest release is the one linked above. The `dev` branch already contains the next version (v3.0.0, not yet released — it waits for a test against a live AD). The check list below describes `dev`; the [CHANGELOG](CHANGELOG.md) separates released from unreleased changes.
 
 ## What it checks
 
@@ -68,17 +75,49 @@ Every finding reduces your **Hygiene Score (0–100, higher is better)** — exp
 
 ## Getting started
 
-1. **Download** the latest `.exe` from [Releases](https://github.com/matharnica/dirhealth-app/releases/latest) — single file, no runtime needed
-2. **Log in** with your domain admin credentials
+1. **Download and run** the installer `DirHealth-Setup-<version>.exe` from [Releases](https://github.com/matharnica/dirhealth-app/releases/latest) — per-user install, no admin rights and no .NET runtime needed
+2. **Log in** with a Domain Admin account
 3. **Scan & fix** — review findings, drill into categories, export a management summary or a full PDF report with risk matrix, references and a "what was checked" appendix (optionally with user names redacted), a work list (one row per rule and object), an Excel workbook, the whole scan as JSON, and any table as CSV or Excel — every file with an audit side-file (SHA-256)
 
 ## Download
 
 → [**Latest Release**](https://github.com/matharnica/dirhealth-app/releases/latest)
 
-Requires Windows 10/11. Self-contained .exe — no .NET runtime installation needed.
+Requires Windows 10/11. The release ships an Inno Setup installer (`DirHealth-Setup-<version>.exe`) plus a `.sha256` checksum file. The installed app is a self-contained single-file .NET 8 executable — no .NET runtime installation needed.
+
+The installer is **not code-signed** yet, so Windows SmartScreen may warn. Compare the file's SHA-256 (`Get-FileHash .\DirHealth-Setup-<version>.exe`) with the attached `.sha256` file. The in-app updater does the same check before it starts a downloaded installer.
 
 **Requires an Active Directory environment.** Run on a domain-joined Windows machine or any machine with network access to your domain controller.
+
+## Read-only by design
+
+DirHealth reads Active Directory and never writes to it. There is no "fix" button: every finding comes with a PowerShell fix as **text** for you to review and run yourself.
+
+- **Enforced in CI:** [`ReadOnlyGuardTests`](src/DirHealth.Tests/ReadOnlyGuardTests.cs) scans the app's source for directory write APIs (`CommitChanges`, `DeleteTree`, `SetPassword`, `Properties[…] =`, ACL writes, LDAP `Add/Modify/DeleteRequest`, …) and fails the build with file and line for every hit. The test's header lists what it cannot detect (reflection, COM interop, external processes).
+- **Secrets are never read:** checks for attributes like `userPassword` or `msDS-KeyCredentialLink` use LDAP presence filters only — the values are never requested.
+- **Live computer details only on request:** WMI queries against member computers (disks, local admins, sessions, event log) run only when you click *Load live details*, only against the computer's `dNSHostName` (never its short name), and request Kerberos authentication — no automatic connections when you browse.
+
+## Why Domain Admin?
+
+DirHealth checks at login that the account is a member of Domain Admins (resolved by SID, so localized group names work) and refuses the login otherwise. The reason is technical, not a gate for its own sake.
+
+With a less privileged account, ACLs can hide objects or attributes from LDAP reads. The query then returns fewer results instead of an error, and a check would look *passed* although it never saw the data. DirHealth reports a check that cannot run as **Failed**, but it cannot detect data it was never allowed to see — so it requires an account that can read the whole directory.
+
+Credentials stay on your machine: they are used for the LDAP connection, and saved credentials are encrypted with Windows DPAPI (current user scope) under `%APPDATA%\DirHealth`. Live computer details (WMI) use the Windows account that runs DirHealth, not the login credentials.
+
+## Architecture
+
+```
+WPF views (XAML)  →  ViewModels (CommunityToolkit.Mvvm)
+                          │
+       Core/AD ───────────┼──── AdScanner: read-only LDAP queries (System.DirectoryServices), run in parallel
+                          │     CheckLogic / FindingCatalog: pure decision logic + 56 rules with fix texts
+                          │     ScoreModel: hygiene score (0–100)
+       Core/Export ───────┼──── PDF (PdfSharp), XLSX (MiniExcel), CSV (CsvHelper), JSON — each with a SHA-256 side file
+       Core/Storage ──────┴──── %APPDATA%\DirHealth: scan cache, score history, exceptions, DPAPI credentials
+```
+
+C# / .NET 8 / WPF, built and tested on `windows-latest` in GitHub Actions. The test suite (xUnit, 652 tests on `dev` as of November 2026, 11 of them manual AD steps marked as skipped) runs on every pull request; merges to `dev` require a green build.
 
 ## Support the project
 

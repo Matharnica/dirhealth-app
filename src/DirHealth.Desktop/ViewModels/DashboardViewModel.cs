@@ -34,7 +34,9 @@ public partial class DashboardViewModel : BaseViewModel
                                 nameof(ExportWorkbookCommand), nameof(ExportScanJsonCommand))]
     [NotifyPropertyChangedFor(nameof(IsFirstRun))]
     private string _lastScanTime = "Never";
-    [ObservableProperty] private List<AdFinding> _findings = [];
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SortedFindings), nameof(CriticalCount), nameof(HighCount), nameof(MediumCount))]
+    private List<AdFinding> _findings = [];
     [ObservableProperty] private ScanDiff? _lastDiff;
     [ObservableProperty] private bool _hasDiff;
 
@@ -84,7 +86,8 @@ public partial class DashboardViewModel : BaseViewModel
 
     // ── Score v2 (ADR 0002), recomputed from raw scan data + exceptions ────────
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ScoreDisplay), nameof(ScoreCoverageText), nameof(ScoreBreakdown), nameof(ScoreNote))]
+    [NotifyPropertyChangedFor(nameof(ScoreDisplay), nameof(ScoreCoverageText), nameof(ScoreBreakdown), nameof(ScoreNote),
+                              nameof(ScoreBreakdownTop), nameof(ScoreBreakdownMore))]
     private ScoreResult? _scoreResult;
 
     /// <summary>"74", "≤ 74" (some checks failed) or "n/a"; old caches show their stored number.</summary>
@@ -95,6 +98,41 @@ public partial class DashboardViewModel : BaseViewModel
 
     public static List<RuleScore> BreakdownOf(ScoreResult? r) =>
         r?.Rules.Where(x => x.PointsIfFixed > 0).OrderByDescending(x => x.PointsIfFixed).ThenBy(x => x.RuleId).ToList() ?? [];
+
+    /// <summary>How many breakdown rows the dashboard shows (G2): the list was unbounded and pushed
+    /// "Last scan" and the status out of the left column.</summary>
+    public const int BreakdownRows = 5;
+
+    /// <summary>The largest <see cref="BreakdownRows"/> entries of <see cref="ScoreBreakdown"/>.</summary>
+    public List<RuleScore> ScoreBreakdownTop => ScoreBreakdown.Take(BreakdownRows).ToList();
+
+    /// <summary>"+ 3 more rules in Findings" when the breakdown is cut, else empty.</summary>
+    public string ScoreBreakdownMore => MoreText(ScoreBreakdown.Count);
+
+    public static string MoreText(int total) => total > BreakdownRows
+        ? $"+ {total - BreakdownRows} more rule{(total - BreakdownRows == 1 ? "" : "s")} in Findings"
+        : "";
+
+    // ── Dashboard order and severity tiles (G3) ───────────────────────────────
+
+    /// <summary>The findings as the dashboard lists them: most severe first, then most objects.</summary>
+    public List<AdFinding> SortedFindings => SortBySeverity(Findings);
+
+    /// <summary>Critical → High → Medium → Low, then by affected count (largest first), then title.
+    /// The scanner returns findings in query order (inactive users first), not by risk.</summary>
+    public static List<AdFinding> SortBySeverity(IEnumerable<AdFinding> findings) =>
+        findings.OrderByDescending(f => f.Severity)   // enum is Low..Critical ascending
+                .ThenByDescending(f => f.Count)
+                .ThenBy(f => f.Title, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    /// <summary>Open findings (not fully covered by exceptions) per severity — the dashboard tiles.</summary>
+    public int CriticalCount => CountOpen(Findings, FindingSeverity.Critical);
+    public int HighCount     => CountOpen(Findings, FindingSeverity.High);
+    public int MediumCount   => CountOpen(Findings, FindingSeverity.Medium);
+
+    public static int CountOpen(IEnumerable<AdFinding> findings, FindingSeverity severity) =>
+        findings.Count(f => f.Severity == severity && !f.IsAcknowledged);
     /// <summary>
     /// One-time release notice (S19): shown after the first scan with a new score formula — i.e. while
     /// the last two history entries use different formulas — and gone after the next scan.
@@ -118,6 +156,10 @@ public partial class DashboardViewModel : BaseViewModel
     public void RecomputeScore()
     {
         _exceptions.Apply(Findings, DateTime.UtcNow);
+        // exceptions change which findings are open — the severity tiles count only open ones
+        OnPropertyChanged(nameof(CriticalCount));
+        OnPropertyChanged(nameof(HighCount));
+        OnPropertyChanged(nameof(MediumCount));
         if (_totals is null || _cachedFormulaVersion != ScoreModel.FormulaVersion)
         {
             ScoreResult = null;   // old cache: keep its stored number, say so
@@ -184,7 +226,7 @@ public partial class DashboardViewModel : BaseViewModel
     public async Task RunScanAsync()
     {
         IsBusy = true;
-        StatusMessage = "Scanning Active Directory...";
+        StatusMessage = "Scanning Active Directory…";
         try
         {
             var previousCache = _cacheStore.Load();

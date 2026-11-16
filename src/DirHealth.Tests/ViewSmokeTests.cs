@@ -237,6 +237,27 @@ public class ViewSmokeTests(ITestOutputHelper output)
         });
     }
 
+    // Severity badge (UI package 4): tints and text colours are the palette values, and the shared
+    // styles that pick them exist — Dashboard and Findings both use them.
+    [Fact]
+    public void SeverityBadgeBrushes_ComeFromPalette()
+    {
+        OnSta(() =>
+        {
+            EnsureResources();
+            foreach (var (key, colour) in new[]
+            {
+                ("CriticalBadgeBackgroundBrush", SeverityPalette.CriticalBadgeBackground), ("CriticalBadgeTextBrush", SeverityPalette.CriticalBadgeText),
+                ("HighBadgeBackgroundBrush",     SeverityPalette.HighBadgeBackground),     ("HighBadgeTextBrush",     SeverityPalette.HighBadgeText),
+                ("MediumBadgeBackgroundBrush",   SeverityPalette.MediumBadgeBackground),   ("MediumBadgeTextBrush",   SeverityPalette.MediumBadgeText),
+                ("LowBadgeBackgroundBrush",      SeverityPalette.LowBadgeBackground),      ("LowBadgeTextBrush",      SeverityPalette.LowBadgeText),
+            })
+                Assert.Equal(colour, ((SolidColorBrush)Application.Current.FindResource(key)).Color);
+            foreach (var key in new[] { "SeverityBadge", "SeverityBadgeText", "SeverityStripe" })
+                Assert.IsType<Style>(Application.Current.FindResource(key));
+        });
+    }
+
     [Fact]
     public void ViewTypes_FindsTheViews()
     {
