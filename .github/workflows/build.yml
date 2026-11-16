@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build Installer
         if: github.event_name != 'pull_request'
-        uses: Minionguyjpro/Inno-Setup-Action@0aa2e2f0ff0885d9a036b4c12521d46784d31647 # v1.2.4
+        uses: Minionguyjpro/Inno-Setup-Action@36e43b836ce2c78d21787b1f7183caf85c60ba05 # v1.3.0
         with:
           path: installer/setup.iss
           options: /O+ /DAppVersion=${{ steps.version.outputs.version }}
@@ -103,7 +103,7 @@ jobs:
           $hash | Out-File -FilePath "installer/Output/DirHealth-Setup-${{ needs.build.outputs.version }}.sha256" -Encoding ASCII -NoNewline
 
       - name: Create Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             installer/Output/DirHealth-Setup-${{ needs.build.outputs.version }}.exe
