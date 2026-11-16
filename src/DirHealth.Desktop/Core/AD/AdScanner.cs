@@ -549,6 +549,24 @@ public partial class AdScanner
         return part.StartsWith("CN=", StringComparison.OrdinalIgnoreCase) ? part[3..] : part;
     }
 
+    /// <summary>
+    /// Does the object exist? Read-only base search. Only LDAP_NO_SUCH_OBJECT means "absent" — every other error
+    /// propagates (lives here, not in Checks19: the split check files contain no catch at all, see FollowUp G-tests).
+    /// </summary>
+    private bool DnExists(string dn)
+    {
+        try
+        {
+            using var entry = EntryAt(dn);
+            using var s = new DirectorySearcher(entry, "(objectClass=*)", ["distinguishedName"], SearchScope.Base);
+            return s.FindOne() is not null;
+        }
+        catch (System.Runtime.InteropServices.COMException ex) when (ex.ErrorCode == unchecked((int)0x80072030))   // LDAP_NO_SUCH_OBJECT
+        {
+            return false;
+        }
+    }
+
     private DirectoryEntry GetEntryByDn(string dn)
     {
         var path = string.IsNullOrEmpty(_connector.Domain)

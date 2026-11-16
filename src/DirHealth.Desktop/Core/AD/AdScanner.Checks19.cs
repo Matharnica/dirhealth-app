@@ -100,20 +100,6 @@ public partial class AdScanner
             || DnExists($"CN=MicrosoftDNS,DC=DomainDnsZones,{domainDn}");
     }
 
-    private bool DnExists(string dn)
-    {
-        try
-        {
-            using var entry = EntryAt(dn);
-            using var s = new DirectorySearcher(entry, "(objectClass=*)", ["distinguishedName"], SearchScope.Base);
-            return s.FindOne() is not null;
-        }
-        catch (System.Runtime.InteropServices.COMException ex) when (ex.ErrorCode == unchecked((int)0x80072030))   // LDAP_NO_SUCH_OBJECT
-        {
-            return false;
-        }
-    }
-
     private HashSet<string> MembersOf(DirectoryEntry root, WellKnownGroupDef def, string extraClause = "")
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
