@@ -54,7 +54,7 @@ public partial class AdScanner
     public Task<List<AdFinding>> GetAdminBackdoorFindingsAsync() => Task.Run(() =>
     {
         using var root = _connector.GetRootEntry();
-        var admins  = GetTier0Members(root);            // throws when a Tier 0 group cannot be resolved
+        var admins  = GetTier0Members(root);            // throws when a mandatory Tier 0 group cannot be read (H3)
         var withKey = DnsMatching(root, CheckFilters.ShadowCredentialUsers);
         var withAlt = DnsMatching(root, CheckFilters.AltSecurityIdentityUsers);
 

@@ -46,7 +46,7 @@ public class Sprint23Tests
         }
         var run = new AdScanner(new AdConnector()).SplitChecks().Select(c => c.Query).ToList();
         Assert.Subset(run.ToHashSet(), expected.Values.Select(v => v.Query).ToHashSet());
-        Assert.Equal(5, ScoreModel.FormulaVersion);
+        Assert.True(ScoreModel.FormulaVersion >= 5);   // bumped again later (review 2026-11-16 M1/M2: 6)
     }
 
     [Fact]

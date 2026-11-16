@@ -287,4 +287,96 @@ public static class CheckLogic
             issues |= TrustIssue.Inactive;
         return issues;
     }
+
+    // ── Review 2026-11-16 H2: password expiry ────────────────────────────────
+    /// <summary>Raw msDS-UserPasswordExpiryTimeComputed value of a user, interpreted.</summary>
+    public enum PasswordExpiryState
+    {
+        /// <summary>The password expires at <see cref="PasswordExpiry.ExpiresUtc"/>.</summary>
+        Expires,
+        /// <summary>No expiry date: password never expires (DONT_EXPIRE_PASSWORD, smartcard, domain/PSO
+        /// policy "never") = 0x7FFFFFFFFFFFFFFF, or pwdLastSet = 0 ("must change at next logon") = 0.</summary>
+        NoExpiry,
+        /// <summary>The attribute was not returned (no read access, missing) — expiry unknown, never guessed.</summary>
+        Unreadable,
+    }
+
+    public readonly record struct PasswordExpiry(PasswordExpiryState State, DateTime? ExpiresUtc);
+
+    /// <summary>
+    /// Interprets msDS-UserPasswordExpiryTimeComputed (MS-ADTS 3.1.1.4.5.13). AD computes it from pwdLastSet
+    /// and the effective maxPwdAge — the resulting PSO if one applies, else the domain policy — so there is no
+    /// fixed fallback such as "90 days" anywhere (before: maxPwdAge read via the ADSI property cache arrived as
+    /// a COM object, never as long, and every expiry was computed with 90 days).
+    /// </summary>
+    public static PasswordExpiry PasswordExpiryFromComputed(long? computed) => computed switch
+    {
+        null                                          => new(PasswordExpiryState.Unreadable, null),
+        < 0                                           => new(PasswordExpiryState.Unreadable, null),
+        0                                             => new(PasswordExpiryState.NoExpiry, null),
+        >= MaxFileTimeForDateTime                     => new(PasswordExpiryState.NoExpiry, null),   // 0x7FFF… = never
+        { } v                                         => new(PasswordExpiryState.Expires, DateTime.FromFileTimeUtc(v)),
+    };
+
+    /// <summary>Largest FILETIME a DateTime can hold (9999-12-31) — anything at or above it means "never".</summary>
+    private const long MaxFileTimeForDateTime = 2650467743999999999;
+
+    /// <summary>Whole days until expiry (truncated toward zero, as before); ≤ 0 = expired.</summary>
+    public static int? DaysUntilExpiry(PasswordExpiry e, DateTime nowUtc) =>
+        e.ExpiresUtc is { } at ? (int)(at - nowUtc).TotalDays : null;
+
+    /// <summary>Users whose password expires within the window (0 … withinDays days), soonest first.</summary>
+    public static List<AdUser> ExpiringWithin(IEnumerable<AdUser> users, int withinDays) =>
+        users.Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= withinDays)
+             .OrderBy(u => u.DaysUntilPasswordExpiry)
+             .ToList();
+
+    // ── Review 2026-11-16 H3: Tier 0 groups that may legitimately be absent ──
+    /// <summary>Error text of AdConnector.FindGroup when the search ran but found nothing (read succeeded).</summary>
+    public const string GroupNotFoundError = "Group not found.";
+
+    /// <summary>
+    /// Decides how GetTier0Members treats each resolved Tier 0 group. Mandatory groups (fixed RID or BUILTIN SID,
+    /// see <see cref="WellKnownGroups.IsOptionalTier0"/>) must resolve — otherwise the read failed and the checks are
+    /// "Failed". Key Admins / Enterprise Key Admins (by SID) that a successful search did not find are skipped and
+    /// returned for the scan log. An optional group whose lookup itself failed (any other error) still throws:
+    /// "absent" must be proven by a successful search, never assumed.
+    /// <para>DnsAdmins has no fixed RID and is found by name, so "not found" may also mean "renamed" — skipping it then
+    /// would silently drop its members from every Tier 0 check (fail-open). It is skipped only when
+    /// <paramref name="dnsRolePresent"/> proves that AD-integrated DNS is absent; if DNS zones exist the checks stay
+    /// <b>Failed</b> (decision 2026-11-16: Failed, not a warning — visible in the check list and score coverage).
+    /// <paramref name="dnsRolePresent"/> is only called when DnsAdmins was not found; if it throws, the checks fail.</para>
+    /// </summary>
+    public static IReadOnlyList<string> Tier0SkippedGroups(
+        IEnumerable<(WellKnownGroupDef Def, bool Found, string? Error)> groups, Func<bool> dnsRolePresent)
+    {
+        var skipped = new List<string>();
+        foreach (var (def, found, error) in groups)
+        {
+            if (found) continue;
+            if (WellKnownGroups.IsOptionalTier0(def) && error == GroupNotFoundError)
+            {
+                if (def.Source == GroupSidSource.NameOnly && dnsRolePresent())
+                    throw new InvalidOperationException(
+                        $"AD-integrated DNS zones exist, but no group named {def.FallbackName} was found (renamed?) — " +
+                        "Tier 0 membership cannot be determined.");
+                skipped.Add(def.FallbackName);
+                continue;
+            }
+            throw new InvalidOperationException($"{def.FallbackName} could not be read{(string.IsNullOrEmpty(error) ? "." : $": {error}")}");
+        }
+        return skipped;
+    }
+
+    // ── Review 2026-11-16 M1: primary-group groups are never "empty" ─────────
+    /// <summary>
+    /// A group that is the primary group of accounts (Domain Users 513, Domain Guests 514, Domain Computers 515,
+    /// Domain Controllers 516, Read-only DCs 521) keeps those members in primaryGroupID, not in member — its
+    /// empty member attribute says nothing. Identified by the RID of the group SID, never by name.
+    /// </summary>
+    public static bool IsPrimaryGroupSid(string? groupSid) =>
+        !string.IsNullOrEmpty(groupSid)
+        && groupSid.StartsWith("S-1-5-21-", StringComparison.Ordinal)
+        && int.TryParse(groupSid[(groupSid.LastIndexOf('-') + 1)..], out var rid)
+        && StandardPrimaryGroups.Contains(rid);
 }
