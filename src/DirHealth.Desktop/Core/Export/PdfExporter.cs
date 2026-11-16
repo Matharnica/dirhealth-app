@@ -131,7 +131,7 @@ public class PdfExporter
             ("Run by",            d.Context.User),
             ("Last scan",         ReportText.ScanTime(d.ScanTime, toUtc: true)),
             ("Created",           ReportText.Time(d.CreatedUtc)),
-            ("Tool",              $"DirHealth {d.Version}"),
+            ("Tool",              $"DirHealth {ReportPdfRenderer.ShortVersion(d.Version)}"),   // full build id: .meta.txt
             ("Integrity",         "SHA-256 of this file: see the .meta.txt next to it"),
         }.Select(r => (r.Item1, r.Item2, false)), 170);
 
