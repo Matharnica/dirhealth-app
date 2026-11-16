@@ -1,3 +1,4 @@
+using DirHealth.Desktop.Core.AD.Checks;
 using DirHealth.Desktop.Core.Export;
 
 namespace DirHealth.Desktop.Core.AD.Models;
@@ -15,6 +16,23 @@ public class AdUser
     public bool IsEnabled        { get; set; }
     public string DistinguishedName { get; set; } = "";
     public int? DaysUntilPasswordExpiry { get; set; }
+    /// <summary>
+    /// How msDS-UserPasswordExpiryTimeComputed was read (review 2026-11-16 H2); null = not loaded for this
+    /// list. Keeps "no expiry date" and "could not be read" apart — both leave PasswordExpires empty.
+    /// </summary>
+    public CheckLogic.PasswordExpiryState? PasswordExpiryState { get; set; }
+
+    /// <summary>Grid/export text for <see cref="PasswordExpiryState"/>; "" when not loaded.</summary>
+    public string PasswordExpiryStatus => PasswordExpiryState switch
+    {
+        CheckLogic.PasswordExpiryState.Expires    => "Expires",
+        CheckLogic.PasswordExpiryState.NoExpiry   => NoExpiryText,
+        CheckLogic.PasswordExpiryState.Unreadable => UnreadableExpiryText,
+        _                                         => "",
+    };
+
+    public const string NoExpiryText         = "No expiry date";
+    public const string UnreadableExpiryText = "Unknown (not readable)";
 
     // ── S14-4: attributes for the ADRecon-style export and Copy SID ─────────────
     public string    Sid                { get; set; } = "";

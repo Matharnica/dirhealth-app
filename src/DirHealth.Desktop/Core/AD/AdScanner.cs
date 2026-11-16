@@ -1056,6 +1056,7 @@ public partial class AdScanner
                 long? raw = props[ExpiryComputedAttr].Count > 0 && props[ExpiryComputedAttr][0] is long l ? l : null;
                 var expiry = CheckLogic.PasswordExpiryFromComputed(raw);
                 if (expiry.State == CheckLogic.PasswordExpiryState.Unreadable) expiryUnreadable++;
+                user.PasswordExpiryState     = expiry.State;
                 user.PasswordExpires         = expiry.ExpiresUtc;
                 user.DaysUntilPasswordExpiry = CheckLogic.DaysUntilExpiry(expiry, now);
             }
