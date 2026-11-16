@@ -76,26 +76,9 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid ToolTip="{Binding Description}">
-                            <!-- Severity stripe -->
-                            <Border Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Background" Value="#64748B" />
-                                        <Style.Triggers>
-                                            <!-- Accent colours from SeverityPalette, same as the PDF (A9) -->
-                                            <DataTrigger Binding="{Binding Severity}" Value="Critical">
-                                                <Setter Property="Background" Value="{StaticResource CriticalSeverityBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Severity}" Value="High">
-                                                <Setter Property="Background" Value="{StaticResource HighSeverityBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Severity}" Value="Medium">
-                                                <Setter Property="Background" Value="{StaticResource MediumSeverityBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                            </Border>
+                            <!-- Severity stripe: palette accent, same as the PDF (A9) -->
+                            <Border Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                    Style="{StaticResource SeverityStripe}" />
                             <!-- Content -->
                             <Border Padding="11,10,8,10" BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="0,0,0,1">
@@ -104,26 +87,10 @@
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextWrapping="Wrap" />
                                     <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                        <!-- Colour-coded severity badge -->
-                                        <Border CornerRadius="3" Padding="6,1" VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="#334155" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Severity}" Value="Critical">
-                                                            <Setter Property="Background" Value="#7F1D1D" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Severity}" Value="High">
-                                                            <Setter Property="Background" Value="#7F1D1D" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Severity}" Value="Medium">
-                                                            <Setter Property="Background" Value="#78350F" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
+                                        <!-- Severity badge: shared style, colours from SeverityPalette (Q2) -->
+                                        <Border Style="{StaticResource SeverityBadge}" Padding="6,1">
                                             <TextBlock Text="{Binding Severity, Mode=OneWay}" FontSize="10"
-                                                       FontWeight="SemiBold" Foreground="White" />
+                                                       Style="{StaticResource SeverityBadgeText}" />
                                         </Border>
                                         <TextBlock FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0"
                                                    Foreground="{DynamicResource TextSecondaryBrush}">
@@ -216,7 +183,7 @@
                     <TextBlock Text="WHY IT MATTERS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <TextBlock Text="{Binding SelectedRule.Why, Mode=OneWay}" FontSize="12.5" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2,0,10" />
-                    <TextBlock Text="HOW TO FIX" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="HOW TO FIX" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentHoverBrush}" />
                     <TextBlock Text="{Binding SelectedRule.HowToFix, Mode=OneWay}" FontSize="12.5" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2,0,12" />
 
@@ -227,7 +194,7 @@
                         <StackPanel>
                             <DockPanel LastChildFill="False">
                                 <TextBlock DockPanel.Dock="Left" Text="FIX (POWERSHELL)" FontSize="10" FontWeight="SemiBold"
-                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                           Foreground="{StaticResource AccentHoverBrush}" VerticalAlignment="Center" />
                                 <Button DockPanel.Dock="Right" Content="Copy" Style="{StaticResource SecondaryButton}"
                                         Padding="10,2" FontSize="11" Command="{Binding CopyFixCommand}"
                                         AutomationProperties.Name="Copy fix command" />

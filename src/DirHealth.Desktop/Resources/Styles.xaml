@@ -25,6 +25,70 @@
     <SolidColorBrush x:Key="MediumSeverityBrush"   Color="{StaticResource MediumSeverityColor}" />
     <SolidColorBrush x:Key="LowSeverityBrush"      Color="{StaticResource LowSeverityColor}" />
 
+    <!-- Severity badge: dark tint + light text from SeverityPalette (≥ 4.5:1, four distinct tints).
+         One set of styles for Dashboard and Findings — views never pick a severity hex (A9, Q1/Q2). -->
+    <SolidColorBrush x:Key="CriticalBadgeBackgroundBrush" Color="{x:Static core:SeverityPalette.CriticalBadgeBackground}" />
+    <SolidColorBrush x:Key="HighBadgeBackgroundBrush"     Color="{x:Static core:SeverityPalette.HighBadgeBackground}" />
+    <SolidColorBrush x:Key="MediumBadgeBackgroundBrush"   Color="{x:Static core:SeverityPalette.MediumBadgeBackground}" />
+    <SolidColorBrush x:Key="LowBadgeBackgroundBrush"      Color="{x:Static core:SeverityPalette.LowBadgeBackground}" />
+    <SolidColorBrush x:Key="CriticalBadgeTextBrush"       Color="{x:Static core:SeverityPalette.CriticalBadgeText}" />
+    <SolidColorBrush x:Key="HighBadgeTextBrush"           Color="{x:Static core:SeverityPalette.HighBadgeText}" />
+    <SolidColorBrush x:Key="MediumBadgeTextBrush"         Color="{x:Static core:SeverityPalette.MediumBadgeText}" />
+    <SolidColorBrush x:Key="LowBadgeTextBrush"            Color="{x:Static core:SeverityPalette.LowBadgeText}" />
+
+    <!-- DataContext: an item with a Severity property (AdFinding) -->
+    <Style x:Key="SeverityBadge" TargetType="Border">
+        <Setter Property="CornerRadius"      Value="4" />
+        <Setter Property="Padding"           Value="7,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background"        Value="{StaticResource LowBadgeBackgroundBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                <Setter Property="Background" Value="{StaticResource CriticalBadgeBackgroundBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="High">
+                <Setter Property="Background" Value="{StaticResource HighBadgeBackgroundBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                <Setter Property="Background" Value="{StaticResource MediumBadgeBackgroundBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SeverityBadgeText" TargetType="TextBlock">
+        <Setter Property="FontSize"   Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource LowBadgeTextBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                <Setter Property="Foreground" Value="{StaticResource CriticalBadgeTextBrush}" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="High">
+                <Setter Property="Foreground" Value="{StaticResource HighBadgeTextBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                <Setter Property="Foreground" Value="{StaticResource MediumBadgeTextBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Left accent stripe of a finding row: the palette accent, same colour as the PDF -->
+    <Style x:Key="SeverityStripe" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource LowSeverityBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                <Setter Property="Background" Value="{StaticResource CriticalSeverityBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="High">
+                <Setter Property="Background" Value="{StaticResource HighSeverityBrush}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                <Setter Property="Background" Value="{StaticResource MediumSeverityBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Primary Button -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="Foreground"      Value="White" />
@@ -181,11 +245,23 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="6">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                            <!-- Q3: placeholder from Tag, shown while the box is empty (was never rendered) -->
+                            <TextBlock x:Name="Watermark" Margin="{TemplateBinding Padding}" Padding="2,0,0,0"
+                                       Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       IsHitTestVisible="False" Visibility="Collapsed" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
