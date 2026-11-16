@@ -1071,7 +1071,8 @@ public partial class AdScanner
         using var root     = _connector.GetRootEntry();
         using var searcher = _connector.CreateSearcher(root, filter,
             "cn", "operatingSystem", "operatingSystemVersion",
-            "lastLogonTimestamp", "userAccountControl", "distinguishedName", "objectSid");
+            "lastLogonTimestamp", "userAccountControl", "distinguishedName", "objectSid",
+            "dNSHostName");
 
         using var results = searcher.FindAll();
         foreach (SearchResult result in results)
@@ -1088,6 +1089,7 @@ public partial class AdScanner
                 IsDomainController  = UacFlags.IsDomainController(uac),
                 DistinguishedName   = GetString(props, "distinguishedName"),
                 Sid                 = SidOf(props),
+                DnsHostName         = GetString(props, "dNSHostName"),
             });
         }
         return computers;

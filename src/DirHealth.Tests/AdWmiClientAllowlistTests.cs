@@ -29,8 +29,8 @@ public class AdWmiClientAllowlistTests
     [InlineData("Application")]
     public async Task GetEventLog_AllowedLogName_PassesAllowlist(string logName)
     {
-        // Allowed names pass the guard. The WMI call may fail in test env (caught internally).
-        // Assert no exception escapes — only that the allowlist does not reject valid names.
+        // Allowed names pass the guard. "localhost" is no FQDN, so the host guard (fix H1) stops
+        // before any WMI connection — no exception escapes.
         var client = new AdWmiClient();
         var ex = await Record.ExceptionAsync(() =>
             client.GetEventLogAsync("localhost", logName, null, 100));

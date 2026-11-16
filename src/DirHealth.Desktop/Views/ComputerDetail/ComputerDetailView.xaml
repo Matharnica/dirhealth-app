@@ -7,7 +7,8 @@
             <TextBox Text="{Binding Computer.Name, Mode=OneWay}" FontSize="18" FontWeight="Bold"
                      Style="{StaticResource CopyableText}"
                      Foreground="{DynamicResource TextPrimaryBrush}" />
-            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12">
+            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12"
+                       Visibility="{Binding LiveLoaded, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
                         <Style.Triggers>
@@ -25,8 +26,19 @@
             </TextBlock>
         </StackPanel>
 
+        <!-- Live details only on click, only via dNSHostName + Kerberos (fix H1) -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Style="{StaticResource SecondaryButton}" Content="Load live details (WMI)"
+                    Command="{Binding LoadLiveDetailsCommand}"
+                    AutomationProperties.Name="Load live details over WMI" />
+            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="11" TextWrapping="Wrap"
+                       MaxWidth="560" Foreground="{DynamicResource TextSecondaryBrush}">
+                <Run Text="Connects to " /><Run Text="{Binding Computer.DnsHostName, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" (ping + WMI) with your own Windows account over Kerberos — no NTLM fallback." />
+            </TextBlock>
+        </StackPanel>
+
         <!-- WMI Error -->
-        <TextBlock Text="{Binding WmiError}" Foreground="{StaticResource ErrorBrush}"
+        <TextBlock Text="{Binding WmiError}" Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap"
                    FontSize="12" Margin="0,0,0,8"
                    Visibility="{Binding WmiError, Converter={StaticResource StringToVisibility}}" />
 
