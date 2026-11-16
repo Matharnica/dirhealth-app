@@ -20,6 +20,7 @@
             <local:RelativeScanTimeConverter    x:Key="RelativeScanTime" />
             <local:ScoreColorConverter          x:Key="ScoreColor" />
             <local:NullToVisibilityConverter    x:Key="NullToVisibility" />
+            <local:ReadableCategoryConverter    x:Key="ReadableCategory" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

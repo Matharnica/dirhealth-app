@@ -136,3 +136,17 @@ public class NullToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
+
+/// <summary>
+/// Rule key → readable name for the UI ("PasswordNeverExpires" → "Password Never Expires").
+/// Reuses <see cref="Core.Services.ScanDiffCalculator.ReadableCategory"/> — one splitting rule
+/// for the scan diff and the views, no second name list.
+/// </summary>
+public class ReadableCategoryConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is string s ? Core.Services.ScanDiffCalculator.ReadableCategory(s) : "";
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
