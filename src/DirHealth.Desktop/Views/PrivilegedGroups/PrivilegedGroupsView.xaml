@@ -21,18 +21,20 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Privileged Groups" FontSize="20" FontWeight="Bold"
-                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"
-                           TextWrapping="Wrap" />
-                <TextBlock Grid.Row="0" Text="All elevated AD groups" FontSize="11" VerticalAlignment="Bottom"
-                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,16" />
+                <!-- Title and subtitle stacked: in one Grid row they overlapped (Q4) -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                    <TextBlock Text="Privileged Groups" FontSize="20" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="All elevated AD groups" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
 
                 <StackPanel Grid.Row="1">
                     <Border Background="{DynamicResource BackgroundBrush}"
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
                         <StackPanel>
-                            <TextBlock Text="TOTAL MEMBERS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="TOTAL MEMBERS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding TotalMembers}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -43,7 +45,7 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="6" Padding="12,8" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="EMPTY GROUPS" FontSize="9" FontWeight="SemiBold"
+                            <TextBlock Text="EMPTY GROUPS" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding EmptyGroups}" FontSize="24" FontWeight="Black"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
