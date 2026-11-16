@@ -20,12 +20,13 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Data Quality" FontSize="20" FontWeight="Bold"
-                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"
-                           TextWrapping="Wrap" />
-                <TextBlock Grid.Row="0" Text="User master-data completeness" FontSize="11"
-                           VerticalAlignment="Bottom"
-                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,16" />
+                <!-- Title and subtitle stacked: in one Grid row they overlapped (Q4) -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                    <TextBlock Text="Data Quality" FontSize="20" FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="User master-data completeness" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
 
                 <StackPanel Grid.Row="1">
                     <Border Background="{DynamicResource BackgroundBrush}"
