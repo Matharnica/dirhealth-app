@@ -110,9 +110,12 @@ public class PdfExporter
             // the pill and the title read as one line "HIGH  Title" — the sink gets exactly that line
             f.Sink($"{sevText}  {finding.Title}");
             double x = PdfFlow.Margin + f.Ui.SeverityPill(f.G, finding.Severity, PdfFlow.Margin, f.Y + 12) + 8;
-            var title = f.Fit(finding.Title, UI.F9B, f.Width - (x - PdfFlow.Margin));
-            f.G.DrawString(title, UI.F9B, f.Ui.SeverityStyle(finding.Severity).text, x, f.Y + 12);
-            f.Y += 19;
+            foreach (var line in f.Wrap(finding.Title, UI.F9B, f.Width - (x - PdfFlow.Margin)))
+            {
+                f.G.DrawString(line, UI.F9B, PdfFlow.Ink, x, f.Y + 12);
+                f.Y += 13;
+            }
+            f.Y += 6;
             if (!string.IsNullOrEmpty(finding.Remediation))
                 f.Paragraph("→ Fix: " + finding.Remediation, UI.F8, PdfFlow.Ink2, 0, 12);
             f.Y += 4;

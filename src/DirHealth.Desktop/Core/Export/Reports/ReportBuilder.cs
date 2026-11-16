@@ -292,7 +292,7 @@ public static class ReportBuilder
         int excepted = i.Findings.Sum(f => f.Objects.Count(o => o.IsExcepted));
         if (objects > 0)
             facts.Add($"{N(objects)} affected object(s) are open" +
-                      (excepted > 0 ? $"; {N(excepted)} more are covered by an active exception." : "."));
+                      (excepted > 0 ? $"; {N(excepted)} more {(excepted == 1 ? "is" : "are")} covered by an active exception." : "."));
 
         if (!scoped && i.Diff is { } d && (d.NewFindings.Count + d.ResolvedFindings.Count + d.ChangedFindings.Count) > 0)
             facts.Add($"Since the last scan: {d.NewFindings.Count} new, {d.ResolvedFindings.Count} resolved and " +

@@ -217,7 +217,7 @@ public class ReportPreviewTests
         Assert.Equal("CONFIDENTIAL", full.Classification);
         Assert.Contains("changed nothing", full.Disclaimer);
         Assert.InRange(full.KeyFacts!.Count, 1, 4);
-        Assert.Contains(full.KeyFacts, f => f.Contains("1 more are covered by an active exception"));
+        Assert.Contains(full.KeyFacts, f => f.Contains("1 more is covered by an active exception"));
         Assert.Contains(full.KeyFacts, f => f.StartsWith("Since the last scan: 2 new, 1 resolved"));
         Assert.Equal(10, full.ScoreTrend!.Count);
         Assert.Contains(full.Methodology!, l => l.Contains($"{ScoreModel.PointsPerWeight.ToString(System.Globalization.CultureInfo.InvariantCulture)} ×"));

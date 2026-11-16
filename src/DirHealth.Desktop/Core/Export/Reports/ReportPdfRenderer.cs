@@ -519,8 +519,17 @@ public sealed class ReportPdfRenderer
     }
 
     // ── appendix ──────────────────────────────────────────────────────────────
+    /// <summary>Appendix: how the score works, exceptions, failed checks, what was checked, then the user lists.</summary>
     private void DrawAppendix()
     {
+        var method = _m.Methodology ?? [];
+        if (method.Count > 0)
+        {
+            _f.Heading("How the score works", 120);
+            Mark("How the score works");
+            foreach (var line in method) { _f.Bullet(line, UI.F9, Ink2); _f.Y += 3; }
+        }
+
         _f.Heading($"Active exceptions ({_m.Exceptions.Count})");
         Mark("Exceptions and failed checks");
         _f.Table(new ReportTable(["Rule", "Object", "Reason", "Expires", "Created by"],
@@ -534,22 +543,12 @@ public sealed class ReportPdfRenderer
             _m.FailedChecks.Select(c => (IReadOnlyList<string>)new[] { c.RuleId, c.Category, c.Reason }).ToList(), 0, "",
             Weights: [0.14, 0.28, 0.58]), [CellKind.Mono, CellKind.Text, CellKind.Text]);
 
+        DrawCheckedRules();
+
         foreach (var (title, table) in _m.Appendix)
         {
             _f.Heading(title);
             _f.Table(table);
-        }
-
-        DrawCheckedRules();
-
-        var method = _m.Methodology ?? [];
-        if (method.Count > 0)
-        {
-            // kept on one page: the lines read as one explanation
-            double h = method.Sum(l => _f.Wrap(l, UI.F9, _f.Width - 16).Count * 13.5 + 3);
-            _f.Heading("How the score works", Math.Min(h, _f.Bottom - _f.Top - 40));
-            Mark("How the score works");
-            foreach (var line in method) { _f.Bullet(line, UI.F9, Ink2); _f.Y += 3; }
         }
     }
 
@@ -564,7 +563,7 @@ public sealed class ReportPdfRenderer
         _f.Y += 6;
         _f.Table(new ReportTable(["Rule", "Check", "Status", "Note"],
             _m.CheckedRules.Select(c => (IReadOnlyList<string>)new[] { c.RuleId, c.Category, c.Status, c.Reason }).ToList(), 0, "",
-            Weights: [0.13, 0.30, 0.14, 0.43]), [CellKind.Mono, CellKind.Text, CellKind.CheckStatus, CellKind.Muted]);
+            Weights: [0.12, 0.30, 0.16, 0.42]), [CellKind.Mono, CellKind.Text, CellKind.CheckStatus, CellKind.Muted]);
     }
 
     /// <summary>Left footer text on every page (S18-2) — pure, so tests can check it without parsing the PDF.</summary>
