@@ -90,8 +90,12 @@ public static class FindingCatalog
         return string.Join("\n", lines);
     }
 
+    /// <summary>
+    /// Restore every row of the backup CSV. The closing brace sits on its own line: a trailing
+    /// <c># comment</c> in <paramref name="perRow"/> would otherwise comment it out and break the script.
+    /// </summary>
     private static string ObjectRevert(string ruleId, string perRow) =>
-        $"{Ps}\nImport-Csv .\\dirhealth-{ruleId}-backup.csv | ForEach-Object {{ {perRow} }}";
+        $"{Ps}\nImport-Csv .\\dirhealth-{ruleId}-backup.csv | ForEach-Object {{\n    {perRow}\n}}";
 
     private static string PolicyFix(string ruleId, string setArgs) =>
         $"{Ps}\nGet-ADDefaultDomainPasswordPolicy | Export-Clixml .\\dirhealth-{ruleId}-backup.xml\n" +
