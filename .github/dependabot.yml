@@ -1,0 +1,13 @@
+# Weekly update PRs for the SHA-pinned GitHub Actions (version in the comment) and the
+# NuGet packages. PRs target the default branch `dev` and must pass `build` like any other.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"

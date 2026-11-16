@@ -342,11 +342,11 @@
                             <TextBlock Text="LICENSE" FontSize="9" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,3" />
                             <TextBlock FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}">
-                                MIT License · Copyright © 2026 Stefan Moseler
+                                Elastic License 2.0 (ELv2) · Copyright © 2026 Stefan Moseler
                             </TextBlock>
                             <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"
                                        TextWrapping="Wrap">
-                                Free to use, modify, and distribute. Attribution appreciated.
+                                Free to use and self-host. Source-available, not OSI open source; offering it as a hosted service is not permitted.
                             </TextBlock>
                         </StackPanel>
                     </Border>
