@@ -103,7 +103,7 @@ jobs:
           $hash | Out-File -FilePath "installer/Output/DirHealth-Setup-${{ needs.build.outputs.version }}.sha256" -Encoding ASCII -NoNewline
 
       - name: Create Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             installer/Output/DirHealth-Setup-${{ needs.build.outputs.version }}.exe
