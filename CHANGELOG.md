@@ -27,6 +27,14 @@ All notable changes to DirHealth are documented here.
 - **Timeline and GPO times** are no longer shifted by your UTC offset; date cutoffs no longer depend on the Windows region settings.
 - **Undo scripts parse again:** undo blocks whose per-row command ends with a comment (e.g. DH-USR-003, DH-GRP-001) put the closing brace on its own line — before, the comment swallowed it.
 
+### Changed — PDF reports redesigned (2026-11-16)
+- **The dashboard report reads like an assessment report:** a cover with the score ring and grade, scan facts, open findings per severity, a CONFIDENTIAL marker (plus NAMES REDACTED when redacted), contents with page numbers and a read-only statement; an executive summary with key facts, a severity distribution bar, the score trend, the failed checks, a ranked "Fix first" list, the risk matrix and the scan scope.
+- **One card per finding:** severity stripe and badge, rule ID, affected objects, points if fixed, why it matters, how to fix, references, framed fix/undo scripts and the object table. Headings and short tables are no longer left alone at the bottom of a page.
+- **New appendix "How the score works"**, generated from the score model itself; "What was checked" colours Failed and Found.
+- **Password report and user dossier** use the same design: title band, summary tiles, wrapped tables with repeated headers, "Page x of y". Long names and e-mail addresses no longer overlap.
+- **One format in every PDF:** dates as `yyyy-MM-dd HH:mm` with the time zone named once, real plurals ("1 failed check", "13 open findings") and the same short version number in every footer.
+- Fonts: Segoe UI and Consolas from the Windows font folder (Arial/Courier New as fallback).
+
 ### Changed — Review 2026-11-16
 - **Score model version 6** (Empty Groups and never-logged-on changes alter finding counts): the dashboard shows a one-time notice and the score history shows a break instead of a drop; trend and report do not compare across the change.
 

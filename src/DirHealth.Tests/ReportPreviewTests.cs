@@ -80,7 +80,7 @@ public class ReportPreviewTests
             bool computers = r.Category.Contains("Computer") || r.Category == "EolOperatingSystems";
             var objs = Enumerable.Range(0, n).Select(i => computers
                 ? Computer($"WS-BER-{100 + i:D3}", i % 3 == 0 ? "Windows Server 2012 R2 Standard (end of support 2023-10-10)" : "Windows 10 Enterprise 21H2")
-                : User(k * 3 + i, i % 4 == 0 ? $"last logon {2024 - i % 3}-0{1 + i % 9}-1{i % 9}, member of {1 + i % 5} privileged group(s)" : ""))
+                : User(k * 3 + i, i % 4 == 0 ? $"last logon {2024 - i % 3}-0{1 + i % 9}-1{i % 9}, member of {ReportText.Count(1 + i % 5, "privileged group")}" : ""))
                 .ToList();
             if (k == 1 && objs.Count > 0) { objs[0].Exception = ExceptionState.Active; objs[0].ExceptionLabel = "Excepted until 2027-01-31 — legacy ERP service"; }
             list.Add(new AdFinding
@@ -132,7 +132,7 @@ public class ReportPreviewTests
         var expiring = PasswordUsers().Take(12).ToList();
         return new ReportInput("corp.example.com", findings, score, score.Score, checks, exceptions, diff, -6,
             inactive, expiring, ["Administrator", Sam(1), Sam(2), "svc.backup"],
-            Now, "3.0.0-preview", totals, "DC01.corp.example.com", "16.11.2026 13:52:10",
+            Now, ExportMetadata.AppVersion, totals, "DC01.corp.example.com", "16.11.2026 13:52:10",
             History: [.. new[] { 48, 51, 50, 55, 58, 57, 61, 66, 64 }.Select((s, n) => new ScoreEntry(Now.ToUniversalTime().AddDays(-7 * (9 - n)), s, ScoreModel.FormulaVersion)),
                       new ScoreEntry(Now.ToUniversalTime(), score.Score, ScoreModel.FormulaVersion)]);
     }
@@ -180,7 +180,49 @@ public class ReportPreviewTests
             .ToList();
         return new UserDossier(u, UserDetailRows.Build(u, Now.AddDays(-2)), groups, findings,
             new ExportContext("corp.example.com", "DC01.corp.example.com", "CORP\\it.admin"), "16.11.2026 13:52:10",
-            Now.ToUniversalTime(), "3.0.0-preview");
+            Now.ToUniversalTime(), ExportMetadata.AppVersion);
+    }
+
+    // ── wording: real plurals and one date format in every PDF ──────────────
+    [Theory]
+    [InlineData(1, "failed check", null, "1 failed check")]
+    [InlineData(13, "open finding", null, "13 open findings")]
+    [InlineData(0, "account", null, "0 accounts")]
+    [InlineData(1842, "user", null, "1,842 users")]
+    [InlineData(2, "is", "are", "2 are")]
+    public void Count_Pluralises(int n, string noun, string? plural, string expected) =>
+        Assert.Equal(expected, ReportText.Count(n, noun, plural));
+
+    [Fact]
+    public void Dates_OneInvariantFormat()
+    {
+        Assert.Equal("2026-11-16 13:52", ReportText.ScanTime("16.11.2026 13:52:10"));
+        Assert.Equal("Never", ReportText.ScanTime("Never"));                               // not a time: unchanged
+        Assert.Equal("2026-11-16 14:05", ReportText.Time(Now));
+        Assert.Matches(@"^UTC[+-]\d\d:\d\d$", ReportText.Zone(Now));
+        var m = ReportBuilder.Build(Input(Findings()), new ReportOptions(ReportKind.Full, false));
+        var scope = m.Scope.ToDictionary(l => l.Label, l => l.Value);
+        Assert.Equal("2026-11-16 13:52", scope["Scan time"]);
+        Assert.Equal("2026-11-16 14:05", scope["Report created"]);                        // zone not repeated here …
+        Assert.StartsWith("UTC", scope["Time zone"]);                                     // … but named once
+        Assert.DoesNotContain(m.SummarySentences.Concat(m.KeyFacts!).Append(m.ExceptedNote ?? ""), s => s.Contains("(s)"));
+    }
+
+    [Fact]
+    public void Render_AllPdfs_NoParenthesisedPlurals_NoDottedDates()
+    {
+        var input = Input(Findings());
+        var texts = new List<string>();
+        var dir = Directory.CreateTempSubdirectory("dh-preview-");
+        try
+        {
+            ReportPdfRenderer.Render(ReportBuilder.Build(input, new ReportOptions(ReportKind.Full, false)), Path.Combine(dir.FullName, "r.pdf"), texts.Add);
+            new PdfExporter().ExportUserDossier(Dossier(), Path.Combine(dir.FullName, "d.pdf"), texts.Add);
+        }
+        finally { dir.Delete(recursive: true); }
+        Assert.DoesNotContain(texts, t => t.Contains("(s)"));
+        Assert.DoesNotContain(texts, t => System.Text.RegularExpressions.Regex.IsMatch(t, @"\b\d\d\.\d\d\.\d{4}\b"));
+        Assert.Contains(texts, t => t.StartsWith($"DirHealth {ReportPdfRenderer.ShortVersion(ExportMetadata.AppVersion)} · "));
     }
 
     private static void AssertPdf(string path)

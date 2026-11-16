@@ -119,7 +119,7 @@ public static class ReportBuilder
         int  failedForScore = score is null ? 0 : score.TotalRules - score.EvaluatedRules;
         // F-05: an unavailable score is not a red "n/a / 100 · Critical" — it is neutral and says why
         string scoreText = !available
-            ? (failedForScore > 0 ? $"Score not available — {failedForScore} of {score!.TotalRules} checks failed"
+            ? (failedForScore > 0 ? $"Score not available — {failedForScore} of {ReportText.Count(score!.TotalRules, "check")} failed"
                                   : "Score not available — too few checks ran")
             : score?.Display ?? i.StoredScore.ToString(CultureInfo.InvariantCulture);
 
@@ -217,7 +217,7 @@ public static class ReportBuilder
         if (failed.Count > FailedChecksOnPageOne)
             failedShort.Add($"{failed.Count - FailedChecksOnPageOne} more — see \"Checks that could not run\" in the full report");
 
-        var model = new ReportModel(o.Kind, i.Domain, i.CreatedLocal.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), i.Version,
+        var model = new ReportModel(o.Kind, i.Domain, ReportText.Time(i.CreatedLocal), i.Version,
             scoreText, "Higher is better (0–100)", available ? ScoreLabel(scoreNum) : "", scoreNum,
             score?.CoverageText ?? "", available && score is { IsUpperBound: true } ? "Upper bound — some checks could not run." : null,
             delta, bySeverity, overview, fixFirst, changes,
@@ -230,7 +230,7 @@ public static class ReportBuilder
             SummarySentences: SummarySentences(available, scoreNum, score, open, fullyExcepted, failed.Count, fixFirst, scoped),
             Scope: ScopeLines(i, checkedRules),
             SeverityCountsLabel: "Open findings by severity (rules — same count as the risk matrix)",
-            ExceptedNote: fullyExcepted > 0 ? $"+{fullyExcepted} fully excepted finding(s), not counted above" : null,
+            ExceptedNote: fullyExcepted > 0 ? $"+{ReportText.Count(fullyExcepted, "fully excepted finding")}, not counted above" : null,
             FailedChecksShort: failedShort,
             RedactionNote: null,
             CoverTitle: scoped ? "Findings Report" : o.Kind == ReportKind.Summary ? "Management Summary" : "Security Health Report",
@@ -291,12 +291,12 @@ public static class ReportBuilder
         int objects  = open.Sum(f => f.Objects.Count(o => !o.IsExcepted));
         int excepted = i.Findings.Sum(f => f.Objects.Count(o => o.IsExcepted));
         if (objects > 0)
-            facts.Add($"{N(objects)} affected object(s) are open" +
+            facts.Add($"{ReportText.Count(objects, "affected object")} {ReportText.Noun(objects, "is", "are")} open" +
                       (excepted > 0 ? $"; {N(excepted)} more {(excepted == 1 ? "is" : "are")} covered by an active exception." : "."));
 
         if (!scoped && i.Diff is { } d && (d.NewFindings.Count + d.ResolvedFindings.Count + d.ChangedFindings.Count) > 0)
             facts.Add($"Since the last scan: {d.NewFindings.Count} new, {d.ResolvedFindings.Count} resolved and " +
-                      $"{d.ChangedFindings.Count} changed finding(s).");
+                      $"{ReportText.Count(d.ChangedFindings.Count, "changed finding")}.");
 
         var ran = i.Checks.Select(c => c.RuleId).ToHashSet(StringComparer.Ordinal);
         if (!scoped && ran.Count > 0)
@@ -336,24 +336,24 @@ public static class ReportBuilder
                       : crit > 0 ? $"{crit} critical" : $"{high} high";
 
         if (!available)
-            s.Add($"No score could be computed because {failedChecks} check(s) failed, so the picture below is incomplete. " +
-                  $"{what} {open.Count} open finding(s), {severe}.");
+            s.Add($"No score could be computed because {ReportText.Count(failedChecks, "check")} failed, so the picture below is incomplete. " +
+                  $"{what} {ReportText.Count(open.Count, "open finding")}, {severe}.");
         else if (open.Count == 0)
             s.Add($"The domain scores {score}/100 ({ScoreLabel(score)}). {what} no open findings.");
         else
             s.Add($"The domain scores {(result is { IsUpperBound: true } ? "at most " : "")}{score}/100 ({ScoreLabel(score)}). " +
-                  $"{what} {open.Count} open finding(s), {severe}.");
+                  $"{what} {ReportText.Count(open.Count, "open finding")}, {severe}.");
 
         if (fixFirst.Rows.Count > 0)
-            s.Add($"The largest single improvement is \"{fixFirst.Rows[0][1]}\" ({fixFirst.Rows[0][2]} points if fixed).");
+            s.Add($"The largest single improvement is \"{fixFirst.Rows[0][1]}\" ({fixFirst.Rows[0][2]} {(fixFirst.Rows[0][2] == "+1" ? "point" : "points")} if fixed).");
         else if (open.OrderByDescending(f => f.Severity).FirstOrDefault() is { } top)
             s.Add($"The most severe open finding is \"{top.Title}\" ({top.Severity}).");
 
         if (failedChecks > 0)
-            s.Add($"Next step: get the {failedChecks} failed check(s) to run (permissions, connectivity) and scan again; until then the score is an upper bound.");
+            s.Add($"Next step: get the {ReportText.Count(failedChecks, "failed check")} to run (permissions, connectivity) and scan again; until then the score is an upper bound.");
         else if (open.Count > 0)
             s.Add("Next step: work through the \"Fix first\" list below from the top" +
-                  (fullyExcepted > 0 ? $"; {fullyExcepted} fully excepted finding(s) are tracked separately." : "."));
+                  (fullyExcepted > 0 ? $"; {ReportText.Count(fullyExcepted, "fully excepted finding")} {ReportText.Noun(fullyExcepted, "is", "are")} tracked separately." : "."));
         return s;
     }
 
@@ -365,8 +365,10 @@ public static class ReportBuilder
         if (!string.IsNullOrWhiteSpace(i.DomainController) && !string.Equals(i.DomainController, "unknown", StringComparison.OrdinalIgnoreCase))
             lines.Add(new("Domain controller", i.DomainController));
         if (!string.IsNullOrWhiteSpace(i.ScanTime) && i.ScanTime != "Never")
-            lines.Add(new("Scan time", i.ScanTime));
-        lines.Add(new("Report created", i.CreatedLocal.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " " + UtcOffset(i.CreatedLocal)));
+            lines.Add(new("Scan time", ReportText.ScanTime(i.ScanTime)));
+        lines.Add(new("Report created", ReportText.Time(i.CreatedLocal)));
+        // V-20: printed once, so the local times can be matched with the UTC time of the .meta.txt
+        lines.Add(new("Time zone", $"{ReportText.Zone(i.CreatedLocal)} (local time)"));
         if (i.Totals is { } t && t.Users + t.Groups + t.Computers > 0)
             lines.Add(new("Objects read", $"{N(t.Users)} users · {N(t.Groups)} groups · {N(t.Computers)} computers"));
         int Of(CheckStatus st) => rules.Count(r => r.Status == Label(st) && (st != CheckStatus.Failed || ran.Contains(r.RuleId)));
@@ -377,12 +379,6 @@ public static class ReportBuilder
         return lines;
     }
 
-    /// <summary>"(UTC+01:00)" for a local time, so page 1 can be matched with the UTC time of the .meta.txt (V-20).</summary>
-    public static string UtcOffset(DateTime local)
-    {
-        var off = TimeZoneInfo.Local.GetUtcOffset(local);
-        return $"(UTC{(off < TimeSpan.Zero ? "-" : "+")}{off:hh\\:mm})";
-    }
 
     /// <summary>
     /// Every account identifier the input knows, typed (F-03/F-04): users (display name, SAM, mail, DN) and

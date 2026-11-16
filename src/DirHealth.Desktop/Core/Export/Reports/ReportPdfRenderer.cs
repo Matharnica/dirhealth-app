@@ -199,7 +199,7 @@ public sealed class ReportPdfRenderer
         }
 
         // scan facts strip at the bottom of the dark block
-        var facts = _m.Scope.Where(l => l.Label is not ("Domain" or "Checks")).Take(4).ToList();
+        var facts = _m.Scope.Where(l => l.Label is not ("Domain" or "Checks")).Take(5).ToList();
         if (facts.Count > 0)
         {
             double stripTop = blockH - 3 - 74, cellW = (pw - 2 * M) / facts.Count;
@@ -436,11 +436,11 @@ public sealed class ReportPdfRenderer
         T(f.RuleId, UI.Mono8, Ink2, x, baseline - 0.5);
         x += W(f.RuleId, UI.Mono8) + 10;
         int objects = f.Objects.Rows.Count + f.Objects.HiddenRows;
-        var count = objects == 1 ? "1 affected object" : $"{objects.ToString("N0", CultureInfo.InvariantCulture)} affected objects";
+        var count = ReportText.Count(objects, "affected object");
         T(count, UI.F8, Ink2, x, baseline - 0.5);
         if (f.PointsIfFixed > 0)
         {
-            var pts = $"+{f.PointsIfFixed} points if fixed";
+            var pts = $"+{ReportText.Count(f.PointsIfFixed, "point")} if fixed";
             T(pts, UI.F8B, PdfFlow.Accent, M + _f.Width - 14 - W(pts, UI.F8B), baseline - 0.5);
         }
         double ty = top + 14 + 12 + 8 + 12;

@@ -31,7 +31,7 @@ public class PdfExporter
         var f = new PdfFlow("Password Expiry Report", ReportBuilder.ClassificationText, null);
         f.NewPage();
         f.Hero("PASSWORD EXPIRY REPORT", "Password expiry",
-               $"{N(list.Count)} account(s) with an expiring password · created {now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}");
+               $"{ReportText.Count(list.Count, "account")} with an expiring password · created {ReportText.Time(now)} ({ReportText.Zone(now)})");
         f.Tiles(
         [
             (N(list.Count(Expired)), "Expired",                  UI.ColCritical),
@@ -45,7 +45,7 @@ public class PdfExporter
         {
             u.DisplayName.Length > 0 ? u.DisplayName : u.SamAccountName,
             u.Email ?? "",
-            u.PasswordExpires?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "",
+            u.PasswordExpires?.ToString(ReportText.DateFormat, CultureInfo.InvariantCulture) ?? "",
             u.DaysUntilPasswordExpiry?.ToString(CultureInfo.InvariantCulture) ?? "N/A",
             Expired(u) ? "Expired" : Soon(u) ? "Soon" : "OK",
         }).ToList();
@@ -55,7 +55,7 @@ public class PdfExporter
             i => Expired(list[i]) ? UI.ColCritical : Soon(list[i]) ? UI.ColHigh : null);
 
         f.Finish(filePath, "DirHealth — Password Expiry Report",
-            $"DirHealth {ReportPdfRenderer.ShortVersion(ExportMetadata.AppVersion)} · Password Expiry Report · created {now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}");
+            $"DirHealth {ReportPdfRenderer.ShortVersion(ExportMetadata.AppVersion)} · Password Expiry Report · created {ReportText.Time(now)}");
     }
 
     /// <summary>
@@ -73,7 +73,7 @@ public class PdfExporter
         var crit = new XSolidBrush(UI.ColCritical);
         f.NewPage();
         f.Hero("USER DOSSIER", d.User.DisplayName.Length > 0 ? d.User.DisplayName : d.User.SamAccountName,
-               $"{d.User.SamAccountName} · {d.Context.Domain}",
+               $"{d.User.SamAccountName} · {d.Context.Domain} · all times UTC",   // AD times are UTC; zone named once
                d.IsTier0 ? new List<(string, XColor)> { ("TIER 0 MEMBER", UI.ColCritical) } : null);
         f.Tiles(
         [
@@ -129,13 +129,13 @@ public class PdfExporter
             ("Domain",            d.Context.Domain),
             ("Domain controller", d.Context.DomainController),
             ("Run by",            d.Context.User),
-            ("Last scan",         d.ScanTime),
-            ("Created (UTC)",     d.CreatedUtc.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)),
+            ("Last scan",         ReportText.ScanTime(d.ScanTime, toUtc: true)),
+            ("Created",           ReportText.Time(d.CreatedUtc)),
             ("Tool",              $"DirHealth {d.Version}"),
             ("Integrity",         "SHA-256 of this file: see the .meta.txt next to it"),
         }.Select(r => (r.Item1, r.Item2, false)), 170);
 
         f.Finish(filePath, $"DirHealth — User dossier: {d.User.SamAccountName}",
-            $"DirHealth {ReportPdfRenderer.ShortVersion(d.Version)} · {d.Context.Domain} · User dossier · created {d.CreatedUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC");
+            $"DirHealth {ReportPdfRenderer.ShortVersion(d.Version)} · {d.Context.Domain} · User dossier · created {ReportText.Time(d.CreatedUtc)}");
     }
 }
