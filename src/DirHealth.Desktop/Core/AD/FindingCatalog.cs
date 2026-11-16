@@ -70,7 +70,10 @@ public static class FindingCatalog
         "$sid = (Get-ADDomain).DomainSID.Value   # Enterprise/Schema/Enterprise Key Admins: use the forest root SID in child domains\n" +
         "$t0 = \"$sid-512\",\"$sid-518\",\"$sid-519\",\"$sid-526\",\"$sid-527\",\"$sid-517\",'S-1-5-32-544','S-1-5-32-548','S-1-5-32-549','S-1-5-32-550','S-1-5-32-551' |\n" +
         "    ForEach-Object { Get-ADGroup -Identity $_ -ErrorAction SilentlyContinue }\n" +
-        "$t0 += Get-ADGroup -Filter \"Name -eq 'DnsAdmins'\" -ErrorAction SilentlyContinue\n" +
+        // DnsAdmins has no fixed RID, so the script can only find it by name (same gap as review H3):
+        // say so out loud instead of silently auditing without a renamed DnsAdmins group.
+        "$dns = Get-ADGroup -Filter \"Name -eq 'DnsAdmins'\" -ErrorAction SilentlyContinue\n" +
+        "if ($dns) { $t0 += $dns } else { Write-Warning 'No group named DnsAdmins found. If it was renamed, its members are NOT included below - add it by hand: $t0 += Get-ADGroup <name>' }\n" +
         "$members = $t0 | Get-ADGroupMember -Recursive | Where-Object objectClass -eq 'user'\n" +
         "$members += Get-ADUser -LDAPFilter '(primaryGroupID=512)'\n" +
         "$admins = $members | Sort-Object DistinguishedName -Unique |\n" +
