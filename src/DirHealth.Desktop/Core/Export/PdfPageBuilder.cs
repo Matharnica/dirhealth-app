@@ -14,6 +14,9 @@ namespace DirHealth.Desktop.Core.Export;
 /// </summary>
 internal sealed class PdfPageBuilder
 {
+    // Must stay the first static field: static initializers run in textual order, and the fonts below need it.
+    private static readonly bool FontsInstalled = PdfFonts.Install();
+
     // ── Colours (neutral slate scale + one brand blue) ───────────────────────
     internal static readonly XColor ColNavy        = XColor.FromArgb( 15,  23,  42); // #0f172a  cover, brand
     internal static readonly XColor ColNavy2       = XColor.FromArgb( 30,  41,  59); // #1e293b  cover panels
