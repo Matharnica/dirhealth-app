@@ -57,9 +57,18 @@ public partial class AdScanner
         ("Recovery.Sysvol",                 GetSysvolReplicationFindingsAsync),
     ];
 
+    /// <summary>Scan log of the scan running on this async flow (null outside RunCompleteScanAsync).
+    /// AsyncLocal flows into Task.Run, so sub-queries can add notes without a parameter.</summary>
+    private static readonly AsyncLocal<ConcurrentBag<ScanLogEntry>?> CurrentScanLog = new();
+
+    /// <summary>Adds an informational line to the current scan's log (no-op outside a scan).</summary>
+    private static void NoteInScanLog(string query, string note) =>
+        CurrentScanLog.Value?.Add(new ScanLogEntry(query, 0, 0, $"note: {note}"));
+
     public async Task<CompleteScanResult> RunCompleteScanAsync()
     {
         var scanLog       = new ConcurrentBag<ScanLogEntry>();
+        CurrentScanLog.Value = scanLog;
         var failures      = new ConcurrentDictionary<string, string>();
         var notApplicable = new ConcurrentDictionary<string, string>();
         // S16-4: every sub-query runs guarded — a failure is recorded, not fatal

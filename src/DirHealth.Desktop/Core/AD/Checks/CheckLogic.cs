@@ -330,4 +330,27 @@ public static class CheckLogic
         users.Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= withinDays)
              .OrderBy(u => u.DaysUntilPasswordExpiry)
              .ToList();
+
+    // ── Review 2026-11-16 H3: Tier 0 groups that may legitimately be absent ──
+    /// <summary>Error text of AdConnector.FindGroup when the search ran but found nothing (read succeeded).</summary>
+    public const string GroupNotFoundError = "Group not found.";
+
+    /// <summary>
+    /// Decides how GetTier0Members treats each resolved Tier 0 group. Mandatory groups (fixed RID or BUILTIN SID,
+    /// see <see cref="WellKnownGroups.IsOptionalTier0"/>) must resolve — otherwise the read failed and the checks are
+    /// "Failed". Optional groups (DnsAdmins, Key Admins, Enterprise Key Admins) that are simply absent are skipped
+    /// and returned for the scan log. An optional group whose lookup itself failed (any other error) still throws:
+    /// "absent" must be proven by a successful search, never assumed.
+    /// </summary>
+    public static IReadOnlyList<string> Tier0SkippedGroups(IEnumerable<(WellKnownGroupDef Def, bool Found, string? Error)> groups)
+    {
+        var skipped = new List<string>();
+        foreach (var (def, found, error) in groups)
+        {
+            if (found) continue;
+            if (WellKnownGroups.IsOptionalTier0(def) && error == GroupNotFoundError) { skipped.Add(def.FallbackName); continue; }
+            throw new InvalidOperationException($"{def.FallbackName} could not be read{(string.IsNullOrEmpty(error) ? "." : $": {error}")}");
+        }
+        return skipped;
+    }
 }

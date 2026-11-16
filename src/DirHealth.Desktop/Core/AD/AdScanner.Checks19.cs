@@ -65,14 +65,20 @@ public partial class AdScanner
 
     // ── S19-2 admin hardening ─────────────────────────────────────────────────
     /// <summary>Enabled Tier 0 members (nested and primary group included), keyed by DN.</summary>
+    /// <remarks>
+    /// Mandatory groups (fixed RID, BUILTIN) that do not resolve throw — the read failed. Optional groups
+    /// (DnsAdmins, Key Admins, Enterprise Key Admins) that a successful search did not find are skipped and noted
+    /// in the scan log (H3, review 2026-11-16): before, their absence made all 8 Tier 0 checks permanently Failed.
+    /// </remarks>
     private Dictionary<string, AdUser> GetTier0Members(DirectoryEntry root)
     {
-        var members = new Dictionary<string, AdUser>(StringComparer.OrdinalIgnoreCase);
-        foreach (var def in WellKnownGroups.Tier0)
+        var members  = new Dictionary<string, AdUser>(StringComparer.OrdinalIgnoreCase);
+        var resolved = WellKnownGroups.Tier0.Select(def => _connector.ResolveGroup(root, def)).ToList();
+        foreach (var name in CheckLogic.Tier0SkippedGroups(resolved.Select(r => (r.Def, r.Found, r.Error))))
+            NoteInScanLog("Tier0Groups", $"skipped, not present in this domain: {name}");
+        foreach (var g in resolved.Where(r => r.Found))
         {
-            var g = _connector.ResolveGroup(root, def);
-            // BUILTIN operator groups exist in every domain — not resolving one means the read failed
-            if (!g.Found) throw new InvalidOperationException($"{def.FallbackName} could not be read.");
+            var def = g.Def;
             int? primaryRid = def.Source != GroupSidSource.Builtin && def.Rid > 0 ? def.Rid : null;
             var filter = "(&" + CheckFilters.EnabledUser + WellKnownGroups.MembershipClause(EscapeDn(g.DistinguishedName!), primaryRid) + ")";
             foreach (var u in QueryUsers(filter)) members.TryAdd(u.DistinguishedName, u);

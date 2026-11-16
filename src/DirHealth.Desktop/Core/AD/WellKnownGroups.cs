@@ -61,6 +61,16 @@ public static class WellKnownGroups
     ];
     private static IReadOnlyList<WellKnownGroupDef>? _tier0;
 
+    /// <summary>
+    /// Tier 0 groups that do not exist in every domain (review 2026-11-16 H3): DnsAdmins only with the
+    /// AD-integrated DNS server role (no fixed RID), Key Admins (526) and Enterprise Key Admins (527) only after
+    /// a Windows Server 2016+ domain/forest prep. All other Tier 0 groups — fixed RIDs 512/517/518/519 and the
+    /// BUILTIN SIDs — exist in every domain; not resolving one of them means the read failed.
+    /// </summary>
+    public static bool IsOptionalTier0(WellKnownGroupDef def) =>
+        def.Source == GroupSidSource.NameOnly
+        || (def.Source != GroupSidSource.Builtin && def.Rid is KeyAdminsRid or EnterpriseKeyAdminsRid);
+
     public static readonly WellKnownGroupDef ProtectedUsers =
         new("Protected Users", "Hardened credential handling", GroupSidSource.Domain, ProtectedUsersRid);
 

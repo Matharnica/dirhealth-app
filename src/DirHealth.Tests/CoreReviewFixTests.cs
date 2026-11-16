@@ -74,4 +74,61 @@ public class CoreReviewFixTests
         };
         Assert.Equal(new[] { "soon", "late" }, ExpiringWithin(users, 30).Select(u => u.SamAccountName));
     }
+
+    // ── H3: optional vs mandatory Tier 0 groups ──────────────────────────────
+    private static WellKnownGroupDef Tier0(Func<WellKnownGroupDef, bool> pick) => WellKnownGroups.Tier0.Single(pick);
+
+    [Fact]
+    public void Tier0_OptionalGroups_AreExactlyDnsAdminsKeyAdminsEnterpriseKeyAdmins()
+    {
+        var optional = WellKnownGroups.Tier0.Where(WellKnownGroups.IsOptionalTier0).Select(d => d.FallbackName).OrderBy(n => n);
+        Assert.Equal(new[] { "DnsAdmins", "Enterprise Key Admins", "Key Admins" }, optional);
+        // the core groups stay mandatory
+        foreach (var rid in new[] { 512, 517, 518, 519 })
+            Assert.False(WellKnownGroups.IsOptionalTier0(Tier0(d => d.Rid == rid && d.Source != GroupSidSource.Builtin)));
+        Assert.False(WellKnownGroups.IsOptionalTier0(Tier0(d => d.Source == GroupSidSource.Builtin && d.Rid == 544)));
+    }
+
+    [Fact]
+    public void Tier0_MissingOptionalGroups_AreSkipped_NotFailed()
+    {
+        var groups = WellKnownGroups.Tier0.Select(d => WellKnownGroups.IsOptionalTier0(d)
+            ? (d, false, (string?)GroupNotFoundError)
+            : (d, true, (string?)null));
+        Assert.Equal(new[] { "DnsAdmins", "Enterprise Key Admins", "Key Admins" }, Tier0SkippedGroups(groups).OrderBy(n => n));
+    }
+
+    [Fact]
+    public void Tier0_AllPresent_SkipsNothing()
+    {
+        Assert.Empty(Tier0SkippedGroups(WellKnownGroups.Tier0.Select(d => (d, true, (string?)null))));
+    }
+
+    [Theory]
+    [InlineData(512)]   // Domain Admins
+    [InlineData(544)]   // BUILTIN\Administrators
+    public void Tier0_MissingMandatoryGroup_Throws(int rid)
+    {
+        var groups = WellKnownGroups.Tier0.Select(d => (d, d.Rid != rid, d.Rid == rid ? (string?)GroupNotFoundError : null));
+        var ex = Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups));
+        Assert.Contains("could not be read", ex.Message);
+    }
+
+    [Fact]
+    public void Tier0_OptionalGroup_WithReadError_StillThrows()
+    {
+        // "absent" must be proven by a successful search — a failed lookup is a failed check
+        var groups = WellKnownGroups.Tier0.Select(d => d.Source == GroupSidSource.NameOnly
+            ? (d, false, (string?)"The server is not operational.")
+            : (d, true, (string?)null));
+        Assert.Throws<InvalidOperationException>(() => Tier0SkippedGroups(groups));
+    }
+
+    [Fact]
+    public void Tier0_GroupNotFoundError_MatchesAdConnector()
+    {
+        // drift guard: "absent" is recognised by AdConnector.FindGroup's error text
+        var src = File.ReadAllText(Path.Combine(ReadOnlyGuardTests.FindDesktopSourceDir(), "Core", "AD", "AdConnector.cs"));
+        Assert.Contains($"\"{GroupNotFoundError}\"", src);
+    }
 }
