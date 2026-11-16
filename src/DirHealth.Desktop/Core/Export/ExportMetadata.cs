@@ -59,6 +59,20 @@ public static class ExportMetadata
         return sb.ToString();
     }
 
+    /// <summary>
+    /// The export context from <paramref name="provider"/> (usually <c>AdScanner.GetExportContext</c>, which
+    /// asks the DC). A failing or missing provider never fails the export — the side-car then says "unknown".
+    /// </summary>
+    public static ExportContext SafeContext(Func<ExportContext>? provider, string domain = "")
+    {
+        try { if (provider?.Invoke() is { } ctx) return ctx; }
+        catch { /* no connection: the export itself is still valid */ }
+        return new ExportContext(string.IsNullOrWhiteSpace(domain) ? "unknown" : domain, "unknown", Environment.UserName);
+    }
+
+    /// <summary>Paket 3 F-04: the side-car of a report with redacted names must not name the person who ran it.</summary>
+    public static ExportContext Redacted(ExportContext ctx) => ctx with { User = Reports.Redactor.RedactedPlaceholder };
+
     /// <summary>Hashes the finished export and writes the side-car. Returns its path.</summary>
     public static string WriteFor(string exportPath, ExportContext ctx, string view, string filter, int rowCount)
     {

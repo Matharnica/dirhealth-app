@@ -300,7 +300,7 @@ internal sealed class PdfPageBuilder
         string rt  = string.IsNullOrEmpty(rightText) ? "AD SECURITY SCANNER" : rightText;
         double rtW = gfx.MeasureString(rt, F9).Width;
         gfx.DrawString(rt, F9,
-            new XSolidBrush(XColor.FromArgb(71, 85, 105)),
+            new XSolidBrush(XColor.FromArgb(148, 163, 184)),   // V-16: readable "NAMES REDACTED" (was #475569 on #0f172a)
             w - Margin - rtW, 19);
     }
 
