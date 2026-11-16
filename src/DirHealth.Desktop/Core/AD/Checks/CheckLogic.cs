@@ -287,4 +287,47 @@ public static class CheckLogic
             issues |= TrustIssue.Inactive;
         return issues;
     }
+
+    // ── Review 2026-11-16 H2: password expiry ────────────────────────────────
+    /// <summary>Raw msDS-UserPasswordExpiryTimeComputed value of a user, interpreted.</summary>
+    public enum PasswordExpiryState
+    {
+        /// <summary>The password expires at <see cref="PasswordExpiry.ExpiresUtc"/>.</summary>
+        Expires,
+        /// <summary>No expiry date: password never expires (DONT_EXPIRE_PASSWORD, smartcard, domain/PSO
+        /// policy "never") = 0x7FFFFFFFFFFFFFFF, or pwdLastSet = 0 ("must change at next logon") = 0.</summary>
+        NoExpiry,
+        /// <summary>The attribute was not returned (no read access, missing) — expiry unknown, never guessed.</summary>
+        Unreadable,
+    }
+
+    public readonly record struct PasswordExpiry(PasswordExpiryState State, DateTime? ExpiresUtc);
+
+    /// <summary>
+    /// Interprets msDS-UserPasswordExpiryTimeComputed (MS-ADTS 3.1.1.4.5.13). AD computes it from pwdLastSet
+    /// and the effective maxPwdAge — the resulting PSO if one applies, else the domain policy — so there is no
+    /// fixed fallback such as "90 days" anywhere (before: maxPwdAge read via the ADSI property cache arrived as
+    /// a COM object, never as long, and every expiry was computed with 90 days).
+    /// </summary>
+    public static PasswordExpiry PasswordExpiryFromComputed(long? computed) => computed switch
+    {
+        null                                          => new(PasswordExpiryState.Unreadable, null),
+        < 0                                           => new(PasswordExpiryState.Unreadable, null),
+        0                                             => new(PasswordExpiryState.NoExpiry, null),
+        >= MaxFileTimeForDateTime                     => new(PasswordExpiryState.NoExpiry, null),   // 0x7FFF… = never
+        { } v                                         => new(PasswordExpiryState.Expires, DateTime.FromFileTimeUtc(v)),
+    };
+
+    /// <summary>Largest FILETIME a DateTime can hold (9999-12-31) — anything at or above it means "never".</summary>
+    private const long MaxFileTimeForDateTime = 2650467743999999999;
+
+    /// <summary>Whole days until expiry (truncated toward zero, as before); ≤ 0 = expired.</summary>
+    public static int? DaysUntilExpiry(PasswordExpiry e, DateTime nowUtc) =>
+        e.ExpiresUtc is { } at ? (int)(at - nowUtc).TotalDays : null;
+
+    /// <summary>Users whose password expires within the window (0 … withinDays days), soonest first.</summary>
+    public static List<AdUser> ExpiringWithin(IEnumerable<AdUser> users, int withinDays) =>
+        users.Where(u => u.DaysUntilPasswordExpiry is >= 0 and { } d && d <= withinDays)
+             .OrderBy(u => u.DaysUntilPasswordExpiry)
+             .ToList();
 }
