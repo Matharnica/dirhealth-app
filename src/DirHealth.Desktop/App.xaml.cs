@@ -131,7 +131,7 @@ public partial class App : Application
         // One exception store for dashboard (score) and findings (card) — ADR 0001/0002
         var exceptions       = new Core.Storage.ExceptionStore();
         var dashboard        = new DashboardViewModel(scanner, exceptions);
-        var findings         = new FindingsViewModel(exceptions);
+        var findings         = new FindingsViewModel(exceptions) { ExportContextProvider = scanner.GetExportContext };   // .meta.txt DC (Paket 3)
         var appSettings      = new SettingsViewModel(connector);
         var computerDetailVm = new ComputerDetailViewModel(wmi);
         // Search has its own detail VMs so opening a result does not disturb the browsers (S15-2)
