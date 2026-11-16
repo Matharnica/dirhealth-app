@@ -14,6 +14,22 @@ All notable changes to DirHealth are documented here.
 - **Kerberos is enforced** — every WMI connection names the server principal (`kerberos:<domain>\<host>`) with packet privacy, instead of letting Windows negotiate (which may fall back to NTLM). Computers whose Kerberos setup is broken now show a clear error instead of connecting over NTLM.
 - **WMI errors are shown** (access denied, RPC unavailable, Kerberos failed, timeout) instead of silently empty lists.
 
+### Security — Settings respects "Remember credentials" (review 2026-11-16, M1)
+- **Settings › Save no longer stores the Domain Admin password when you chose not to remember it.** Settings now shows the same "Remember credentials" checkbox as the login window. Unticked, Save only updates the running session and deletes an existing `credentials.dat`; ticked, it saves as before.
+
+### Fixed — Review 2026-11-16 (scan core) — ⚠ your score may change without any change in AD
+- **Password expiry is now read from AD per user** (`msDS-UserPasswordExpiryTimeComputed`), so fine-grained password policies and "never expires" policies are respected. Before, every expiry was computed with a silent 90-day default. The "Password Expires" date is filled in again.
+- **Unreadable expiry is never guessed.** The password report and the "expiring passwords" check report **Failed** when the expiry of any user cannot be read. The user browser has a new **Password Expiry** column ("Expires", "No expiry date", "Unknown (not readable)") and says above the table how many users could not be read — before, those cells were silently empty.
+- **Optional Tier 0 groups:** Key Admins / Enterprise Key Admins that do not exist (older domains) are skipped with a note in the scan log. DnsAdmins is skipped only when the domain has no AD-integrated DNS; with DNS but no group named DnsAdmins (e.g. renamed), the Tier 0 checks report **Failed** instead of passing.
+- **Fix scripts warn about DnsAdmins:** the Tier 0 PowerShell fix blocks find DnsAdmins by name and now print a warning when no such group exists, instead of silently leaving out the members of a renamed group.
+- **Empty Groups** no longer lists critical system groups or groups used as a primary group (Domain Users, Domain Computers …).
+- **Accounts that never logged on** count as inactive (users, computers, stale Domain Admins) only when they were created before the inactivity cutoff — new accounts are no longer flagged on day one.
+- **Timeline and GPO times** are no longer shifted by your UTC offset; date cutoffs no longer depend on the Windows region settings.
+- **Undo scripts parse again:** undo blocks whose per-row command ends with a comment (e.g. DH-USR-003, DH-GRP-001) put the closing brace on its own line — before, the comment swallowed it.
+
+### Changed — Review 2026-11-16
+- **Score model version 6** (Empty Groups and never-logged-on changes alter finding counts): the dashboard shows a one-time notice and the score history shows a break instead of a drop; trend and report do not compare across the change.
+
 ### Fixed — Review 2026-11-16 (report, exports, UI, repository)
 - **PDF report:** PowerShell fix/undo scripts wrap copy-safe (PowerShell continuation, split strings, comments stay comments); table cells wrap instead of being cut, headers repeat after page breaks.
 - **Redaction:** built-in accounts and groups (krbtgt, Guest, Administrator, Domain Admins) stay readable; rule texts are no longer garbled; exception creators and known names in reasons are redacted, also in the `.meta.txt`.
