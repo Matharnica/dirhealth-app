@@ -22,20 +22,29 @@ public static class ScanDiffCalculator
 {
     public static ScanDiff Calculate(ScanCache previous, ScanCache current)
     {
-        var prevByCategory = previous.Findings.ToDictionary(f => f.Category);
-        var currByCategory = current.Findings.ToDictionary(f => f.Category);
+        // One category can carry several findings (e.g. up to three FineGrainedPasswordPolicy
+        // findings per PSO) — group instead of ToDictionary, which threw on the duplicate key.
+        var prevByCategory = ByCategory(previous.Findings);
+        var currByCategory = ByCategory(current.Findings);
 
-        var newFindings = currByCategory.Values
-            .Where(f => !prevByCategory.ContainsKey(f.Category))
+        var newFindings = currByCategory
+            .Where(kv => !prevByCategory.ContainsKey(kv.Key))
+            .Select(kv => Merge(kv.Value))
             .ToList();
 
-        var resolved = prevByCategory.Values
-            .Where(f => !currByCategory.ContainsKey(f.Category))
+        var resolved = prevByCategory
+            .Where(kv => !currByCategory.ContainsKey(kv.Key))
+            .Select(kv => Merge(kv.Value))
             .ToList();
 
-        var changed = currByCategory.Values
-            .Where(f => prevByCategory.TryGetValue(f.Category, out var p) && p.Count != f.Count)
-            .Select(f => new ScanChange(f, f.Count - prevByCategory[f.Category].Count))
+        var changed = currByCategory
+            .Where(kv => prevByCategory.ContainsKey(kv.Key))
+            .Select(kv => (Curr: kv.Value, Prev: prevByCategory[kv.Key]))
+            .Select(x => (x.Curr, x.Prev, Delta: x.Curr.Sum(f => f.Count) - x.Prev.Sum(f => f.Count)))
+            .Where(x => x.Delta != 0)
+            // Neutral title as soon as either scan had several findings: the delta is about the
+            // category, so naming the one remaining PSO would be misleading.
+            .Select(x => new ScanChange(Merge(x.Curr, neutralTitle: x.Prev.Count > 1), x.Delta))
             .ToList();
 
         return new ScanDiff
@@ -46,6 +55,35 @@ public static class ScanDiffCalculator
             NewFindings      = newFindings,
             ResolvedFindings = resolved,
             ChangedFindings  = changed
+        };
+    }
+
+    /// <summary>Findings per category, in first-seen order (keeps the display order of the scan).</summary>
+    private static Dictionary<string, List<AdFinding>> ByCategory(IEnumerable<AdFinding>? findings)
+    {
+        var map = new Dictionary<string, List<AdFinding>>(StringComparer.Ordinal);
+        foreach (var f in findings ?? Enumerable.Empty<AdFinding>())
+            (map.TryGetValue(f.Category, out var list) ? list : map[f.Category] = []).Add(f);
+        return map;
+    }
+
+    /// <summary>
+    /// One finding per category for the diff. A single finding is returned unchanged; several are
+    /// summed (Count), take the highest severity, and get a neutral title naming the category —
+    /// a title like "PSO 'X': …" would describe only one of them.
+    /// </summary>
+    private static AdFinding Merge(List<AdFinding> group, bool neutralTitle = false)
+    {
+        if (group.Count == 1 && !neutralTitle) return group[0];
+        var top = group.MaxBy(f => f.Severity)!;
+        return new AdFinding
+        {
+            Category    = top.Category,
+            Title       = $"{top.Category} ({group.Count} finding{(group.Count == 1 ? "" : "s")})",
+            Description = top.Description,
+            Severity    = top.Severity,
+            Count       = group.Sum(f => f.Count),
+            Objects     = group.SelectMany(f => f.Objects).ToList(),
         };
     }
 }
