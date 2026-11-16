@@ -353,4 +353,16 @@ public static class CheckLogic
         }
         return skipped;
     }
+
+    // ── Review 2026-11-16 M1: primary-group groups are never "empty" ─────────
+    /// <summary>
+    /// A group that is the primary group of accounts (Domain Users 513, Domain Guests 514, Domain Computers 515,
+    /// Domain Controllers 516, Read-only DCs 521) keeps those members in primaryGroupID, not in member — its
+    /// empty member attribute says nothing. Identified by the RID of the group SID, never by name.
+    /// </summary>
+    public static bool IsPrimaryGroupSid(string? groupSid) =>
+        !string.IsNullOrEmpty(groupSid)
+        && groupSid.StartsWith("S-1-5-21-", StringComparison.Ordinal)
+        && int.TryParse(groupSid[(groupSid.LastIndexOf('-') + 1)..], out var rid)
+        && StandardPrimaryGroups.Contains(rid);
 }

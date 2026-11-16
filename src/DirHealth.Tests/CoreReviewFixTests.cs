@@ -131,4 +131,26 @@ public class CoreReviewFixTests
         var src = File.ReadAllText(Path.Combine(ReadOnlyGuardTests.FindDesktopSourceDir(), "Core", "AD", "AdConnector.cs"));
         Assert.Contains($"\"{GroupNotFoundError}\"", src);
     }
+
+    // ── M1: primary-group groups are not "empty" ─────────────────────────────
+    [Theory]
+    [InlineData("S-1-5-21-100-200-300-513", true)]    // Domain Users
+    [InlineData("S-1-5-21-100-200-300-514", true)]    // Domain Guests
+    [InlineData("S-1-5-21-100-200-300-515", true)]    // Domain Computers
+    [InlineData("S-1-5-21-100-200-300-516", true)]    // Domain Controllers
+    [InlineData("S-1-5-21-100-200-300-521", true)]    // Read-only Domain Controllers
+    [InlineData("S-1-5-21-100-200-300-512", false)]   // Domain Admins — members in member
+    [InlineData("S-1-5-21-100-200-300-1513", false)]  // ordinary group whose RID merely ends in 513
+    [InlineData("S-1-5-32-513", false)]               // not a domain SID
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void EmptyGroups_PrimaryGroupsAreRecognisedByRid(string? sid, bool primary) =>
+        Assert.Equal(primary, IsPrimaryGroupSid(sid));
+
+    [Fact]
+    public void EmptyGroups_Filter_ExcludesCriticalSystemGroups_AndFixBlockUsesTheSameFilter()
+    {
+        Assert.Contains("(!(isCriticalSystemObject=TRUE))", CheckFilters.EmptyGroups);
+        Assert.Contains($"-LDAPFilter \"{CheckFilters.EmptyGroups}\"", FindingCatalog.Get("EmptyGroups")!.Fix);
+    }
 }

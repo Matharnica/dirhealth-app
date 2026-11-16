@@ -28,7 +28,13 @@ public static class CheckFilters
     public static string ExpiredPasswords(string cutoff) =>
         $"(&{EnabledUser}(pwdLastSet<={cutoff})(pwdLastSet>=1))";
 
-    public const string EmptyGroups = "(&(objectClass=group)(!(member=*)))";
+    /// <summary>
+    /// Groups without member values. Critical system groups are excluded (review 2026-11-16 M1): the primary
+    /// groups (Domain Users/Computers/Controllers/Guests, RODCs) hold their members in primaryGroupID, not in
+    /// member, and none of these groups can be deleted — they are no cleanup candidates. The scanner additionally
+    /// drops primary groups by RID (CheckLogic.IsPrimaryGroupSid) in case the flag is missing.
+    /// </summary>
+    public const string EmptyGroups = "(&(objectClass=group)(!(member=*))(!(isCriticalSystemObject=TRUE)))";
 
     /// <summary>Single-member groups: all groups, member count checked client-side.</summary>
     public const string AllGroups = "(objectClass=group)";

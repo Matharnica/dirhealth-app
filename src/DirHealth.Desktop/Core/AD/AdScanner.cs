@@ -390,7 +390,8 @@ public partial class AdScanner
     {
         return await Task.Run(() =>
         {
-            return QueryGroups(CheckFilters.EmptyGroups);
+            // M1: primary groups keep their members in primaryGroupID — an empty member attribute says nothing
+            return QueryGroups(CheckFilters.EmptyGroups).Where(g => !CheckLogic.IsPrimaryGroupSid(g.Sid)).ToList();
         });
     }
 
