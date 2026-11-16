@@ -19,7 +19,9 @@ public record ReportInput(
     IReadOnlyList<string> DomainAdmins,
     DateTime CreatedLocal, string Version,
     // scan scope for page 1 (Paket 3, V-11) — optional: unknown values are left out, never guessed
-    ScanTotals? Totals = null, string DomainController = "", string ScanTime = "");
+    ScanTotals? Totals = null, string DomainController = "", string ScanTime = "",
+    // score history for the trend line of the executive summary — optional, oldest first
+    IReadOnlyList<ScoreEntry>? History = null);
 
 /// <summary>Builds the report model (S18-1..S18-4). Pure: no PDF, no LDAP, no clock.</summary>
 public static class ReportBuilder
@@ -117,7 +119,7 @@ public static class ReportBuilder
         int  failedForScore = score is null ? 0 : score.TotalRules - score.EvaluatedRules;
         // F-05: an unavailable score is not a red "n/a / 100 · Critical" — it is neutral and says why
         string scoreText = !available
-            ? (failedForScore > 0 ? $"Score not available — {failedForScore} of {score!.TotalRules} checks failed"
+            ? (failedForScore > 0 ? $"Score not available — {failedForScore} of {ReportText.Count(score!.TotalRules, "check")} failed"
                                   : "Score not available — too few checks ran")
             : score?.Display ?? i.StoredScore.ToString(CultureInfo.InvariantCulture);
 
@@ -144,15 +146,16 @@ public static class ReportBuilder
         // "Fix first": largest score gain first (effort per rule is not modelled yet — S17-5 deferred).
         // Only rules among the given findings — the findings-tab PDF lists its filter selection only (S21-4).
         var shown = i.Findings.Select(f => f.Category).ToHashSet(StringComparer.Ordinal);
-        var fixFirst = new ReportTable(["#", "Finding", "Points if fixed"],
+        var fixFirst = new ReportTable(["#", "Finding", "Points if fixed", "Severity"],
             (score?.Rules ?? []).Where(r => r.PointsIfFixed > 0 && shown.Contains(r.Category)).Take(FixFirstCount)
                 .Select((r, n) => (IReadOnlyList<string>)new[]
                 {
                     (n + 1).ToString(CultureInfo.InvariantCulture),
                     i.Findings.FirstOrDefault(f => f.Category == r.Category)?.Title ?? r.Category,
                     $"+{r.PointsIfFixed}",
+                    i.Findings.FirstOrDefault(f => f.Category == r.Category)?.Severity.ToString() ?? "",
                 }).ToList(), 0, "",
-            Weights: [0.06, 0.78, 0.16]);   // F-02: the title gets the width, "#" does not
+            Weights: [0.06, 0.64, 0.14, 0.16]);   // F-02: the title gets the width, "#" does not
 
         var changes = new ReportTable(["Change", "Finding"],
             (i.Diff is null || scoped ? [] :
@@ -214,7 +217,7 @@ public static class ReportBuilder
         if (failed.Count > FailedChecksOnPageOne)
             failedShort.Add($"{failed.Count - FailedChecksOnPageOne} more — see \"Checks that could not run\" in the full report");
 
-        var model = new ReportModel(o.Kind, i.Domain, i.CreatedLocal.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), i.Version,
+        var model = new ReportModel(o.Kind, i.Domain, ReportText.Time(i.CreatedLocal), i.Version,
             scoreText, "Higher is better (0–100)", available ? ScoreLabel(scoreNum) : "", scoreNum,
             score?.CoverageText ?? "", available && score is { IsUpperBound: true } ? "Upper bound — some checks could not run." : null,
             delta, bySeverity, overview, fixFirst, changes,
@@ -227,11 +230,93 @@ public static class ReportBuilder
             SummarySentences: SummarySentences(available, scoreNum, score, open, fullyExcepted, failed.Count, fixFirst, scoped),
             Scope: ScopeLines(i, checkedRules),
             SeverityCountsLabel: "Open findings by severity (rules — same count as the risk matrix)",
-            ExceptedNote: fullyExcepted > 0 ? $"+{fullyExcepted} fully excepted finding(s), not counted above" : null,
+            ExceptedNote: fullyExcepted > 0 ? $"+{ReportText.Count(fullyExcepted, "fully excepted finding")}, not counted above" : null,
             FailedChecksShort: failedShort,
-            RedactionNote: null);
+            RedactionNote: null,
+            CoverTitle: scoped ? "Findings Report" : o.Kind == ReportKind.Summary ? "Management Summary" : "Security Health Report",
+            Classification: ClassificationText,
+            Disclaimer: DisclaimerText,
+            KeyFacts: KeyFacts(i, open, scoped, checkedRules),
+            ScoreTrend: scoped ? [] : Trend(i.History),
+            Methodology: o.Kind == ReportKind.Full ? MethodologyLines : []);
 
         return o.RedactUserNames ? RedactorFor(i).Apply(model) : model;
+    }
+
+    public const string ClassificationText = "CONFIDENTIAL";
+
+    /// <summary>Bottom of the cover. True by design: DirHealth only reads (ReadOnlyGuardTests).</summary>
+    public const string DisclaimerText =
+        "DirHealth only reads Active Directory and changed nothing during this assessment. The report shows the state " +
+        "at scan time. Fix scripts are suggestions: review them and run them yourself.";
+
+    /// <summary>At most this many points of score history are drawn as the trend line.</summary>
+    public const int TrendPoints = 12;
+
+    /// <summary>
+    /// "How the score works" (appendix of the full report) — describes <see cref="ScoreModel"/> (ADR 0002)
+    /// with its real constants, so the text cannot drift from the formula's numbers.
+    /// </summary>
+    public static readonly IReadOnlyList<string> MethodologyLines =
+    [
+        $"The score starts at 100. Every rule that finds something deducts {ScoreModel.PointsPerWeight.ToString(CultureInfo.InvariantCulture)} × " +
+        "its weight × how present the problem is (0 to 100 %). The score never drops below 0.",
+        "How present a problem is depends on the rule: most rules count affected objects up to a saturation point, some measure " +
+        "the share of all users, groups or computers, and setting rules count as fully present for a high or critical finding " +
+        "and half present otherwise.",
+        "Objects with an active exception do not count. They stay listed in the report, with the exception next to them.",
+        "A check that could not run (permissions, timeouts) is left out: it can neither lower nor raise the score, so the score " +
+        $"is shown as an upper bound (≤). When less than {ScoreModel.MinCoverage.ToString("P0", CultureInfo.InvariantCulture)} of the " +
+        "catalog weight could be evaluated, no score is shown.",
+        "\"Points if fixed\" splits the gap to 100 across the rules: the points of all rules add up exactly to 100 minus the score.",
+        "Severity (Critical, High, Medium, Low) describes the impact of a single finding; the weight that drives the score is set per rule.",
+        $"{ScoreLegendText}. Score model version {ScoreModel.FormulaVersion}; scores of different model versions are not compared.",
+    ];
+
+    /// <summary>
+    /// 1–4 plain statements for the executive summary, from counts only (no names): the most affected area,
+    /// open and excepted objects, changes since the last scan, how many checks ran.
+    /// </summary>
+    public static IReadOnlyList<string> KeyFacts(ReportInput i, IReadOnlyList<AdFinding> open, bool scoped, IReadOnlyList<ReportCheckedRule> rules)
+    {
+        var facts = new List<string>();
+        var top = open.GroupBy(f => AreaOf(f.RuleId))
+            .Select(g => (Area: g.Key, Count: g.Count(), Severe: g.Count(f => f.Severity >= FindingSeverity.High)))
+            .OrderByDescending(a => a.Count).ThenByDescending(a => a.Severe).ThenBy(a => a.Area, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (top.Count > 1)
+            facts.Add($"{(AreaLabels.TryGetValue(top.Area, out var l) ? l : top.Area)} is the most affected area: {top.Count} open findings" +
+                      (top.Severe > 0 ? $", {top.Severe} of them critical or high." : "."));
+
+        int objects  = open.Sum(f => f.Objects.Count(o => !o.IsExcepted));
+        int excepted = i.Findings.Sum(f => f.Objects.Count(o => o.IsExcepted));
+        if (objects > 0)
+            facts.Add($"{ReportText.Count(objects, "affected object")} {ReportText.Noun(objects, "is", "are")} open" +
+                      (excepted > 0 ? $"; {N(excepted)} more {(excepted == 1 ? "is" : "are")} covered by an active exception." : "."));
+
+        if (!scoped && i.Diff is { } d && (d.NewFindings.Count + d.ResolvedFindings.Count + d.ChangedFindings.Count) > 0)
+            facts.Add($"Since the last scan: {d.NewFindings.Count} new, {d.ResolvedFindings.Count} resolved and " +
+                      $"{ReportText.Count(d.ChangedFindings.Count, "changed finding")}.");
+
+        var ran = i.Checks.Select(c => c.RuleId).ToHashSet(StringComparer.Ordinal);
+        if (!scoped && ran.Count > 0)
+        {
+            int completed = rules.Count(r => ran.Contains(r.RuleId) && r.Status != Label(CheckStatus.Failed));
+            int passed    = rules.Count(r => r.Status == Label(CheckStatus.Passed));
+            facts.Add($"{N(completed)} of {N(rules.Count)} checks ran; {N(passed)} of them passed without a finding.");
+        }
+        return facts;
+    }
+
+    /// <summary>Score trend: the latest run of entries with the same formula version (comparable), oldest first.</summary>
+    public static IReadOnlyList<ReportTrendPoint> Trend(IReadOnlyList<ScoreEntry>? history)
+    {
+        if (history is null || history.Count < 2) return [];
+        int version = history[^1].FormulaVersion;
+        var run = history.Reverse().TakeWhile(e => e.FormulaVersion == version).Take(TrendPoints).Reverse()
+            .Select(e => new ReportTrendPoint(e.Timestamp.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), e.Score))
+            .ToList();
+        return run.Count >= 2 ? run : [];
     }
 
     /// <summary>
@@ -251,24 +336,24 @@ public static class ReportBuilder
                       : crit > 0 ? $"{crit} critical" : $"{high} high";
 
         if (!available)
-            s.Add($"No score could be computed because {failedChecks} check(s) failed, so the picture below is incomplete. " +
-                  $"{what} {open.Count} open finding(s), {severe}.");
+            s.Add($"No score could be computed because {ReportText.Count(failedChecks, "check")} failed, so the picture below is incomplete. " +
+                  $"{what} {ReportText.Count(open.Count, "open finding")}, {severe}.");
         else if (open.Count == 0)
             s.Add($"The domain scores {score}/100 ({ScoreLabel(score)}). {what} no open findings.");
         else
             s.Add($"The domain scores {(result is { IsUpperBound: true } ? "at most " : "")}{score}/100 ({ScoreLabel(score)}). " +
-                  $"{what} {open.Count} open finding(s), {severe}.");
+                  $"{what} {ReportText.Count(open.Count, "open finding")}, {severe}.");
 
         if (fixFirst.Rows.Count > 0)
-            s.Add($"The largest single improvement is \"{fixFirst.Rows[0][1]}\" ({fixFirst.Rows[0][2]} points if fixed).");
+            s.Add($"The largest single improvement is \"{fixFirst.Rows[0][1]}\" ({fixFirst.Rows[0][2]} {(fixFirst.Rows[0][2] == "+1" ? "point" : "points")} if fixed).");
         else if (open.OrderByDescending(f => f.Severity).FirstOrDefault() is { } top)
             s.Add($"The most severe open finding is \"{top.Title}\" ({top.Severity}).");
 
         if (failedChecks > 0)
-            s.Add($"Next step: get the {failedChecks} failed check(s) to run (permissions, connectivity) and scan again; until then the score is an upper bound.");
+            s.Add($"Next step: get the {ReportText.Count(failedChecks, "failed check")} to run (permissions, connectivity) and scan again; until then the score is an upper bound.");
         else if (open.Count > 0)
             s.Add("Next step: work through the \"Fix first\" list below from the top" +
-                  (fullyExcepted > 0 ? $"; {fullyExcepted} fully excepted finding(s) are tracked separately." : "."));
+                  (fullyExcepted > 0 ? $"; {ReportText.Count(fullyExcepted, "fully excepted finding")} {ReportText.Noun(fullyExcepted, "is", "are")} tracked separately." : "."));
         return s;
     }
 
@@ -280,8 +365,10 @@ public static class ReportBuilder
         if (!string.IsNullOrWhiteSpace(i.DomainController) && !string.Equals(i.DomainController, "unknown", StringComparison.OrdinalIgnoreCase))
             lines.Add(new("Domain controller", i.DomainController));
         if (!string.IsNullOrWhiteSpace(i.ScanTime) && i.ScanTime != "Never")
-            lines.Add(new("Scan time", i.ScanTime));
-        lines.Add(new("Report created", i.CreatedLocal.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " " + UtcOffset(i.CreatedLocal)));
+            lines.Add(new("Scan time", ReportText.ScanTime(i.ScanTime)));
+        lines.Add(new("Report created", ReportText.Time(i.CreatedLocal)));
+        // V-20: printed once, so the local times can be matched with the UTC time of the .meta.txt
+        lines.Add(new("Time zone", $"{ReportText.Zone(i.CreatedLocal)} (local time)"));
         if (i.Totals is { } t && t.Users + t.Groups + t.Computers > 0)
             lines.Add(new("Objects read", $"{N(t.Users)} users · {N(t.Groups)} groups · {N(t.Computers)} computers"));
         int Of(CheckStatus st) => rules.Count(r => r.Status == Label(st) && (st != CheckStatus.Failed || ran.Contains(r.RuleId)));
@@ -292,12 +379,6 @@ public static class ReportBuilder
         return lines;
     }
 
-    /// <summary>"(UTC+01:00)" for a local time, so page 1 can be matched with the UTC time of the .meta.txt (V-20).</summary>
-    public static string UtcOffset(DateTime local)
-    {
-        var off = TimeZoneInfo.Local.GetUtcOffset(local);
-        return $"(UTC{(off < TimeSpan.Zero ? "-" : "+")}{off:hh\\:mm})";
-    }
 
     /// <summary>
     /// Every account identifier the input knows, typed (F-03/F-04): users (display name, SAM, mail, DN) and

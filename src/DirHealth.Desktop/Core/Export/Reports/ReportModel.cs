@@ -84,4 +84,14 @@ public record ReportModel(
     string SeverityCountsLabel,                         // what SeverityCounts count (same definition as the matrix)
     string? ExceptedNote,                               // "+2 fully excepted findings not counted"
     IReadOnlyList<string> FailedChecksShort,            // failed checks for page 1, max. 5 + "n more"
-    string? RedactionNote);                             // set by the redactor: what was and was not redacted
+    string? RedactionNote,                              // set by the redactor: what was and was not redacted
+    // report design (cover, executive summary, methodology) — built here, so the renderer only draws
+    string CoverTitle = "",                             // "Security Health Report" / "Management Summary" / "Findings Report"
+    string Classification = "",                         // "CONFIDENTIAL" marker on the cover and the running header
+    string Disclaimer = "",                             // read-only statement at the bottom of the cover
+    IReadOnlyList<string>? KeyFacts = null,             // 1–4 plain statements below the summary sentences
+    IReadOnlyList<ReportTrendPoint>? ScoreTrend = null, // comparable score history (same formula), oldest first
+    IReadOnlyList<string>? Methodology = null);         // "How the score works" (appendix)
+
+/// <summary>One point of the score trend sparkline: date (yyyy-MM-dd) and score.</summary>
+public record ReportTrendPoint(string Date, int Score);

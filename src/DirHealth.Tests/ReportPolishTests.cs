@@ -274,14 +274,14 @@ public class ReportPolishTests : IDisposable
 
         Assert.InRange(m.SummarySentences.Count, 2, 3);
         Assert.Contains("/100", m.SummarySentences[0]);
-        Assert.Contains("1 open finding(s), 1 high", m.SummarySentences[0]);
-        Assert.Contains("7 failed check(s)", m.SummarySentences[^1]);
+        Assert.Contains("1 open finding, 1 high", m.SummarySentences[0]);
+        Assert.Contains("7 failed checks", m.SummarySentences[^1]);
         Assert.Equal(ReportBuilder.ScoreLegendText, m.ScoreLegend);
 
         var scope = m.Scope.ToDictionary(l => l.Label, l => l.Value);
         Assert.Equal("corp.com", scope["Domain"]);
         Assert.Equal("DC01.corp.com", scope["Domain controller"]);
-        Assert.Equal("16.11.2026 13:55:00", scope["Scan time"]);
+        Assert.Equal("2026-11-16 13:55", scope["Scan time"]);            // report date format (ISO, local)
         Assert.Equal("1,200 users · 300 groups · 450 computers", scope["Objects read"]);
         Assert.Contains("7 failed", scope["Checks"]);
         Assert.StartsWith($"{FindingCatalog.All.Count} rules", scope["Checks"]);
@@ -334,7 +334,7 @@ public class ReportPolishTests : IDisposable
         var matrixBySeverity = m.RiskMatrix.Severities.Select((s, c) => (s, m.RiskMatrix.Rows.Sum(r => r.Counts[c]))).ToList();
         Assert.Equal(matrixBySeverity.Select(x => $"{x.Item1}:{x.Item2}"), m.SeverityCounts.Select(x => $"{x.Severity}:{x.Count}"));
         Assert.Equal("Medium:0", $"{m.SeverityCounts[2].Severity}:{m.SeverityCounts[2].Count}");
-        Assert.Equal("+1 fully excepted finding(s), not counted above", m.ExceptedNote);
+        Assert.Equal("+1 fully excepted finding, not counted above", m.ExceptedNote);
     }
 
     // ── F-02 + F-01 in a real render: long and many lines, no crash, nothing cut ─

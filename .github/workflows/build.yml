@@ -44,7 +44,18 @@ jobs:
           fi
 
       - name: Test
+        env:
+          REPORT_PREVIEW_DIR: ${{ github.workspace }}/report-previews
         run: dotnet test src/DirHealth.Tests/DirHealth.Tests.csproj -c Release --verbosity normal
+
+      # Rendered sample PDFs of every report variant (ReportPreviewTests) — for looking at the layout
+      - name: Upload report previews
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: report-previews
+          path: report-previews
+          retention-days: 7
 
       # Ab hier nur auf push/tags — auf PRs reicht der Test als Merge-Gate (spart den schweren Windows-Publish/Installer).
       - name: Publish
