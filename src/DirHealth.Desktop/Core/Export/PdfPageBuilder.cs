@@ -91,8 +91,11 @@ internal sealed class PdfPageBuilder
 
     internal void DrawLogo(XGraphics g, double x, double y, double size)
     {
-        if (_logo != null) g.DrawImage(_logo, x, y, size, size);
-        else g.DrawRoundedRectangle(new XSolidBrush(ColAccent), x, y, size, size, size / 4, size / 4);
+        if (_logo != null) { g.DrawImage(_logo, x, y, size, size); return; }
+        // without the app's resources (e.g. tests): a simple mark — blue tile with a white check
+        g.DrawRoundedRectangle(new XSolidBrush(ColAccent), x, y, size, size, size / 3.5, size / 3.5);
+        var pen = new XPen(XColors.White, Math.Max(1.2, size / 9)) { LineCap = XLineCap.Round, LineJoin = XLineJoin.Round };
+        g.DrawLines(pen, [new XPoint(x + size * 0.27, y + size * 0.52), new XPoint(x + size * 0.44, y + size * 0.68), new XPoint(x + size * 0.74, y + size * 0.34)]);
     }
 
     /// <summary>Severity row tint, accent (= palette colour) and a dark text brush in the same hue.</summary>

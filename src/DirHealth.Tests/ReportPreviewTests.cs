@@ -57,20 +57,19 @@ public class ReportPreviewTests
         // a mid-sized domain in typical shape: a few severe, small findings and broad hygiene findings
         var plan = new (string Category, FindingSeverity Severity, int Objects)[]
         {
-            ("UnconstrainedDelegationComputers", FindingSeverity.Critical, 1),
+            ("PasswordNotRequired",              FindingSeverity.Critical, 1),
             ("KerberoastableAccounts",           FindingSeverity.High,     2),
             ("AsRepRoasting",                    FindingSeverity.High,     1),
             ("ComputersWithoutLaps",             FindingSeverity.High,    48),
             ("KrbtgtPasswordOld",                FindingSeverity.Medium,   1),
             ("PasswordNeverExpires",             FindingSeverity.Medium,  60),
             ("StaleDomainAdmins",                FindingSeverity.Medium,   1),
-            ("ServiceAccountsWithoutAes",        FindingSeverity.Medium,   3),
-            ("EolOperatingSystems",              FindingSeverity.Medium,   2),
-            ("AdminWithMailbox",                 FindingSeverity.Low,      2),
+            ("EolOperatingSystems",              FindingSeverity.Medium,   1),
             ("InactiveUsers",                    FindingSeverity.Low,     34),
             ("InactiveComputers",                FindingSeverity.Low,     27),
             ("EmptyGroups",                      FindingSeverity.Low,     18),
-            ("RecycleBinDisabled",               FindingSeverity.Low,      1),
+            ("SingleMemberGroups",               FindingSeverity.Low,     12),
+            ("AdminSdHolderAccounts",            FindingSeverity.Low,      5),
         };
         var list = new List<AdFinding>();
         for (int k = 0; k < plan.Length; k++)

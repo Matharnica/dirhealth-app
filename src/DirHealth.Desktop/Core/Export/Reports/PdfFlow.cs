@@ -6,7 +6,7 @@ using UI = DirHealth.Desktop.Core.Export.PdfPageBuilder;
 namespace DirHealth.Desktop.Core.Export.Reports;
 
 /// <summary>Per-column look of a <see cref="PdfFlow.Table"/>.</summary>
-internal enum CellKind { Text, Muted, Mono, Severity, Number }
+internal enum CellKind { Text, Muted, Mono, Severity, Number, CheckStatus }
 
 /// <summary>
 /// Page flow shared by every DirHealth PDF: running header (brand · report name · domain/classification),
@@ -317,7 +317,7 @@ internal sealed class PdfFlow
         if (t.Headers.Count >= 6 && !IsLandscape) NewPage(landscape: true);
         int cols = Math.Max(1, t.Headers.Count);
         CellKind KindOf(int c) => kinds is not null && c < kinds.Count ? kinds[c] : CellKind.Text;
-        XFont FontOf(int c) => KindOf(c) switch { CellKind.Mono => UI.Mono8, CellKind.Severity => UI.F8B, _ => UI.F8 };
+        XFont FontOf(int c) => KindOf(c) switch { CellKind.Mono => UI.Mono8, CellKind.Severity or CellKind.CheckStatus => UI.F8B, _ => UI.F8 };
         const double padX = 6;
         var natural = Enumerable.Range(0, cols).Select(c =>
             Math.Max(W(t.Headers.Count > c ? t.Headers[c].ToUpperInvariant() : "", UI.F7B),
@@ -385,6 +385,14 @@ internal sealed class PdfFlow
                 var kind = KindOf(c);
                 double x0 = Margin + xs[c] + padX;
                 XBrush brush = kind == CellKind.Muted ? Muted : Ink;
+                if (kind == CellKind.CheckStatus && cells[c].Count > 0)   // "Failed" red, "Found" amber, rest grey
+                    brush = cells[c][0] switch
+                    {
+                        "Failed" => new XSolidBrush(UI.Shade(UI.ColCritical, 0.85)),
+                        "Found"  => Ui.SeverityStyle(AD.Models.FindingSeverity.High).text,
+                        "Passed" => Ink2,
+                        _        => Muted,
+                    };
                 if (kind == CellKind.Severity && cells[c].Count > 0 && cells[c][0].Length > 0)
                 {
                     var (_, accent, txt) = Ui.SeverityStyle(UI.ParseSeverity(cells[c][0]));
@@ -406,9 +414,11 @@ internal sealed class PdfFlow
     }
 
     // ── footers with "Page x of y" (second pass) ─────────────────────────────
-    public void Finish(string filePath, string title, string footerLeft)
+    /// <param name="beforeFooters">Second-pass drawing that needs the final page count (contents on the cover).</param>
+    public void Finish(string filePath, string title, string footerLeft, Action? beforeFooters = null)
     {
         G?.Dispose();
+        beforeFooters?.Invoke();
         int total = Doc.PageCount;
         for (int i = 0; i < total; i++)
         {

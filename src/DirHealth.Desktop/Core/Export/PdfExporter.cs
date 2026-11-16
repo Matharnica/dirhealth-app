@@ -55,7 +55,7 @@ public class PdfExporter
             i => Expired(list[i]) ? UI.ColCritical : Soon(list[i]) ? UI.ColHigh : null);
 
         f.Finish(filePath, "DirHealth — Password Expiry Report",
-            $"DirHealth {ExportMetadata.AppVersion} · Password Expiry Report · created {now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}");
+            $"DirHealth {ReportPdfRenderer.ShortVersion(ExportMetadata.AppVersion)} · Password Expiry Report · created {now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}");
     }
 
     /// <summary>
@@ -133,6 +133,6 @@ public class PdfExporter
         }.Select(r => (r.Item1, r.Item2, false)), 170);
 
         f.Finish(filePath, $"DirHealth — User dossier: {d.User.SamAccountName}",
-            $"DirHealth {d.Version} · {d.Context.Domain} · User dossier · created {d.CreatedUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC");
+            $"DirHealth {ReportPdfRenderer.ShortVersion(d.Version)} · {d.Context.Domain} · User dossier · created {d.CreatedUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC");
     }
 }

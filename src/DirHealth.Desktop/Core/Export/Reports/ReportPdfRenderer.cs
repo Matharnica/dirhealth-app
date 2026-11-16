@@ -23,6 +23,8 @@ public sealed class ReportPdfRenderer
     private readonly ReportModel _m;
     private readonly PdfFlow _f;
     private bool _wrapNoteShown;
+    private readonly List<(string Label, int Page)> _toc = [];   // contents on the cover, drawn once page numbers are known
+    private double _tocTop, _tocBottom;
 
     private static XSolidBrush Ink   => PdfFlow.Ink;
     private static XSolidBrush Ink2  => PdfFlow.Ink2;
@@ -45,7 +47,7 @@ public sealed class ReportPdfRenderer
     {
         var r = new ReportPdfRenderer(model, textSink);
         r.Draw();
-        r._f.Finish(filePath, $"DirHealth — {r.HeaderTitle}", FooterText(model));
+        r._f.Finish(filePath, $"DirHealth — {r.HeaderTitle}", FooterText(model), r.DrawContents);
     }
 
     private string HeaderTitle => _m.FilterScope is not null ? "Findings Report"
@@ -67,14 +69,52 @@ public sealed class ReportPdfRenderer
         DrawExecutiveSummary();
         if (_m.Kind == ReportKind.Summary) return;
 
+        _f.Continued = "";
         _f.NewPage();
         _f.Heading($"Detailed findings ({_m.Findings.Count})");
+        Mark("Detailed findings");
         if (_m.Findings.Count == 0) _f.Paragraph("No findings.", UI.F9, Muted);
         foreach (var f in _m.Findings) DrawFinding(f);
 
         _f.Continued = "";
         _f.NewPage();
         DrawAppendix();
+    }
+
+    /// <summary>Records the page of a heading just drawn for the contents on the cover.</summary>
+    private void Mark(string label) => _toc.Add((label, _f.Doc.PageCount));
+
+    /// <summary>
+    /// Contents on the cover (second pass — the page numbers are known only now). Two columns between the
+    /// cover notes and the read-only statement; left out when that space is too small.
+    /// </summary>
+    private void DrawContents()
+    {
+        if (_toc.Count == 0) return;
+        var entries = _toc.Take(8).ToList();
+        int rows = (entries.Count + 1) / 2;
+        const double rowH = 16;
+        double need = 22 + rows * rowH;
+        if (_tocTop + need > _tocBottom) return;
+        var page = _f.Doc.Pages[0];
+        using var g = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+        double y = _tocBottom - need, w = page.Width.Point - 2 * M, colW = (w - 28) / 2;
+        _f.Sink("CONTENTS");
+        g.DrawString("CONTENTS", UI.F7B, Muted, M, y + 8);
+        g.DrawLine(new XPen(UI.ColBorder, 0.8), M, y + 13, M + w, y + 13);
+        y += 22;
+        var leader = new XPen(UI.ColBorderDark, 0.6) { DashStyle = XDashStyle.Dot };
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var (label, pageNo) = entries[i];
+            double x = M + (i / rows) * (colW + 28), ly = y + (i % rows) * rowH + 10;
+            var no = pageNo.ToString(CultureInfo.InvariantCulture);
+            _f.Sink(label); _f.Sink(no);
+            g.DrawString(label, UI.F8, Ink, x, ly);
+            double lw = g.MeasureString(label, UI.F8).Width, nw = g.MeasureString(no, UI.F8B).Width;
+            g.DrawLine(leader, x + lw + 6, ly, x + colW - nw - 6, ly);
+            g.DrawString(no, UI.F8B, Ink, x + colW - nw, ly);
+        }
     }
 
     // ── cover ─────────────────────────────────────────────────────────────────
@@ -86,7 +126,7 @@ public sealed class ReportPdfRenderer
     {
         _f.NewPage(bare: true);
         double pw = _f.PageW, ph = _f.PageH;
-        const double blockH = 452;
+        const double blockH = 432;
         G.DrawRectangle(new XSolidBrush(UI.ColNavy), 0, 0, pw, blockH);
         G.DrawRectangle(new XSolidBrush(UI.ColAccent), 0, blockH - 3, pw, 3);
 
@@ -107,9 +147,9 @@ public sealed class ReportPdfRenderer
 
         // title block (left) — leaves room for the ring on the right
         const double ringR = 66;
-        double ringCx = pw - M - ringR - 8, ringCy = 222;
+        double ringCx = pw - M - ringR - 8, ringCy = 208;
         double textW = ringCx - ringR - M - 28;
-        double y = 150;
+        double y = 140;
         T("ACTIVE DIRECTORY SECURITY ASSESSMENT", UI.F7B, OnDarkMuted, M, y);
         y += 34;
         foreach (var line in _f.Wrap(CoverTitle, UI.F26B, textW)) { T(line, UI.F26B, White, M, y); y += 32; }
@@ -196,11 +236,14 @@ public sealed class ReportPdfRenderer
         if (_m.RedactionNote is { } rn)
             _f.Callout("This report is redacted", [rn], UI.ColHigh, _f.Ui.SeverityStyle(FindingSeverity.High).text);
 
-        // read-only statement at the bottom of the cover
+        // read-only statement at the bottom of the cover; the contents (second pass) go between
+        _tocTop = _f.Y + 4;
+        _tocBottom = ph - PdfFlow.FooterH - 12;
         if (_m.Disclaimer.Length > 0)
         {
             var lines = _f.Wrap(_m.Disclaimer, UI.F7, _f.Width);
             double dy = Math.Max(_f.Y + 6, ph - PdfFlow.FooterH - 14 - lines.Count * 10.5);
+            _tocBottom = dy - 22;
             foreach (var line in lines) { T(line, UI.F7, Muted, M, dy); dy += 10.5; }
         }
     }
@@ -209,6 +252,7 @@ public sealed class ReportPdfRenderer
     private void DrawExecutiveSummary()
     {
         _f.Heading("Executive summary", 100);
+        Mark("Executive summary");
         foreach (var sentence in _m.SummarySentences) { _f.Paragraph(sentence, UI.F10, Ink, 0, 15.5); _f.Y += 4; }
         var facts = _m.KeyFacts ?? [];
         if (facts.Count > 0)
@@ -227,15 +271,18 @@ public sealed class ReportPdfRenderer
         DrawRiskMatrix();
 
         _f.Heading("Scan scope", 80);
+        if (_m.Kind == ReportKind.Summary) Mark("Scan scope");
         _f.KeyValues(_m.Scope.Select(l => (l.Label, l.Value, false))
             .Append(("Score", _m.ScoreAvailable ? $"{_m.ScoreText} / 100 · {_m.ScoreLabel}" : _m.ScoreText, false))
             .Append(("Score scale", _m.ScoreLegend, false)));
 
         _f.Heading("Overview by finding", 80);
+        Mark("Overview by finding");
         _f.Table(_m.CategoryOverview, [CellKind.Mono, CellKind.Text, CellKind.Severity, CellKind.Number, CellKind.Number]);
         if (_m.Changes.Rows.Count > 0)
         {
             _f.Heading("Changes since the last scan (objects)", 80);
+            if (_m.Kind == ReportKind.Summary) Mark("Changes since the last scan");
             _f.Table(_m.Changes, [CellKind.Muted, CellKind.Text]);
         }
     }
@@ -259,11 +306,12 @@ public sealed class ReportPdfRenderer
         else
         {
             double x = barX;
-            foreach (var (sev, count) in _m.SeverityCounts.Where(s => s.Count > 0))
+            var parts = _m.SeverityCounts.Where(s => s.Count > 0).ToList();
+            for (int i = 0; i < parts.Count; i++)
             {
-                double w = barW * count / total;
-                G.DrawRectangle(new XSolidBrush(_f.Ui.SeverityStyle(UI.ParseSeverity(sev)).border), x, barY, w, barH);
-                G.DrawLine(new XPen(XColors.White, 1.2), x + w, barY, x + w, barY + barH);
+                double w = barW * parts[i].Count / total;
+                G.DrawRectangle(new XSolidBrush(_f.Ui.SeverityStyle(UI.ParseSeverity(parts[i].Severity)).border), x, barY, w, barH);
+                if (i < parts.Count - 1) G.DrawLine(new XPen(XColors.White, 1.2), x + w, barY, x + w, barY + barH);
                 x += w;
             }
         }
@@ -303,6 +351,7 @@ public sealed class ReportPdfRenderer
     {
         var t = _m.FixFirst;
         _f.Heading("Fix first — largest score gain", 60);
+        Mark("Fix first");
         if (t.Rows.Count == 0) { _f.Paragraph("Nothing to fix first — no rule lowers the score.", UI.F9, Muted); _f.Y += 6; return; }
         const double lineH = 12.5, sevW = 70, ptsW = 58;
         double textX = M + 28, textW = _f.Width - 28 - sevW - ptsW - 8;
@@ -330,6 +379,7 @@ public sealed class ReportPdfRenderer
         var mx = _m.RiskMatrix;
         const double rowH = 20;
         _f.Heading("Risk matrix — open findings by area and severity", 30 + rowH * mx.Rows.Count);
+        Mark("Risk matrix");
         double labelW = _f.Width * 0.34;
         double cellW  = (_f.Width - labelW) / (mx.Severities.Count + 1);
         G.DrawRectangle(new XSolidBrush(UI.ColSurface2), M, _f.Y, _f.Width, 19);
@@ -400,7 +450,8 @@ public sealed class ReportPdfRenderer
 
         if (f.Description.Length > 0 && f.Description != f.What && f.Description != f.Why)
             _f.Definition("OBSERVATION", f.Description, Ink2);
-        _f.Definition("WHAT", f.What);
+        if (!string.Equals(f.What.Trim(), f.Title.Trim(), StringComparison.OrdinalIgnoreCase))   // no line that repeats the title
+            _f.Definition("WHAT", f.What);
         _f.Definition("WHY IT MATTERS", f.Why);
         _f.Definition("HOW TO FIX", f.HowToFix);
         DrawReferences(f.References);
@@ -471,6 +522,7 @@ public sealed class ReportPdfRenderer
     private void DrawAppendix()
     {
         _f.Heading($"Active exceptions ({_m.Exceptions.Count})");
+        Mark("Exceptions and failed checks");
         _f.Table(new ReportTable(["Rule", "Object", "Reason", "Expires", "Created by"],
             _m.Exceptions.Select(e => (IReadOnlyList<string>)new[] { e.RuleId, e.Object, e.Reason, e.Expires, e.CreatedBy }).ToList(), 0, "",
             Weights: [0.13, 0.20, 0.37, 0.12, 0.18]), [CellKind.Mono, CellKind.Text, CellKind.Text, CellKind.Muted, CellKind.Muted],
@@ -493,7 +545,10 @@ public sealed class ReportPdfRenderer
         var method = _m.Methodology ?? [];
         if (method.Count > 0)
         {
-            _f.Heading("How the score works", 80);
+            // kept on one page: the lines read as one explanation
+            double h = method.Sum(l => _f.Wrap(l, UI.F9, _f.Width - 16).Count * 13.5 + 3);
+            _f.Heading("How the score works", Math.Min(h, _f.Bottom - _f.Top - 40));
+            Mark("How the score works");
             foreach (var line in method) { _f.Bullet(line, UI.F9, Ink2); _f.Y += 3; }
         }
     }
@@ -503,17 +558,21 @@ public sealed class ReportPdfRenderer
     {
         if (_m.CheckedRules.Count == 0) return;
         _f.Heading($"What was checked ({_m.CheckedRules.Count} rules)");
+        Mark("What was checked");
         _f.Paragraph(string.Join("   ·   ", _m.CheckedRules.GroupBy(c => c.Status).OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => $"{g.Key}: {g.Count()}")), UI.F9, Ink2);
         _f.Y += 6;
         _f.Table(new ReportTable(["Rule", "Check", "Status", "Note"],
             _m.CheckedRules.Select(c => (IReadOnlyList<string>)new[] { c.RuleId, c.Category, c.Status, c.Reason }).ToList(), 0, "",
-            Weights: [0.13, 0.30, 0.14, 0.43]), [CellKind.Mono, CellKind.Text, CellKind.Text, CellKind.Muted]);
+            Weights: [0.13, 0.30, 0.14, 0.43]), [CellKind.Mono, CellKind.Text, CellKind.CheckStatus, CellKind.Muted]);
     }
 
     /// <summary>Left footer text on every page (S18-2) — pure, so tests can check it without parsing the PDF.</summary>
     public static string FooterText(ReportModel m) =>
-        $"DirHealth {m.ToolVersion} · {m.Domain} · created {m.CreatedLocal}" + (m.Redacted ? " · names redacted" : "");
+        $"DirHealth {ShortVersion(m.ToolVersion)} · {m.Domain} · created {m.CreatedLocal}" + (m.Redacted ? " · names redacted" : "");
+
+    /// <summary>"2.9.0+2692a5c…" → "2.9.0" for footers; the full build id stays in the .meta.txt next to the file.</summary>
+    internal static string ShortVersion(string version) => version.Split('+')[0];
 
     /// <summary>Right footer text; drawn in the second pass once the total is known.</summary>
     public static string PageLabel(int n, int total) => $"Page {n} of {total}";
