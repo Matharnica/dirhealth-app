@@ -128,6 +128,11 @@ public class CsvExporter
     // full-width forms (U+FF1D/FF0B/FF0D/FF20), which some spreadsheet apps normalise to ASCII.
     private static readonly char[] FormulaStarters = ['=', '+', '-', '@', '＝', '＋', '－', '＠'];
 
+    /// <summary>An optionally negative ASCII integer or decimal with a dot, nothing else ([0-9], not \d:
+    /// \d would also match other scripts' digits). \z instead of $: "$" would accept a trailing newline.</summary>
+    private static readonly System.Text.RegularExpressions.Regex PlainNumber =
+        new(@"^-?[0-9]+(\.[0-9]+)?\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
     /// <summary>
     /// Prefixes an apostrophe when the value could be read as a formula (OWASP CSV
     /// injection): it starts with a formula character, with tab/CR/LF, or with
@@ -136,6 +141,10 @@ public class CsvExporter
     public static string SafeField(string? value)
     {
         if (string.IsNullOrEmpty(value)) return "";
+        // Paket 3 F-28: a plain number ("-5", "-0.25") is not a formula — the apostrophe made Excel show
+        // "'-5" and sort the column as text. Only a field that is entirely an ASCII number is exempt;
+        // "-1+cmd|…", "-5 " or a full-width minus stay protected.
+        if (PlainNumber.IsMatch(value)) return value;
         if (value[0] is '\t' or '\r' or '\n') return "'" + value;
         var firstVisible = value.TrimStart(' ', '\u00A0', '\u3000');
         return firstVisible.Length > 0 && FormulaStarters.Contains(firstVisible[0]) ? "'" + value : value;

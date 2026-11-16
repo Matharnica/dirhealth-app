@@ -278,7 +278,10 @@ public partial class FindingsViewModel : BaseViewModel
             try
             {
                 _csvExporter.ExportFindings(FilteredFindings, dlg.FileName);
-                StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)}";
+                // Paket 3 F-08: every export gets its .meta.txt (SHA-256, who/where/when)
+                ExportMetadata.WriteFor(dlg.FileName, ExportMetadata.SafeContext(ExportContextProvider, ReportContext?.Invoke().Domain ?? ""),
+                    "Findings (CSV)", FilterScopeText, FilteredFindings.Count);
+                StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)} (+ .meta.txt)";
             }
             catch (Exception ex) { StatusMessage = $"Export failed: {ex.Message}"; }
         }
@@ -289,6 +292,10 @@ public partial class FindingsViewModel : BaseViewModel
     /// <summary>Score and check results of the whole scan (set by the main VM). Null → the PDF has no
     /// score breakdown and lists every rule without a result as "Failed" — never as "Passed".</summary>
     public Func<FindingsReportContext>? ReportContext { get; set; }
+
+    /// <summary>Domain, queried DC and user for the .meta.txt of the findings exports (set at startup from the
+    /// scanner). Null or failing → "unknown" — the export itself still succeeds.</summary>
+    public Func<ExportContext>? ExportContextProvider { get; set; }
 
     /// <summary>Report options dialog; replaced in tests. Same dialog as the dashboard report.</summary>
     public static Func<ReportOptions?> AskReportOptions { get; set; } = () => DashboardViewModel.AskReportOptions();
@@ -334,7 +341,9 @@ public partial class FindingsViewModel : BaseViewModel
         {
             var model = BuildReportModel(options, DateTime.Now);
             await Task.Run(() => ReportPdfRenderer.Render(model, path));
-            ExportMetadata.WriteFor(path, new ExportContext(model.Domain.Length > 0 ? model.Domain : "unknown", "unknown", Environment.UserName),
+            // Backlog: the DC used to be "unknown" — it now comes from the scanner like every other export.
+            var ctx = ExportMetadata.SafeContext(ExportContextProvider, model.Domain);
+            ExportMetadata.WriteFor(path, options.RedactUserNames ? ExportMetadata.Redacted(ctx) : ctx,
                 $"Findings report ({options.Kind})",
                 (model.FilterScope ?? "") + (options.RedactUserNames ? " · user names redacted" : ""), FilteredFindings.Count);
             StatusMessage = $"Exported: {System.IO.Path.GetFileName(path)} (+ .meta.txt)";

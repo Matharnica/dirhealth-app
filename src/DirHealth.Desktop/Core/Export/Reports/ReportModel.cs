@@ -10,7 +10,10 @@ public enum ReportKind { Summary, Full }
 public record ReportOptions(ReportKind Kind, bool RedactUserNames, string? FilterScope = null);
 
 /// <summary>A simple table for the PDF. Six or more columns render on a landscape page (S18-2).</summary>
-public record ReportTable(IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows, int HiddenRows, string HiddenHint);
+/// <param name="Weights">Relative column widths (Paket 3, F-02). Null = the renderer weights the columns by
+/// their content. Cells always wrap onto several lines — nothing is cut off.</param>
+public record ReportTable(IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows, int HiddenRows, string HiddenHint,
+                          IReadOnlyList<double>? Weights = null);
 
 public record ReportFinding(
     string RuleId, string Severity, string Title, string Description,
@@ -46,6 +49,9 @@ public record ReportException(string RuleId, string Object, string Reason, strin
 
 public record ReportFailedCheck(string RuleId, string Category, string Reason);
 
+/// <summary>One line of the scan-scope box on page 1 (Paket 3, V-11), e.g. ("Objects", "1,200 users · …").</summary>
+public record ReportScopeLine(string Label, string Value);
+
 /// <summary>
 /// Everything a report shows, as plain strings (S18). Built by <see cref="ReportBuilder"/>, redacted by
 /// <see cref="Redactor"/>, drawn by the PDF renderer — the renderer adds no data of its own, so what is
@@ -69,4 +75,13 @@ public record ReportModel(
     IReadOnlyList<ReportFailedCheck> FailedChecks,      // S18-3
     IReadOnlyList<(string Title, ReportTable Table)> Appendix,
     IReadOnlyList<ReportCheckedRule> CheckedRules,      // S21-3 "What was checked" (Full only)
-    bool Redacted);
+    bool Redacted,
+    // page 1 for a reader who reads nothing else (Paket 3, V-11 / F-05..F-07)
+    bool ScoreAvailable,                                // false → ScoreText is the neutral "Score not available — …"
+    string ScoreLegend,                                 // what Good/Review/Critical mean
+    IReadOnlyList<string> SummarySentences,             // 2–3 generated sentences: situation · largest risk · next step
+    IReadOnlyList<ReportScopeLine> Scope,               // domain, DC, scan time, objects, checks
+    string SeverityCountsLabel,                         // what SeverityCounts count (same definition as the matrix)
+    string? ExceptedNote,                               // "+2 fully excepted findings not counted"
+    IReadOnlyList<string> FailedChecksShort,            // failed checks for page 1, max. 5 + "n more"
+    string? RedactionNote);                             // set by the redactor: what was and was not redacted

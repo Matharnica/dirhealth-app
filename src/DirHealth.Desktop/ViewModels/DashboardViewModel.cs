@@ -308,10 +308,13 @@ public partial class DashboardViewModel : BaseViewModel
         StatusMessage = "Building report…";
         try
         {
-            var model = BuildReportModel(options, DateTime.Now);
+            var ctx   = SafeExportContext();
+            var model = BuildReportModel(options, DateTime.Now, ctx.DomainController);
             await Task.Run(() => ReportPdfRenderer.Render(model, path));
-            ExportMetadata.WriteFor(path, SafeExportContext(), $"Report ({options.Kind})",
-                options.RedactUserNames ? "user names redacted" : "", model.Findings.Count);
+            // Paket 3: a redacted report's side-car does not name who ran it (F-04); rows = findings in the
+            // report, also for the summary, whose detail list is empty (F-09)
+            ExportMetadata.WriteFor(path, options.RedactUserNames ? ExportMetadata.Redacted(ctx) : ctx, $"Report ({options.Kind})",
+                options.RedactUserNames ? "user names redacted" : "", model.CategoryOverview.Rows.Count);
             StatusMessage = $"Report saved: {System.IO.Path.GetFileName(path)} (+ .meta.txt)";
         }
         catch (Exception ex)
@@ -426,7 +429,8 @@ public partial class DashboardViewModel : BaseViewModel
     }
 
     /// <summary>The report model for the current scan (pure inputs, testable).</summary>
-    public ReportModel BuildReportModel(ReportOptions options, DateTime nowLocal)
+    /// <param name="domainController">The DC the scan used, for the scope box on page 1 (Paket 3, V-11); "" = not shown.</param>
+    public ReportModel BuildReportModel(ReportOptions options, DateTime nowLocal, string domainController = "")
     {
         int? scoreDelta = ScoreHistoryStore.Comparable(ScoreHistory)
             ? ScoreHistory[^1].Score - ScoreHistory[^2].Score
@@ -437,7 +441,8 @@ public partial class DashboardViewModel : BaseViewModel
             Findings: Findings, Score: ScoreResult, StoredScore: ComplianceScore, Checks: Checks,
             Exceptions: _exceptions.All, Diff: LastDiff, ScoreDelta: scoreDelta,
             InactiveUsers: _cachedInactiveUsers, ExpiringPasswords: _cachedExpiringPasswords, DomainAdmins: _cachedDomainAdmins,
-            CreatedLocal: nowLocal, Version: ExportMetadata.AppVersion);
+            CreatedLocal: nowLocal, Version: ExportMetadata.AppVersion,
+            Totals: _totals, DomainController: domainController, ScanTime: LastScanTime);
         return ReportBuilder.Build(input, options);
     }
 

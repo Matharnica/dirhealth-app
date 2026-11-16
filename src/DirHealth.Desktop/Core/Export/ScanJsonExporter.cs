@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -12,11 +13,16 @@ namespace DirHealth.Desktop.Core.Export;
 // property on AdFinding/AffectedObject must not leak into it unnoticed. No DTO carries raw AD attributes —
 // secret-bearing attribute names (userPassword, unicodePwd, LAPS, BitLocker) can never appear (test-guarded).
 
+/// <param name="ScanTime">The scan time as the app shows it (local time, "dd.MM.yyyy HH:mm:ss", or "Never").
+/// Kept unchanged for existing readers; for scripts use <paramref name="ScanTimeUtc"/>.</param>
+/// <param name="ScanTimeUtc">Paket 3 F-29: the scan time as ISO 8601 in UTC ("2026-11-16T13:03:00Z"); null
+/// when unknown. Added field — not a breaking change, so schemaVersion stays 1 (ADR 0005).</param>
 public sealed record ScanJsonDocument(
     int SchemaVersion, int FormulaVersion, string Tool, DateTime CreatedUtc,
     string Domain, string DomainController, string ScanTime,
     ScanJsonScore? Score, ScanJsonTotals? Totals,
-    IReadOnlyList<ScanJsonCheck> Checks, IReadOnlyList<ScanJsonFinding> Findings);
+    IReadOnlyList<ScanJsonCheck> Checks, IReadOnlyList<ScanJsonFinding> Findings,
+    DateTime? ScanTimeUtc = null);
 
 /// <summary>Score per ADR 0002. Value is null when no score could be computed (too many failed checks).</summary>
 public sealed record ScanJsonScore(int? Value, bool IsUpperBound, int EvaluatedRules, int TotalRules, double Coverage);
@@ -54,6 +60,19 @@ public static class ScanJsonExporter
         Converters           = { new JsonStringEnumConverter() },   // "High", "Passed" — readable for scripts
     };
 
+    /// <summary>The display format of <c>DashboardViewModel.LastScanTime</c> (local time of this machine).</summary>
+    public const string DisplayScanTimeFormat = "dd.MM.yyyy HH:mm:ss";
+
+    /// <summary>
+    /// The app's scan-time string (local time) as UTC; null for "Never" or anything unparsable. Parsed with the
+    /// invariant culture and exactly the display format — no guessing between day/month orders.
+    /// </summary>
+    public static DateTime? ScanTimeUtcOf(string? scanTime) =>
+        DateTime.TryParseExact(scanTime?.Trim(), DisplayScanTimeFormat, CultureInfo.InvariantCulture,
+                               DateTimeStyles.AssumeLocal, out var local)
+            ? DateTime.SpecifyKind(local.ToUniversalTime(), DateTimeKind.Utc)
+            : null;
+
     public static ScanJsonDocument Build(ScanJsonInput input) => new(
         SchemaVersion, ScoreModel.FormulaVersion, $"DirHealth {input.Version}", input.CreatedUtc,
         input.Domain, input.DomainController, input.ScanTime,
@@ -66,7 +85,8 @@ public static class ScanJsonExporter
             f.RuleId, f.Category, f.Title, f.Severity, f.Weight, f.Count,
             input.Score?.PointsFor(f.Category) ?? 0, f.Remediation, f.References,
             f.Objects.Select(o => new ScanJsonObject(o.Name, o.DistinguishedName, o.Sid, o.Type, o.Detail,
-                o.IsDomainController, new ScanJsonException(o.Exception, o.ExceptionLabel))).ToList())).ToList());
+                o.IsDomainController, new ScanJsonException(o.Exception, o.ExceptionLabel))).ToList())).ToList(),
+        ScanTimeUtcOf(input.ScanTime));
 
     public static string Serialize(ScanJsonDocument doc) => JsonSerializer.Serialize(doc, Options);
 

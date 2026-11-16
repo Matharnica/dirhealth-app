@@ -71,7 +71,10 @@ public partial class DataQualityViewModel : BaseViewModel
         try
         {
             _csvExporter.ExportDataQuality(Attributes!, dlg.FileName);
-            StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)}";
+            // Paket 3 F-08: every export gets its .meta.txt (SHA-256, who/where/when)
+            ExportMetadata.WriteFor(dlg.FileName, ExportMetadata.SafeContext(_scanner is null ? null : _scanner.GetExportContext),
+                "Data quality", "", Attributes!.Count);
+            StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)} (+ .meta.txt)";
         }
         catch (Exception ex) { StatusMessage = $"Export failed: {ex.Message}"; }
     }

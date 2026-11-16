@@ -78,8 +78,12 @@ public partial class PasswordReportViewModel : ListBrowserViewModel
         {
             try
             {
-                _pdfExporter.ExportPasswordReport(Table.FilteredRows, dlg.FileName);
-                StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)}";
+                var rows = Table.FilteredRows.ToList();
+                _pdfExporter.ExportPasswordReport(rows, dlg.FileName);
+                // Paket 3 F-08: every export gets its .meta.txt (SHA-256, who/where/when)
+                ExportMetadata.WriteFor(dlg.FileName, ExportMetadata.SafeContext(Table.ContextProvider),
+                    "Password report (PDF)", $"expiring within {WithinDays} days", rows.Count);
+                StatusMessage = $"Exported: {System.IO.Path.GetFileName(dlg.FileName)} (+ .meta.txt)";
             }
             catch (Exception ex) { StatusMessage = $"Export failed: {ex.Message}"; }
         }

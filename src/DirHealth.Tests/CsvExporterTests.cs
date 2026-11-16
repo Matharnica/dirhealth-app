@@ -93,7 +93,7 @@ public class CsvExporterTests
     [Theory]
     [InlineData("=CMD+CALC")]
     [InlineData("+1234")]
-    [InlineData("-9")]
+    [InlineData("-9+1")]          // Paket 3 F-28: a bare "-9" is a plain number now and stays unescaped (ReportPolishTests)
     [InlineData("@SUM(A1)")]
     public void ExportPasswordReport_FormulaDisplayName_IsPrefixEscaped(string formulaName)
     {
