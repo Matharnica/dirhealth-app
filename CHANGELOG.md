@@ -8,6 +8,12 @@ All notable changes to DirHealth are documented here.
 
 > Sprints 13–23 ship together as **3.0.0** once the live test against a real domain is done (major version: the score changes without any change in your AD, and old acknowledgements no longer hide findings).
 
+### Security — WMI live details only on click, Kerberos only (review 2026-11-16, H1)
+- **Selecting a computer no longer connects to it.** The detail view shows AD data only; ping, disks, local admins, sessions and event log load when you click **Load live details (WMI)**. Selecting another computer discards the previous live data.
+- **Only the DNS host name from AD is used** (`dNSHostName`), never the short name (cn). A short name that DNS cannot resolve could be answered by any machine in the subnet (LLMNR/NetBIOS) and receive your NTLM logon. Computers without `dNSHostName` show "No DNS host name in AD — live details unavailable" and are never contacted.
+- **Kerberos is enforced** — every WMI connection names the server principal (`kerberos:<domain>\<host>`) with packet privacy; there is no negotiated NTLM fallback anymore. Computers whose Kerberos setup is broken now show a clear error instead of connecting over NTLM.
+- **WMI errors are shown** (access denied, RPC unavailable, Kerberos failed, timeout) instead of silently empty lists.
+
 ### Added — Sprint 23 (High-value checks) — ⚠ your score will drop without any change in AD
 - **Privileged SID in SID history** (DH-PRV-010, Critical) — an account whose sIDHistory carries a Domain Admins, Enterprise Admins or BUILTIN\Administrators SID has those rights silently. Ordinary SID history is still reported by DH-USR-005. An account with a privileged SID appears in both rules on purpose — clearing its sIDHistory resolves both, and the texts of both rules point to each other.
 - **Backdoors on Tier 0 accounts** (DH-PRV-011–013) — key credentials (shadow credentials), explicit certificate mappings (`altSecurityIdentities`) and "trusted to authenticate for delegation" (protocol transition). DirHealth only checks that a value exists — it never reads key material. Three separate rules, so an exception for one does not hide the others.

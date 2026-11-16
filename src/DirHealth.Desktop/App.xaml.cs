@@ -126,7 +126,7 @@ public partial class App : Application
             return;
         }
         var scanner          = new Core.AD.AdScanner(connector);
-        var wmi              = new Core.AD.AdWmiClient();
+        Core.AD.IWmiClient wmi = new Core.AD.AdWmiClient();
         var searcher         = new Core.AD.AdSearcher(connector);
         // One exception store for dashboard (score) and findings (card) — ADR 0001/0002
         var exceptions       = new Core.Storage.ExceptionStore();
